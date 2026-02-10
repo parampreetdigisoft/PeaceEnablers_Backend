@@ -1,0 +1,402 @@
+﻿using PeaceEnablers.Common.Implementation;
+using PeaceEnablers.Common.Models;
+using PeaceEnablers.Data;
+using PeaceEnablers.Dtos.CityUserDto;
+using PeaceEnablers.Dtos.CommonDto;
+using PeaceEnablers.Dtos.kpiDto;
+using PeaceEnablers.Enums;
+using PeaceEnablers.IServices;
+using PeaceEnablers.Models;
+using Microsoft.EntityFrameworkCore;
+using System.Linq.Expressions;
+
+namespace PeaceEnablers.Services
+{
+    public class KpiService : IKpiService
+    {
+        private readonly ApplicationDbContext _context;
+        private readonly IAppLogger _appLogger;
+        public KpiService(ApplicationDbContext context, IAppLogger appLogger)
+        {
+            _context = context;
+            _appLogger = appLogger;
+        }
+
+        #region GetAnalyticalLayerResults
+        public async Task<PaginationResponse<GetAnalyticalLayerResultDto>> 
+            GetAnalyticalLayerResults(GetAnalyticalLayerRequestDto request, int userId, UserRole role, TieredAccessPlan userPlan = TieredAccessPlan.Pending)
+        {
+            try
+            {
+                var year = request.Year;
+                var startDate = new DateTime(year, 1, 1);
+                var endDate = new DateTime(year + 1, 1, 1);
+
+                var baseQuery = _context.AnalyticalLayerResults
+                    .AsNoTracking()
+                    .Include(ar => ar.AnalyticalLayer)
+                        .ThenInclude(al => al.FiveLevelInterpretations)
+                    .Include(ar => ar.City)
+                    .Where(x => (x.LastUpdated >= startDate && x.LastUpdated < endDate) || (x.AiLastUpdated >= startDate && x.AiLastUpdated < endDate));
+
+                if (role == UserRole.CityUser)
+                {
+                    var validCities = _context.PublicUserCityMappings
+                        .Where(x =>
+                            x.IsActive &&
+                            x.UserID == userId &&
+                            (!request.CityID.HasValue || x.CityID == request.CityID))
+                        .Select(x => x.CityID);
+
+                    var validPillarIds = _context.CityUserPillarMappings
+                        .Where(x => x.IsActive && x.UserID == userId)
+                        .Select(x => x.PillarID);
+
+                    var validLayerIds = _context.AnalyticalLayerPillarMappings
+                        .Where(x =>
+                            validPillarIds.Contains(x.PillarID) &&
+                            (!request.LayerID.HasValue || x.LayerID == request.LayerID))
+                        .Select(x => x.LayerID)
+                        .Distinct();
+
+                    baseQuery = baseQuery
+                        .Where(ar =>
+                            validCities.Contains(ar.CityID) &&
+                            validLayerIds.Contains(ar.LayerID));
+                }
+                else
+                {
+                    baseQuery = baseQuery.Where(ar =>
+                        (!request.CityID.HasValue || ar.CityID == request.CityID) &&
+                        (!request.LayerID.HasValue || ar.LayerID == request.LayerID));
+                }
+                var response = await baseQuery.Select(Projection).ApplyPaginationAsync(request);
+
+                return response;
+
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error occurred in GetAnalyticalLayers", ex);
+                return new PaginationResponse<GetAnalyticalLayerResultDto>();
+            }
+        }
+
+        private static Expression<Func<AnalyticalLayerResult, GetAnalyticalLayerResultDto>> Projection => ar => new GetAnalyticalLayerResultDto
+        {
+            LayerResultID = ar.LayerResultID,
+            LayerID = ar.LayerID,
+            CityID = ar.CityID,
+            InterpretationID = ar.InterpretationID,
+            NormalizeValue = ar.NormalizeValue,
+            CalValue1 = ar.CalValue1,
+            CalValue2 = ar.CalValue2,
+            CalValue3 = ar.CalValue3,
+            CalValue4 = ar.CalValue4,
+            CalValue5 = ar.CalValue5,
+            LastUpdated = ar.LastUpdated,
+
+            AiInterpretationID = ar.AiInterpretationID,
+            AiNormalizeValue = ar.AiNormalizeValue,
+            AiCalValue1 = ar.AiCalValue1,
+            AiCalValue2 = ar.AiCalValue2,
+            AiCalValue3 = ar.AiCalValue3,
+            AiCalValue4 = ar.AiCalValue4,
+            AiCalValue5 = ar.AiCalValue5,
+            AiLastUpdated = ar.AiLastUpdated,
+
+            LayerCode = ar.AnalyticalLayer.LayerCode,
+            LayerName = ar.AnalyticalLayer.LayerName,
+            Purpose = ar.AnalyticalLayer.Purpose,
+            CalText1 = ar.AnalyticalLayer.CalText1,
+            CalText2 = ar.AnalyticalLayer.CalText2,
+            CalText3 = ar.AnalyticalLayer.CalText3,
+            CalText4 = ar.AnalyticalLayer.CalText4,
+            CalText5 = ar.AnalyticalLayer.CalText5,
+            FiveLevelInterpretations = ar.AnalyticalLayer.FiveLevelInterpretations,
+
+            City = ar.City
+        };
+
+        #endregion
+        public async Task<ResultResponseDto<List<AnalyticalLayer>>> GetAllKpi()
+        {
+            try
+            {
+                var result = await _context.AnalyticalLayers
+                    .Where(ar => !ar.IsDeleted)
+                    .ToListAsync();
+                    
+                 return ResultResponseDto<List<AnalyticalLayer>>.Success(result); 
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error occurred in GetAnalyticalLayers", ex);
+                return  ResultResponseDto<List<AnalyticalLayer>>.Failure(new List<string> { "an error occure"});
+            }
+        }
+        public async Task<ResultResponseDto<CompareCityResponseDto>> CompareCities(CompareCityRequestDto c, int userId, UserRole role)
+        {
+            try
+            {
+                var year = c.UpdatedAt.Year;
+                var startDate = new DateTime(year, 1, 1);
+                var endDate = new DateTime(year + 1, 1, 1);
+
+
+                var validKpiIds = new List<int>();
+                if (c.Kpis.Count == 0)
+                {
+                    var query = _context.AnalyticalLayers
+                    .Where(x => !x.IsDeleted)
+                    .Select(x => x.LayerID)
+                    .OrderBy(x => x);
+
+                    var res = await query.ApplyPaginationAsync(c);
+                    validKpiIds = res.Data.ToList() ;
+                }
+                else
+                {
+                    validKpiIds = c.Kpis;
+                }
+
+                Expression<Func<City, bool>> expression = role switch
+                {
+                    UserRole.Admin => x => !x.IsDeleted && c.Cities.Contains(x.CityID),
+                    UserRole.Analyst => x => !x.IsDeleted && c.Cities.Contains(x.CityID),
+                    UserRole.Evaluator => x => !x.IsDeleted && c.Cities.Contains(x.CityID),
+                    _ => x => false
+                };
+
+                // Step 2: Get all selected cities (even if no analytical data)
+                var selectedCities = await _context.Cities
+                    .Where(expression)
+                    .Distinct()
+                    .ToListAsync();
+
+                var selectedCityIds = selectedCities.Select(x => x.CityID).ToList();
+
+                if(role == UserRole.Analyst || role == UserRole.Evaluator)
+                {
+                    var validMappedCityIds = await _context.UserCityMappings
+                       .Where(x => x.UserID == userId && !x.IsDeleted)
+                       .Select(x => x.CityID)
+                       .ToListAsync();
+
+                    // ✅ Check if all selected cities are valid
+                    bool allValid = selectedCityIds.All(id => validMappedCityIds.Contains(id));
+
+                    if (!allValid)
+                    {
+                        return ResultResponseDto<CompareCityResponseDto>.Failure(new List<string> { "No valid cities found." });
+                    }
+                }
+
+                // Step 3: Fetch analytical layer results for selected cities
+                var analyticalResults = await _context.AnalyticalLayerResults
+                    .Include(ar => ar.AnalyticalLayer)
+                    .Where(x => selectedCityIds.Contains(x.CityID) 
+                    && ((x.AiLastUpdated >= startDate && x.AiLastUpdated < endDate || x.LastUpdated >= startDate && x.LastUpdated < endDate))
+                    && validKpiIds.Contains(x.LayerID))
+                    .Select(ar => new
+                    {
+                        ar.CityID,
+                        ar.LayerID,
+                        ar.AnalyticalLayer.LayerCode,
+                        ar.AnalyticalLayer.LayerName,
+                        ar.CalValue5,
+                        ar.AiCalValue5
+                    })
+                    .ToListAsync();
+
+                // Step 4: Get all distinct layers
+                var allLayers = analyticalResults
+                    .Select(x => new { x.LayerID, x.LayerCode, x.LayerName })
+                    .Distinct()
+                    .OrderBy(x => x.LayerName)
+                    .ToList();
+
+                // Step 5: Prepare response DTO
+                var response = new CompareCityResponseDto
+                {
+                    Categories = new List<string>(),
+                    Series = new List<ChartSeriesDto>(),
+                    TableData = new List<ChartTableRowDto>()
+                };
+
+                // Initialize chart series for each city
+                foreach (var city in selectedCities)
+                {
+                    response.Series.Add(new ChartSeriesDto
+                    {
+                        Name = city.CityName,
+                        Data = new List<decimal>(),
+                        AiData = new List<decimal>()
+                    });
+                }
+
+                // Add Peer City Score series
+                var peerSeries = new ChartSeriesDto
+                {
+                    Name = "Peer City Score",
+                    Data = new List<decimal>(),
+                    AiData = new List<decimal>()
+                };
+
+                // Step 6: Build chart and table data
+                foreach (var layer in allLayers)
+                {
+                    response.Categories.Add(layer.LayerCode);
+
+                    // Map KPI values for each city (0 if missing)
+                    var values = new Dictionary<int, List<decimal>>();
+
+                    foreach (var city in selectedCities)
+                    {
+                        var value = analyticalResults
+                            .FirstOrDefault(r => r.CityID == city.CityID && r.LayerID == layer.LayerID);
+
+                        var evaluatedValue = Math.Round(value?.CalValue5 ?? 0, 2);
+                        var aiValue = Math.Round(value?.AiCalValue5 ?? 0, 2);
+                        values[city.CityID] = new List<decimal> { evaluatedValue, aiValue };
+
+                        // Add to series
+                        var citySeries = response.Series.First(s => s.Name == city.CityName);
+                        citySeries.Data.Add(evaluatedValue);
+
+                        citySeries.AiData.Add(aiValue);
+                    }
+                    // ✅ Calculate Peer City Score (average of all cities for this layer)
+                    var peerCityScore = values.Values.Any() ? Math.Round(values.Values.Select(x => x.First()).Average(), 2) : 0;
+                    peerSeries.Data.Add(peerCityScore);
+                    var aiPeerCityScore = values.Values.Any() ? Math.Round(values.Values.Select(x => x.Last()).Average(), 2) : 0;
+                    peerSeries.AiData.Add(aiPeerCityScore);
+
+                    // Add table data
+                    response.TableData.Add(new ChartTableRowDto
+                    {
+                        LayerID = layer.LayerID,
+                        LayerCode = layer.LayerCode,
+                        LayerName = layer.LayerName,
+                        CityValues = selectedCities.Select(c => new CityValueDto
+                        {
+                            CityID = c.CityID,
+                            CityName = c.CityName,
+                            Value = values[c.CityID].First(),
+                            AiValue = values[c.CityID].Last()
+                        }).ToList(),
+                        PeerCityScore = peerCityScore // You can rename property if needed
+                    });
+                }
+
+                // Append Peer City Score series
+                response.Series.Add(peerSeries);
+
+                return ResultResponseDto<CompareCityResponseDto>.Success(response);
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error occurred in CompareCities", ex);
+                return ResultResponseDto<CompareCityResponseDto>.Failure(new List<string> { "An error occurred while comparing cities." });
+            }
+        }
+
+        public async Task<ResultResponseDto<GetMutiplekpiLayerResultsDto>> GetMutiplekpiLayerResults(
+            GetMutiplekpiLayerRequestDto request,
+            int userId,
+            UserRole role,
+            TieredAccessPlan userPlan = TieredAccessPlan.Pending)
+        {
+            try
+            {
+                var year = request.Year;
+                var startDate = new DateTime(year, 1, 1);
+                var endDate = startDate.AddYears(1);
+
+                if (role == UserRole.CityUser)
+                {
+                    var validCityIds = await _context.PublicUserCityMappings
+                        .Where(x =>
+                            x.IsActive &&
+                            x.UserID == userId)
+                        .Select(x => x.CityID)
+                        .ToListAsync();
+
+                    bool hasInvalidCity = request.CityIDs
+                        .Any(cityId => !validCityIds.Contains(cityId));
+
+                    if (hasInvalidCity)
+                    {
+                        return ResultResponseDto<GetMutiplekpiLayerResultsDto>
+                            .Failure(new List<string> { "You are not authorized to access one or more selected cities." });
+                    }
+                }
+
+
+                var query = _context.AnalyticalLayerResults
+                    .AsNoTracking()
+                    .Where(x =>
+                        request.CityIDs.Contains(x.CityID) &&
+                        x.LayerID == request.LayerID &&
+                        (
+                            (x.LastUpdated >= startDate && x.LastUpdated < endDate) ||
+                            (x.AiLastUpdated >= startDate && x.AiLastUpdated < endDate)
+                        ));
+
+                var response = await query
+                    .GroupBy(x => x.LayerID)
+                    .Select(g => new GetMutiplekpiLayerResultsDto
+                    {
+                        LayerID = g.Key,
+
+                        LayerCode = g.Select(x => x.AnalyticalLayer.LayerCode).FirstOrDefault()?? string.Empty,
+                        LayerName = g.Select(x => x.AnalyticalLayer.LayerName).FirstOrDefault() ?? string.Empty,
+                        Purpose = g.Select(x => x.AnalyticalLayer.Purpose).FirstOrDefault() ?? string.Empty,
+                        CalText1 = g.Select(x => x.AnalyticalLayer.CalText1).FirstOrDefault(),
+                        CalText2 = g.Select(x => x.AnalyticalLayer.CalText2).FirstOrDefault(),
+                        CalText3 = g.Select(x => x.AnalyticalLayer.CalText3).FirstOrDefault(),
+                        CalText4 = g.Select(x => x.AnalyticalLayer.CalText4).FirstOrDefault(),
+                        CalText5 = g.Select(x => x.AnalyticalLayer.CalText5).FirstOrDefault(),
+
+                        FiveLevelInterpretations = g.First().AnalyticalLayer.FiveLevelInterpretations,
+
+                        cities = g.Select(x => new MutipleCitieskpiLayerResults
+                        {
+                            CityID = x.CityID,
+                            InterpretationID = x.InterpretationID,
+                            NormalizeValue = x.NormalizeValue,
+                            CalValue1 = x.CalValue1,
+                            CalValue2 = x.CalValue2,
+                            CalValue3 = x.CalValue3,
+                            CalValue4 = x.CalValue4,
+                            CalValue5 = x.CalValue5,
+                            LastUpdated = x.LastUpdated,
+
+                            AiInterpretationID = x.AiInterpretationID,
+                            AiNormalizeValue = x.AiNormalizeValue,
+                            AiCalValue1 = x.AiCalValue1,
+                            AiCalValue2 = x.AiCalValue2,
+                            AiCalValue3 = x.AiCalValue3,
+                            AiCalValue4 = x.AiCalValue4,
+                            AiCalValue5 = x.AiCalValue5,
+
+                            AiLastUpdated = x.AiLastUpdated,
+                            City = x.City
+                        }).ToList()
+                    })
+                    .FirstOrDefaultAsync();
+
+                return ResultResponseDto<GetMutiplekpiLayerResultsDto>
+                    .Success(response ?? new GetMutiplekpiLayerResultsDto());
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error occurred in GetMutiplekpiLayerResults", ex);
+
+                return ResultResponseDto<GetMutiplekpiLayerResultsDto>
+                    .Failure(new List<string> { "An error occurred." });
+            }
+        }
+
+    }
+}
