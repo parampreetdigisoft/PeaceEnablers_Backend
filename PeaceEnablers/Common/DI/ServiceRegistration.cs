@@ -35,6 +35,7 @@ namespace PeaceEnablers.Common.DI
             services.AddScoped<IKpiService, KpiService>();
             services.AddScoped<IAIComputationService, AIComputationService>();
             services.AddScoped<ICommonService, CommonService>();
+            services.AddScoped<IPdfGeneratorService, PdfGeneratorService>();
             return services;
         }
     }
