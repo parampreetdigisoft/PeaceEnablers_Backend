@@ -56,15 +56,18 @@ namespace PeaceEnablers.Controllers
             var result = await _pillarService.AddAsync(pillar);
             return Created($"/api/pillar/{result.PillarID}", result);
         }
-
-        [HttpPut("{id}")]
+       
+        [HttpPost("edit/{id}")]
+        [Consumes("multipart/form-data")]
         [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> Update(int id, [FromBody] UpdatePillarDto pillar)
-        {
+        public async Task<IActionResult> Update( int id, [FromForm] UpdatePillarDto pillar)
+        {          
+
             var result = await _pillarService.UpdateAsync(id, pillar);
             if (result == null) return NotFound();
             return Ok(result);
         }
+
 
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
@@ -110,4 +113,4 @@ namespace PeaceEnablers.Controllers
             return Ok(response);
         }
     }
-} 
+}

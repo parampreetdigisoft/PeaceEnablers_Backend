@@ -647,7 +647,7 @@ namespace PeaceEnablers.Services
                     .Select(g => new
                     {
                         CityID = g.Key,
-                        Score = g.Average(x => (decimal?)x.EvaluatorProgress) ?? 0,
+                        Score = g.Average(x => (decimal?)x.EvaluatorScore) ?? 0,
                         AiScore = g.Average(x => (decimal?)x.AIProgress) ?? 0
                     })
                     .ToDictionaryAsync(x => x.CityID, x => new { x.Score, x.AiScore });
@@ -707,9 +707,9 @@ namespace PeaceEnablers.Services
 
                 var tierLimits = tier switch
                 {
-                    TieredAccessPlan.Basic => new { Min = 2, Max = 3, Name = "Basic" },
-                    TieredAccessPlan.Standard => new { Min = 5, Max = 7, Name = "Standard" },
-                    TieredAccessPlan.Premium => new { Min = 0, Max = int.MaxValue, Name = "Premium" },
+                    TieredAccessPlan.Basic => new { Min = 5, Max = 7, Name = "Basic" },
+                    TieredAccessPlan.Standard => new { Min = 8, Max = 12, Name = "Standard" },
+                    TieredAccessPlan.Premium => new { Min = 13, Max = 23, Name = "Premium" },
                     _ => new { Min = 0, Max = 0, Name = "Unknown" }
                 };
 
@@ -1008,7 +1008,7 @@ namespace PeaceEnablers.Services
                 {
                     var isAccess = pillarIds.Count == 0 || pillarIds.Contains(x.pillar.PillarID);
 
-                    var r = new AiCityPillarReponse
+                    var r = new AiCityPillarResponse
                     {
                         PillarScoreID = x.score?.PillarScoreID ?? 0,
                         CityID = x.score?.CityID ?? request.CityID,
@@ -1028,7 +1028,7 @@ namespace PeaceEnablers.Services
                         r.AIScore = x.score.AIScore;
                         r.AIProgress = x.score.AIProgress;
                         r.EvidenceSummary = x.score.EvidenceSummary;
-                        r.RedFlags = x.score.RedFlags;
+                        r.RedFlag = x.score.RedFlag;
                         r.GeographicEquityNote = x.score.GeographicEquityNote;
                         r.InstitutionalAssessment = x.score.InstitutionalAssessment;
                         r.DataGapAnalysis = x.score.DataGapAnalysis;

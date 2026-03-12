@@ -74,10 +74,30 @@ namespace PeaceEnablers.Services
             {
                 var existing = await _context.Pillars.FindAsync(id);
                 if (existing == null) return null;
-                existing.PillarName = pillar.PillarName;
-                existing.Description = pillar.Description;
+                existing.PillarName = pillar.PillarName ?? "";
+                existing.Description = pillar.Description ?? "";
                 existing.DisplayOrder = pillar.DisplayOrder;
-
+                
+                if (pillar.ImageFile != null)
+                {                    
+                    if (!string.IsNullOrEmpty(existing.ImagePath))
+                    {
+                        var oldFilePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", existing.ImagePath);
+                        if (File.Exists(oldFilePath))
+                        {
+                            File.Delete(oldFilePath);
+                        }
+                    }                    
+                    var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/assets/pillars");
+                    if (!Directory.Exists(uploadsFolder))
+                        Directory.CreateDirectory(uploadsFolder);
+                    var fileName = Guid.NewGuid() + Path.GetExtension(pillar.ImageFile.FileName);
+                    var filePath = Path.Combine(uploadsFolder, fileName);
+                    using var stream = new FileStream(filePath, FileMode.Create);
+                    await pillar.ImageFile.CopyToAsync(stream);
+                    existing.ImagePath = $"assets/pillars/{fileName}";
+                }
+                
                 if (existing.Weight != pillar.Weight || existing.Reliability != pillar.Reliability)
                 {
                     existing.Weight = pillar.Weight;
@@ -85,15 +105,15 @@ namespace PeaceEnablers.Services
                     _download.InsertAnalyticalLayerResults();
                 }
                 await _context.SaveChangesAsync();
-
                 return existing;
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure", ex);
+                await _appLogger.LogAsync("Error Occured", ex);
                 return new Pillar();
             }
         }
+
 
         public async Task<bool> DeleteAsync(int id)
         {

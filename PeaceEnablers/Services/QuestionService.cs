@@ -43,7 +43,7 @@ namespace PeaceEnablers.Services
                     .Include(q => q.Pillar)
                     .Include(o => o.QuestionOptions)
                 where !q.IsDeleted
-                   && (!request.PillarID.HasValue || q.PillarID == request.PillarID.Value)
+                   && (!request.PillarID.HasValue || q.PillarID == request.PillarID.Value)                
                 select new GetQuestionRespones
                 {
                     QuestionID = q.QuestionID,

@@ -183,12 +183,13 @@ namespace PeaceEnablers
             {
                 c.SwaggerEndpoint("/swagger/v1/swagger.json", "Peace Enablers Api");
                 c.RoutePrefix = string.Empty; // Swagger UI at root URL (e.g. https://localhost:5001/)
-            });
-            app.UseCors("AllowAngularApp");
+            });           
 
             app.UseHttpsRedirection();
 
             app.UseRouting();
+
+            app.UseCors("AllowAngularApp");
 
             app.UseAuthentication();
             app.UseAuthorization();

@@ -278,6 +278,7 @@ namespace PeaceEnablers.Services
                         .Where(x => x.IsVerified && x.Year == year)
                     on c.CityID equals ai.CityID into aiJoin
                 from ai in aiJoin.DefaultIfEmpty()
+
                 select new UserCityMappingResponseDto
                 {
                     CityID = c.CityID,
@@ -294,7 +295,7 @@ namespace PeaceEnablers.Services
                     UpdatedDate = c.UpdatedDate,
                     IsDeleted = c.IsDeleted,
                     Score = 0,
-                    AiScore = ai != null ? ai.AIScore : 0
+                   // AiScore = ai != null ? ai.AIScore : 0
                 };
         }
 
@@ -309,10 +310,10 @@ namespace PeaceEnablers.Services
                     on c.CityID equals cm.CityID
                 join u in _context.Users
                     on cm.AssignedByUserId equals u.UserID
-                join ai in _context.AICityScores
-                .Where(x => x.IsVerified && x.Year == year)
-            on c.CityID equals ai.CityID into aiJoin
-                from ai in aiJoin.DefaultIfEmpty()
+               join ai in _context.AICityScores
+               .Where(x => x.IsVerified && x.Year == year)
+                on c.CityID equals ai.CityID into aiJoin
+               from ai in aiJoin.DefaultIfEmpty()
 
                 where !c.IsDeleted
                 select new UserCityMappingResponseDto
@@ -330,7 +331,7 @@ namespace PeaceEnablers.Services
                     AssignedBy = u.FullName,
                     UserCityMappingID = cm.UserCityMappingID,
                     Score = 0,
-                    AiScore = ai.AIProgress
+                    //AiScore = ai.AIProgress
                 };
         }
         private async Task ApplyManualScoresAsync(PaginationResponse<CityResponseDto> response,PaginationRequest request,UserRole role, int year)

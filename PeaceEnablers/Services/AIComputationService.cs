@@ -1,4 +1,8 @@
-﻿using PeaceEnablers.Backgroundjob;
+﻿using DocumentFormat.OpenXml.Spreadsheet;
+
+using Microsoft.EntityFrameworkCore;
+
+using PeaceEnablers.Backgroundjob;
 using PeaceEnablers.Common.Implementation;
 using PeaceEnablers.Common.Interface;
 using PeaceEnablers.Common.Models;
@@ -8,7 +12,6 @@ using PeaceEnablers.Dtos.CityDto;
 using PeaceEnablers.Dtos.CommonDto;
 using PeaceEnablers.IServices;
 using PeaceEnablers.Models;
-using Microsoft.EntityFrameworkCore;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -24,13 +27,16 @@ namespace PeaceEnablers.Services
         private readonly ICommonService _commonService;
         private readonly Download _download;
         private readonly IAIAnalyzeService _iAIAnalayzeService;
-        public AIComputationService(ApplicationDbContext context, IAppLogger appLogger, ICommonService commonService, Download download, IAIAnalyzeService iAIAnalayzeService)
+        private readonly IPdfGeneratorService _iPdfGeneratorService;
+        public AIComputationService(ApplicationDbContext context, IAppLogger appLogger, ICommonService commonService, Download download, IAIAnalyzeService iAIAnalayzeService
+            , IPdfGeneratorService iPdfGeneratorService)
         {
             _context = context;
             _appLogger = appLogger;
             _commonService = commonService;
             _download = download;
             _iAIAnalayzeService = iAIAnalayzeService;
+            _iPdfGeneratorService = iPdfGeneratorService;
         }
         #endregion
 
@@ -86,7 +92,7 @@ namespace PeaceEnablers.Services
                             .DefaultIfEmpty(0)
                             .Average();
 
-                        c.EvaluatorProgress = cityScore;
+                        c.EvaluatorScore = cityScore;
                         c.Discrepancy = Math.Abs(cityScore - (c.AIProgress ?? 0));
                         c.AICompletionRate = answeredQuestions.FirstOrDefault(x=>x.CityID== c.CityID)?.CompletionRate;
                     }
@@ -189,29 +195,47 @@ namespace PeaceEnablers.Services
                     Country = c.Country ?? string.Empty,
                     Image = c.Image ?? string.Empty,
 
-                    ScoringYear = score != null ? score.Year : currentYear,
-                    AIScore = score != null ? score.AIScore : 0,
+                    Year = score != null ? score.Year : currentYear,
+                    AIScore = score != null ? score.AIScore : null,
                     AIProgress = score != null ? score.AIProgress : null,
-                    EvaluatorProgress = score != null ? score.EvaluatorProgress : null,
+                    EvaluatorScore = score != null ? score.EvaluatorScore : null,
                     Discrepancy = score != null ? score.Discrepancy : null,
-                    ConfidenceLevel = score != null ? score.ConfidenceLevel : string.Empty,
 
-                    EvidenceSummary = score != null ? score.EvidenceSummary : string.Empty,
-                    CrossPillarPatterns = score != null ? score.CrossPillarPatterns : string.Empty,
-                    InstitutionalCapacity = score != null ? score.InstitutionalCapacity : string.Empty,
-                    EquityAssessment = score != null ? score.EquityAssessment : string.Empty,
-                    SustainabilityOutlook = score != null ? score.SustainabilityOutlook : string.Empty,
-                    StrategicRecommendations = score != null ? score.StrategicRecommendations : string.Empty,
-                    DataTransparencyNote = score != null ? score.DataTransparencyNote : string.Empty,
+                    ConfidenceLevel = score != null ? score.ConfidenceLevel ?? string.Empty : string.Empty,
+                    EvidenceSummary = score != null ? score.EvidenceSummary ?? string.Empty : string.Empty,
 
-                    UpdatedAt = score != null ? score.UpdatedAt : null,
-                    IsVerified = score != null ? score.IsVerified : false,
+                    StructuralEvidence = score != null ? score.StructuralEvidence : null,
+                    OperationalEvidence = score != null ? score.OperationalEvidence : null,
+                    OutcomeEvidence = score != null ? score.OutcomeEvidence : null,
+                    PerceptionEvidence = score != null ? score.PerceptionEvidence : null,
 
-                    Comment = cmt != null ? cmt.Comment : null
+                    TemporalScope = score != null ? score.TemporalScope : null,
+                    DistortionScreening = score != null ? score.DistortionScreening : null,
+
+                    PoliticalShock = score != null ? score.PoliticalShock : null,
+                    EconomicShock = score != null ? score.EconomicShock : null,
+                    NarrativeShock = score != null ? score.NarrativeShock : null,
+
+                    OverallStressResilience = score != null ? score.OverallStressResilience : null,
+                    StressScoreAdjustment = score != null ? score.StressScoreAdjustment : null,
+                    InequalityAdjustment = score != null ? score.InequalityAdjustment : null,
+                    OpacityRisk = score != null ? score.OpacityRisk : null,
+                    NonCompensationNote = score != null ? score.NonCompensationNote : null,
+
+                    CrossPillarPatterns = score != null ? score.CrossPillarPatterns : null,
+                    RelationalIntegrity = score != null ? score.RelationalIntegrity : null,
+                    InstitutionalCapacity = score != null ? score.InstitutionalCapacity : null,
+                    EquityAssessment = score != null ? score.EquityAssessment : null,
+                    ConflictRiskOutlook = score != null ? score.ConflictRiskOutlook : null,
+
+                    StrategicRecommendation = score != null ? score.StrategicRecommendation : null,
+                    DataTransparencyNote = score != null ? score.DataTransparencyNote : null,
+                    PrimarySource = score != null ? score.PrimarySource : null,
+
+                    UpdatedAt = score != null ? score.UpdatedAt : default(DateTime),
+
+                    IsVerified = score != null && score.IsVerified
                 };
-
-
-
             return query;
         }
     
@@ -257,7 +281,7 @@ namespace PeaceEnablers.Services
                 {
                     var isAccess = pillarIds.Count == 0 || pillarIds.Contains(x.pillar.PillarID);
 
-                    var r = new AiCityPillarReponse
+                    var r = new AiCityPillarResponse
                     {
                         PillarScoreID = x.score?.PillarScoreID ?? 0,
                         CityID = x.score?.CityID ?? cityID,
@@ -276,14 +300,29 @@ namespace PeaceEnablers.Services
                         r.AIDataYear = x.score.Year;
                         r.AIScore = x.score.AIScore;
                         r.AIProgress = x.score.AIProgress;
-                        r.EvaluatorProgress = x.score.EvaluatorProgress;
+                        r.EvaluatorScore = x.score.EvaluatorScore;
                         r.Discrepancy = x.score.Discrepancy;
                         r.ConfidenceLevel = x.score.ConfidenceLevel;
                         r.EvidenceSummary = x.score.EvidenceSummary;
-                        r.RedFlags = x.score.RedFlags;
+                        r.StructuralEvidence = x.score.StructuralEvidence;
+                        r.OperationalEvidence = x.score.OperationalEvidence;
+                        r.OutcomeEvidence = x.score.OutcomeEvidence;
+                        r.PerceptionEvidence = x.score.PerceptionEvidence;
+                        r.TemporalScope = x.score.TemporalScope;
+                        r.DistortionScreening = x.score.DistortionScreening;
+                        r.RelationalIntegrity = x.score.RelationalIntegrity;
+                        r.StressPoliticalShock = x.score.StressPoliticalShock;
+                        r.StressEconomicShock = x.score.StressEconomicShock;
+                        r.StressNarrativeShock = x.score.StressNarrativeShock;
+                        r.StressOverallResilience = x.score.StressOverallResilience;
+                        r.StressScoreAdjustment = x.score.StressScoreAdjustment;
+                        r.InequalityAdjustment = x.score.InequalityAdjustment;
+                        r.OpacityRisk = x.score.OpacityRisk;
+                        r.NonCompensationNote = x.score.NonCompensationNote;
                         r.GeographicEquityNote = x.score.GeographicEquityNote;
                         r.InstitutionalAssessment = x.score.InstitutionalAssessment;
                         r.DataGapAnalysis = x.score.DataGapAnalysis;
+                        r.RedFlag = x.score.RedFlag;
                         r.DataSourceCitations = x.score.DataSourceCitations;
                         r.UpdatedAt = x.score.UpdatedAt;
                     }
@@ -320,13 +359,14 @@ namespace PeaceEnablers.Services
                         .Average();
 
 
-                    c.EvaluatorProgress = cityScore;
+                    c.EvaluatorScore = cityScore;
                     c.Discrepancy = Math.Abs(cityScore - (c.AIProgress ?? 0));
                     c.AICompletionRate = answeredQuestion * 100.0M / totalQuestions;
                 }
 
                 var finalResutl = new AiCityPillarReponseDto
                 {
+
                     Pillars = result
                 };
 
@@ -372,27 +412,43 @@ namespace PeaceEnablers.Services
                     from x in qs.DefaultIfEmpty() // LEFT JOIN
                     select new AIEstimatedQuestionScoreDto
                     {
-                        CityID = x == null ? request.CityID ??0  : x.CityID,
+                        CityID = x == null ? request.CityID ?? 0 : x.CityID,
                         PillarID = x == null ? request.PillarID ?? 0 : x.PillarID,
                         QuestionID = q.QuestionID,
-                        DataYear = x == null ? currentYear : x.Year,
+                        Year = x == null ? currentYear : x.Year,
                         AIScore = x == null ? null : x.AIScore,
                         AIProgress = x == null ? null : x.AIProgress,
-                        EvaluatorProgress = x == null ? null : x.EvaluatorProgress,
+                        EvaluatorScore = x == null ? null : x.EvaluatorScore,
                         Discrepancy = x == null ? null : x.Discrepancy,
                         ConfidenceLevel = x == null ? string.Empty : x.ConfidenceLevel,
-                        DataSourcesUsed = x == null ? null : x.DataSourcesUsed,
+                        SourcesConsulted = x == null ? null : x.SourcesConsulted,  // ✅ renamed
                         EvidenceSummary = x == null ? string.Empty : x.EvidenceSummary,
-                        RedFlags = x == null ? string.Empty : x.RedFlags,
-                        GeographicEquityNote = x == null ? string.Empty : x.GeographicEquityNote,
+                        // Evidence Dimensions
+                        StructuralEvidence = x == null ? string.Empty : x.StructuralEvidence,
+                        OperationalEvidence = x == null ? string.Empty : x.OperationalEvidence,
+                        OutcomeEvidence = x == null ? string.Empty : x.OutcomeEvidence,
+                        PerceptionEvidence = x == null ? string.Empty : x.PerceptionEvidence,
+                        TemporalScope = x == null ? string.Empty : x.TemporalScope,
+                        DistortionScreening = x == null ? string.Empty : x.DistortionScreening,
+                        RelationalDependencies = x == null ? string.Empty : x.RelationalDependencies,
+                        // Stress Tests
+                        StressPoliticalShock = x == null ? string.Empty : x.StressPoliticalShock,
+                        StressEconomicShock = x == null ? string.Empty : x.StressEconomicShock,
+                        StressNarrativeShock = x == null ? string.Empty : x.StressNarrativeShock,
+                        StressOverallResilienceShock = x == null ? string.Empty : x.StressOverallResilienceShock,
+                        InequalityAdjustment = x == null ? string.Empty : x.InequalityAdjustment,   // ✅ renamed
+                        OpacityRisk = x == null ? string.Empty : x.OpacityRisk,
+                        RedFlag = x == null ? string.Empty : x.RedFlag,   // ✅ renamed
+                        // Source Metadata
                         SourceType = x == null ? string.Empty : x.SourceType,
                         SourceName = x == null ? string.Empty : x.SourceName,
                         SourceURL = x == null ? string.Empty : x.SourceURL,
                         SourceDataExtract = x == null ? string.Empty : x.SourceDataExtract,
                         SourceDataYear = x == null ? null : x.SourceDataYear,
-                        SourceTrustLevel = x == null ? null : x.SourceTrustLevel,
+                        SourceHierarchyLevel = x == null ? null : x.SourceHierarchyLevel,   // ✅ renamed
                         UpdatedAt = x == null ? null : x.UpdatedAt,
-                        QuestionText = q.QuestionText == null ? string.Empty : q.QuestionText
+
+                        QuestionText = q.QuestionText ?? string.Empty
                     };
 
                 var r = await res.ApplyPaginationAsync(request);
@@ -405,343 +461,47 @@ namespace PeaceEnablers.Services
                 return new PaginationResponse<AIEstimatedQuestionScoreDto>();
             }
         }
-        public async Task<byte[]> GenerateCityDetailsPdf(AiCitySummeryDto cityDetails, UserRole userRole)
-        {
+        public async Task<byte[]> GenerateCityDetailsPdf(AiCitySummeryDto cityDetails, UserRole userRole, int userID)
+        {            
             try
             {
-                var document = Document.Create(container =>
-                {
-                    container.Page(page =>
-                    {
-                        page.Size(PageSizes.A4);
-                        page.Margin(25);
-                        page.PageColor(Colors.White);
-                        page.DefaultTextStyle(x => x.FontSize(10).FontFamily("Arial"));
+                var pillars = await GetAICityPillars(
+                    cityDetails.CityID, userID, userRole, cityDetails.Year);
 
-                        page.Header().Element(x => CityComposeHeader(x, cityDetails, userRole));
-                        page.Content().Element(content => CitySummeryComposeContent(content, cityDetails, userRole));
-                        page.Footer().AlignCenter().Text(x =>
-                        {
-                            x.CurrentPageNumber();
-                            x.Span(" / ");
-                            x.TotalPages();
-                        });
-                    });
-                });
-                return document.GeneratePdf();
+                var kpis = await GetAccessKpis(userID, userRole, cityDetails.CityID, cityDetails.Year);                
+                var pillarChartItems = pillars.Result.Pillars                    
+                    .Select(p => new KpiChartItem(
+                        p.PillarName?.Length > 20 ? p.PillarName[..20] : p.PillarName ?? "—",
+                        p.PillarName ?? "—",
+                        p.AIProgress, null))
+                    .ToList();
+
+                var document = await _iPdfGeneratorService.GenerateCityDetailsPdf(cityDetails, pillars.Result.Pillars, kpis, userRole);
+
+                return document;
             }
             catch (Exception ex)
             {
                 await _appLogger.LogAsync("Error Occured in GenerateCityDetailsPdf", ex);
-                return new byte[] { };
+                return Array.Empty<byte>();
             }
         }
-        public async Task<byte[]> GeneratePillarDetailsPdf(AiCityPillarReponse pillarData, UserRole userRole)
+        public async Task<byte[]> GeneratePillarDetailsPdf(AiCityPillarResponse pillarData, UserRole userRole)
         {
+            
             try
             {
-                var document = Document.Create(container =>
-                {
-                    container.Page(page =>
-                    {
-                        page.Size(PageSizes.A4);
-                        page.Margin(25);
-                        page.PageColor("#FAFAFA");
-                        page.DefaultTextStyle(x => x.FontSize(10).FontFamily("Segoe UI"));
+                var document = await _iPdfGeneratorService.GeneratePillarDetailsPdf(pillarData, userRole);
 
-                        page.Header().Element(header => PillarComposeHeader(header, pillarData));
-                        page.Content().Element(content => PillarComposeContent(content, pillarData, userRole));
-                        page.Footer().Element(PillarComposeFooter);
-                    });
-                });
-
-                return document.GeneratePdf();
+                return document;
             }
             catch (Exception ex)
             {
                 await _appLogger.LogAsync("Error Occured in GeneratePillarDetailsPdf", ex);
-                return new byte[] { };
+                return Array.Empty<byte>();
             }
         }
-        void CityComposeHeader(IContainer container, AiCitySummeryDto data, UserRole userRole)
-        {
-            container.Column(column =>
-            {
-                // Top Bar with Logo/Title
-                column.Item().Background("#12352f").Padding(8).Row(row =>
-                {
-                    row.RelativeItem().Column(col =>
-                    {
-                        col.Item().Text($"City Analysis Report")
-                            .FontSize(16)
-                            .FontColor(Colors.White);
-                    });
-
-                    row.ConstantItem(150).AlignRight().Column(col =>
-                    {
-                        col.Item().AlignRight().Text($"Generated")
-                            .FontSize(9)
-                            .FontColor("#a5a8ad");
-                        col.Item().AlignRight().Text(DateTime.Now.ToString("MMM dd, yyyy"))
-                            .FontSize(10)
-                            .Bold()
-                            .FontColor(Colors.White);
-                    });
-                });
-
-                // Pillar Name Header
-                column.Item().Background("#336b58").Padding(12).Column(col =>
-                {
-                    col.Item().Text(data.CityName)
-                        .FontSize(22)
-                        .Bold()
-                        .FontColor(Colors.White);
-
-                    col.Item().PaddingTop(3).Text($"{data.CityName},{data.State},{data.Country} | Data Year: {data.ScoringYear}")
-                        .FontSize(10)
-                        .FontColor("#E0E0E0");
-                });
-            });
-        }
-        void CitySummeryComposeContent(IContainer container, AiCitySummeryDto data, UserRole userRole)
-        {
-            container.PaddingTop(4).Column(column =>
-            {
-                if(userRole != UserRole.CityUser)
-                {
-                    column.Item().Row(row =>
-                    {
-                        row.RelativeItem().Element(c => PillarScoreCard(c, "AI Confidence",
-                            data.ConfidenceLevel, GetConfidenceBadgeColor(data.ConfidenceLevel), true));
-                        row.Spacing(10);
-
-                        row.RelativeItem().Element(c => PillarScoreCard(c, "AI Score",
-                            data.AIProgress != null ? $"{data.AIProgress}%" : "N/A", "#6b732f", false));
-                        row.Spacing(10);
-
-                        row.RelativeItem().Element(c => PillarScoreCard(c, "Evaluator Score",
-                            data.EvaluatorProgress != null ? $"{data.EvaluatorProgress}%" : "N/A", "#232420", false));
-                        row.Spacing(10);
-
-                        row.RelativeItem().Element(c => PillarScoreCard(c, "Discrepancy",
-                            $"{data.Discrepancy:F1}%", GetDiscrepancyColor(data.Discrepancy ?? 0), false));
-                        row.Spacing(10);
-
-                        row.RelativeItem().Element(c => PillarScoreCard(c, "Average Score",
-                            $"{((data.AIProgress + data.EvaluatorProgress) ?? 0) / 2:F0}%", "#4a4d4f", false));
-                    });
-                }
-
-
-                // Progress Bars
-                var random = new AiCityPillarReponse
-                {
-                    EvaluatorProgress = data.EvaluatorProgress,
-                    Discrepancy = data.Discrepancy,
-                    AIDataYear = data.ScoringYear,
-                    AIProgress = data.AIProgress
-                };
-                column.Item().PaddingTop(10).Element(c => PillarProgressSection(c, random,userRole));
-
-                // Evidence Summary Section
-                column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Evidence Summary", data.EvidenceSummary, "#163329"));
-
-                // Red Flags Section (with warning styling)
-                column.Item().PageBreak();
-                column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Cross-Pillar Patterns", data.CrossPillarPatterns, "#6e9688"));
-
-                // Other Sections
-                column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Institutional Capacity", data.InstitutionalCapacity, "#0d8057"));
-
-                column.Item().PageBreak();
-                column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Equity Assessment", data.EquityAssessment, "#a4bab2"));
-
-                column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Sustainability Outlook", data.SustainabilityOutlook, "#373d3b"));
-
-                column.Item().PageBreak();
-                column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Strategic Recommendations", data.StrategicRecommendations, "#2e9975"));
-
-                column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Data Transparency Note", data.DataTransparencyNote, "#63a68f"));
-            });
-        }
-        void PillarComposeHeader(IContainer container, AiCityPillarReponse data)
-        {
-            container.Column(column =>
-            {
-                // Top Bar with Logo/Title
-                column.Item().Background("#12352f").Padding(8).Row(row =>
-                {
-                    row.RelativeItem().Column(col =>
-                    {
-                        col.Item().Text($"Pillar Analysis Report")
-                            .FontSize(16)
-                            .FontColor(Colors.White);
-                    });
-
-                    row.ConstantItem(150).AlignRight().Column(col =>
-                    {
-                        col.Item().AlignRight().Text($"Generated")
-                            .FontSize(9)
-                            .FontColor("#a5a8ad");
-                        col.Item().AlignRight().Text(DateTime.Now.ToString("MMM dd, yyyy"))
-                            .FontSize(10)
-                            .Bold()
-                            .FontColor(Colors.White);
-                    });
-                });
-
-                // Pillar Name Header
-                column.Item().Background("#336b58").Padding(12).Column(col =>
-                {
-                    col.Item().Text(data.PillarName)
-                        .FontSize(22)
-                        .Bold()
-                        .FontColor(Colors.White);
-
-                    col.Item().PaddingTop(3).Text($"{data.CityName},{data.State},{data.Country} | Data Year: {data.AIDataYear}")
-                        .FontSize(10)
-                        .FontColor("#E0E0E0");
-                });
-            });
-        }
-        void PillarComposeContent(IContainer container, AiCityPillarReponse data, UserRole userRole)
-        {
-            container.PaddingTop(8).Column(column =>
-            {
-                // Score Cards Row
-                if(userRole != UserRole.CityUser)
-                {
-                    column.Item().Row(row =>
-                    {
-                        row.RelativeItem().Element(c => PillarScoreCard(c, "AI Confidence",
-                            data.ConfidenceLevel, GetConfidenceBadgeColor(data.ConfidenceLevel), true));
-                        row.Spacing(10);
-
-                        row.RelativeItem().Element(c => PillarScoreCard(c, "AI Score",
-                            data.AIProgress != null ? $"{data.AIProgress}%" : "N/A", "#6b732f", false));
-                        row.Spacing(10);
-
-                        row.RelativeItem().Element(c => PillarScoreCard(c, "Evaluator Score",
-                            data.EvaluatorProgress != null ? $"{data.EvaluatorProgress}%" : "N/A", "#232420", false));
-                        row.Spacing(10);
-
-                        row.RelativeItem().Element(c => PillarScoreCard(c, "Discrepancy",
-                            $"{data.Discrepancy:F1}%", GetDiscrepancyColor(data.Discrepancy ?? 0), false));
-                        row.Spacing(10);
-
-                        row.RelativeItem().Element(c => PillarScoreCard(c, "Average Score",
-                            $"{((data.AIProgress + data.EvaluatorProgress) ?? 0) / 2:F0}%", "#4a4d4f", false));
-                    });
-                }
-
-                // Progress Bars
-                column.Item().PaddingTop(10).Element(c => PillarProgressSection(c, data, userRole));
-
-                // Evidence Summary Section
-                column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Evidence Summary", data.EvidenceSummary, "#163329"));
-
-                // Red Flags Section (with warning styling)
-                column.Item().PageBreak();
-                column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Red Flags", data.RedFlags, "#6e9688"));
-
-                // Other Sections
-                column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Geographic Equity Note", data.GeographicEquityNote, "#0d8057"));
-
-                column.Item().PageBreak();
-                column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Institutional Assessment", data.InstitutionalAssessment, "#2e9975"));
-
-                column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Data Gap Analysis", data.DataGapAnalysis, "#a4bab2"));
-
-                // Data Sources Section
-                if (data.DataSourceCitations?.Any() == true)
-                {
-                    column.Item().PageBreak();
-                    column.Item().PaddingTop(10).Element(c =>
-                        DataSourcesSection(c, data.DataSourceCitations.ToList()));
-                }
-
-            });
-        }
-        void PillarScoreCard(IContainer container, string label, string value, string color, bool isBadge)
-        {
-            container.Background(Colors.White)
-                .Border(1)
-                .BorderColor("#E0E0E0")
-                .Padding(10)
-                .Column(column =>
-                {
-                    column.Item().Text(label)
-                        .FontSize(10)
-                        .FontColor("#757575")
-                        .Bold();
-
-                    if (isBadge)
-                    {
-                        column.Item().PaddingTop(8).Background(color)
-                            .CornerRadius(12)
-                            .Padding(6)
-                            .AlignCenter()
-                            .Text(value)
-                            .FontSize(13)
-                            .Bold()
-                            .FontColor(Colors.Black);
-                    }
-                    else
-                    {
-                        column.Item().PaddingTop(8).Text(value)
-                            .FontSize(16)
-                            .Bold()
-                            .FontColor(color);
-                    }
-                });
-        }
-        void PillarProgressSection(IContainer container, AiCityPillarReponse data, UserRole userRole)
-        {
-            container.Background(Colors.White)
-                .Border(1)
-                .BorderColor("#E0E0E0")
-                .Padding(15)
-                .Column(column =>
-                {
-                    column.Item().Text("Progress Metrics")
-                        .FontSize(16)
-                        .Bold()
-                        .FontColor("#203d33");
-
-                    if(userRole == UserRole.CityUser)
-                    {
-                        column.Item().PaddingTop(12).Column(col =>
-                        {
-                            PillarProgressBar(col, "Score", data.AIProgress, "#58a389");
-                            col.Item().PaddingTop(10);
-                        });
-                    }
-                    else
-                    {
-                        column.Item().PaddingTop(12).Column(col =>
-                        {
-                            PillarProgressBar(col, "AI Progress", data.AIProgress, "#6b732f");
-                            col.Item().PaddingTop(10);
-                            PillarProgressBar(col, "Evaluator Progress", data.EvaluatorProgress, "#2b4039");
-                            col.Item().PaddingTop(10);
-                            PillarProgressBar(col, "Discrepancy", data.Discrepancy, "#73675c");
-                        });
-                    }
-
-                });
-        }
+        
         void PillarProgressBar(ColumnDescriptor column, string label, decimal? percentage, string color)
         {
             var per = (float)(percentage ?? 0);
@@ -766,111 +526,7 @@ namespace PeaceEnablers.Services
                     .FontColor(color);
             });
         }
-        void PillarContentSection(IContainer container, string title, string content, string accentColor)
-        {
-            container.Column(column =>
-            {
-                // Section Header with Accent Bar
-                column.Item().Row(row =>
-                {
-                    row.ConstantItem(5).Background(accentColor);
-                    row.RelativeItem().Background("#F5F5F5").Padding(12).Text(title)
-                        .FontSize(15)
-                        .Bold()
-                        .FontColor("#212121");
-                });
-
-                // Content Box
-                column.Item().Background(Colors.White)
-                    .Border(1)
-                    .BorderColor("#E0E0E0")
-                    .Padding(18)
-                    .Text(content)
-                    .FontSize(10)
-                    .LineHeight(1.6f)
-                    .FontColor("#424242")
-                    .Justify();
-            });
-        }
-        void DataSourcesSection(IContainer container, List<AIDataSourceCitation> sources)
-        {
-            container.Column(column =>
-            {
-                column.Item().Row(row =>
-                {
-                    row.ConstantItem(5).Background("#396154");
-                    row.RelativeItem().Background("#F5F5F5").Padding(12).Text("Data Source Citations")
-                        .FontSize(15)
-                        .Bold()
-                        .FontColor("#212121");
-                });
-
-                column.Item().PaddingTop(10).Background(Colors.White)
-                .Border(1)
-                .BorderColor("#E0E0E0")
-                .Padding(15)
-                .Column(col =>
-                {
-                    foreach (var source in sources.Take(10)) // Limit to first 10 for space
-                    {
-                        col.Item().PaddingBottom(15).Column(sourceCol =>
-                        {
-                            // Source Header
-                            sourceCol.Item().Row(row =>
-                            {
-                                row.RelativeItem().Text(source.SourceName)
-                                    .FontSize(11)
-                                    .Bold()
-                                    .FontColor("#2c423b");
-
-                                row.ConstantItem(100).AlignRight()
-                                    .Background(GetSourceTypeBadgeColor(source.SourceType))
-                                    .CornerRadius(3)
-                                    .Padding(3)
-                                    .Text(source.SourceType)
-                                    .FontSize(8)
-                                    .FontColor(Colors.White);
-                            });
-
-                            // Trust Level and Year
-                            sourceCol.Item().PaddingTop(4).Row(row =>
-                            {
-                                row.AutoItem().Text($"Trust Level: {source.TrustLevel}/7")
-                                    .FontSize(9)
-                                    .FontColor("#757575");
-
-                                row.AutoItem().PaddingLeft(15).Text($"Year: {source.DataYear}")
-                                    .FontSize(9)
-                                    .FontColor("#757575");
-                            });
-
-                            // Data Extract
-                            if (!string.IsNullOrEmpty(source.DataExtract))
-                            {
-                                sourceCol.Item().PaddingTop(6).Text(TruncateText(source.DataExtract, 200))
-                                    .FontSize(9)
-                                    .FontColor("#616161")
-                                    .Italic();
-                            }
-
-                            // URL
-                            if (!string.IsNullOrEmpty(source.SourceURL))
-                            {
-                                sourceCol.Item().PaddingTop(4).Text(source.SourceURL)
-                                    .FontSize(8)
-                                    .FontColor("#305246")
-                                    .Underline();
-                            }
-                        });
-
-                        if (source != sources.Last())
-                        {
-                            col.Item().PaddingBottom(10).LineHorizontal(1).LineColor("#EEEEEE");
-                        }
-                    }
-                });
-            });
-        }
+        
         void PillarComposeFooter(IContainer container)
         {
             container.AlignCenter().Row(row =>
@@ -1232,12 +888,262 @@ namespace PeaceEnablers.Services
                         .DefaultIfEmpty(0)
                         .Average();
 
-                    cityDetails.EvaluatorProgress = Math.Round(cityScore,2);
+                    cityDetails.EvaluatorScore = Math.Round(cityScore,2);
                     cityDetails.Discrepancy = Math.Abs(cityScore - (cityDetails.AIProgress ?? 0));
                }
             }
             return cityDetails;
         }
+        private async Task<List<KpiChartItem>> GetAccessKpis(int userID, UserRole role, int? cityID, int year = 0)
+        {
+            var startDate = new DateTime(year, 1, 1);
+            var endDate = new DateTime(year + 1, 1, 1);
+
+            var baseQuery = _context.AnalyticalLayerResults
+                .AsNoTracking()
+                .Include(ar => ar.AnalyticalLayer)
+                    .ThenInclude(al => al.FiveLevelInterpretations)
+                .Include(ar => ar.City)
+                .Where(x => x.AiLastUpdated >= startDate && x.AiLastUpdated < endDate);
+
+            if (role == UserRole.CityUser)
+            {
+                var validCities = _context.PublicUserCityMappings
+                    .Where(x => x.IsActive && x.UserID == userID)
+                    .Select(x => x.CityID);
+
+                var validPillarIds = _context.CityUserPillarMappings
+                    .Where(x => x.IsActive && x.UserID == userID)
+                    .Select(x => x.PillarID);
+
+                var validLayerIds = _context.AnalyticalLayerPillarMappings
+                    .Where(x => validPillarIds.Contains(x.PillarID))
+                    .Select(x => x.LayerID)
+                    .Distinct();
+
+                baseQuery = baseQuery
+                    .Where(ar =>
+                        validCities.Contains(ar.CityID) &&
+                        validLayerIds.Contains(ar.LayerID));
+            }
+
+            var kpiRaw = baseQuery
+                .Where(x => !cityID.HasValue || x.CityID == cityID)
+                .Select(x => new
+                {
+                    KpiShortName = x.AnalyticalLayer.LayerCode,
+                    KpiName = x.AnalyticalLayer.LayerName,
+                    Value = x.AiCalValue5,
+                    CityID = x.CityID
+                });
+
+            var kpis = await kpiRaw
+                .Select(k => new KpiChartItem(k.KpiShortName, k.KpiName, k.Value, k.CityID))
+                .ToListAsync();
+
+            return kpis ?? new List<KpiChartItem>();
+        }
+        public async Task<List<AiCitySummeryDto>> GetAllCityAiSummeryDetail(int userID, UserRole userRole, int year)
+        {
+            var query = await GetCityAiSummeryDetails(userID, userRole, null, year);
+            var citiesDetails = await query.ToListAsync();
+
+            if (userRole != UserRole.CityUser)
+            {
+                foreach (var cityDetails in citiesDetails)
+                {
+                    var progress = await _commonService.GetCitiesProgressAsync(userID, (int)userRole, DateTime.Now.Year);
+
+                    var cities = progress.Where(x => x.CityID == cityDetails.CityID);
+
+                    if (cities != null)
+                    {
+                        var cityScore = cities
+                            .Select(x => x.ScoreProgress)
+                            .DefaultIfEmpty(0)
+                            .Average();
+
+                        cityDetails.EvaluatorScore = Math.Round(cityScore, 2);
+                        cityDetails.Discrepancy = Math.Abs(cityScore - (cityDetails.AIProgress ?? 0));
+                    }
+                }
+
+            }
+            return citiesDetails;
+        }
+        public async Task<byte[]> GenerateAllCityDetailsPdf(List<AiCitySummeryDto> citiesDetails, UserRole userRole, int userID, int year)
+        {
+            try
+            {
+                var pillars = await GetAllCitiesAIPillars(userID, userRole, year);
+
+                var kpis = new List<KpiChartItem>();
+
+                var document = await _iPdfGeneratorService.GenerateAllCitiesDetailsPdf(citiesDetails, pillars.Result, kpis, userRole);
+
+                return document;
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error Occured in GenerateCityDetailsPdf", ex);
+                return Array.Empty<byte>();
+            }
+        }
+        public async Task<ResultResponseDto<Dictionary<int, List<AiCityPillarResponse>>>> GetAllCitiesAIPillars(
+         int userID, UserRole userRole, int currentYear = 0)
+        {
+            try
+            {
+                currentYear = currentYear == 0 ? DateTime.Now.Year : currentYear;
+                var firstDate = new DateTime(currentYear, 1, 1);
+
+                var scores = await _context.AIPillarScores
+                    .Where(x => x.UpdatedAt >= firstDate && x.Year == currentYear)
+                    .Include(x => x.City)
+                    .Include(x => x.DataSourceCitations)
+                    .ToListAsync();
+
+                List<int> pillarIds = new();
+                if (userRole == UserRole.CityUser)
+                {
+                    pillarIds = await _context.CityUserPillarMappings
+                        .Where(x => x.IsActive && x.UserID == userID)
+                        .Select(x => x.PillarID)
+                        .Distinct()
+                        .ToListAsync();
+                }
+
+                var pillars = await _context.Pillars.Select(x => new
+                {
+                    x.PillarID,
+                    x.PillarName,
+                    x.DisplayOrder,
+                    x.ImagePath,
+                    TotalQuestions = x.Questions.Count()
+                }).ToListAsync();
+
+                var cityIds = scores.Select(x => x.CityID).Distinct().ToList();
+
+                var result = new Dictionary<int, List<AiCityPillarResponse>>();
+
+                foreach (var cityId in cityIds)
+                {
+                    var cityScores = scores.Where(x => x.CityID == cityId).ToList();
+
+                    var pillarResults = pillars
+                        .GroupJoin(
+                            cityScores,
+                            p => p.PillarID,
+                            s => s.PillarID,
+                            (pillar, score) => new { pillar, score = score.FirstOrDefault() }
+                        )
+                        .Select(x =>
+                        {
+                            var isAccess = pillarIds.Count == 0 || pillarIds.Contains(x.pillar.PillarID);
+
+                            var r = new AiCityPillarResponse
+                            {
+                                PillarScoreID = x.score?.PillarScoreID ?? 0,
+                                CityID = x.score?.CityID ?? cityId,
+                                CityName = x.score?.City?.CityName ?? "",
+                                State = x.score?.City?.State ?? "",
+                                Country = x.score?.City?.Country ?? "",
+                                PillarID = x.pillar.PillarID,
+                                PillarName = x.pillar.PillarName,
+                                DisplayOrder = x.pillar.DisplayOrder,
+                                ImagePath = x.pillar.ImagePath,
+                                IsAccess = isAccess
+                            };
+
+                            if (isAccess && x.score != null)
+                            {
+                                r.AIDataYear = x.score.Year;
+                                r.AIScore = x.score.AIScore;
+                                r.AIProgress = x.score.AIProgress;
+                                r.EvaluatorScore = x.score.EvaluatorScore;
+                                r.Discrepancy = x.score.Discrepancy;
+                                r.ConfidenceLevel = x.score.ConfidenceLevel;
+                                r.EvidenceSummary = x.score.EvidenceSummary;
+                                r.StructuralEvidence = x.score.StructuralEvidence;
+                                r.OperationalEvidence = x.score.OperationalEvidence;
+                                r.OutcomeEvidence = x.score.OutcomeEvidence;
+                                r.PerceptionEvidence = x.score.PerceptionEvidence;
+                                r.TemporalScope = x.score.TemporalScope;
+                                r.DistortionScreening = x.score.DistortionScreening;
+                                r.RelationalIntegrity = x.score.RelationalIntegrity;
+                                r.StressPoliticalShock = x.score.StressPoliticalShock;
+                                r.StressEconomicShock = x.score.StressEconomicShock;
+                                r.StressNarrativeShock = x.score.StressNarrativeShock;
+                                r.StressOverallResilience = x.score.StressOverallResilience;
+                                r.StressScoreAdjustment = x.score.StressScoreAdjustment;
+                                r.InequalityAdjustment = x.score.InequalityAdjustment;
+                                r.OpacityRisk = x.score.OpacityRisk;
+                                r.NonCompensationNote = x.score.NonCompensationNote;
+                                r.GeographicEquityNote = x.score.GeographicEquityNote;
+                                r.InstitutionalAssessment = x.score.InstitutionalAssessment;
+                                r.DataGapAnalysis = x.score.DataGapAnalysis;
+                                r.RedFlag = x.score.RedFlag;
+                                r.DataSourceCitations = x.score.DataSourceCitations;
+                                r.UpdatedAt = x.score.UpdatedAt;
+                            }
+
+                            return r;
+                        })
+                        .OrderBy(x => !x.IsAccess)
+                        .ThenBy(x => x.DisplayOrder)
+                        .ToList();
+
+                    result.Add(cityId, pillarResults);
+                }
+
+                var progress = await _commonService.GetCitiesProgressAsync(userID, (int)userRole, currentYear);
+
+                var answeredQuestions = await _context.AIEstimatedQuestionScores
+                    .Where(x => x.Year == currentYear)
+                    .GroupBy(x => new { x.CityID, x.PillarID })
+                    .Select(g => new
+                    {
+                        g.Key.CityID,
+                        g.Key.PillarID,
+                        AnsweredQuestions = g.Count()
+                    })
+                    .ToListAsync();
+
+                foreach (var city in result)
+                {
+                    foreach (var c in city.Value)
+                    {
+                        var totalQuestions = pillars.FirstOrDefault(x => x.PillarID == c.PillarID)?.TotalQuestions ?? 1;
+
+                        var answeredQuestion = answeredQuestions
+                            .FirstOrDefault(x => x.CityID == city.Key && x.PillarID == c.PillarID)?.AnsweredQuestions ?? 0;
+
+                        var cityScore = progress
+                            .Where(x => x.CityID == city.Key && x.PillarID == c.PillarID)
+                            .Select(x => x.ScoreProgress)
+                            .DefaultIfEmpty(0)
+                            .Average();
+
+                        c.EvaluatorScore = cityScore;
+                        c.Discrepancy = Math.Abs(cityScore - (c.AIProgress ?? 0));
+                        c.AICompletionRate = answeredQuestion * 100.0M / totalQuestions;
+                    }
+                }
+
+                var response = ResultResponseDto<Dictionary<int, List<AiCityPillarResponse>>>
+                    .Success(result, new[] { "All cities pillars fetched successfully" });
+
+                return response;
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error Occured in GetAllCitiesAIPillars", ex);
+
+                return ResultResponseDto<Dictionary<int, List<AiCityPillarResponse>>>
+                    .Failure(new[] { "Error in getting cities pillar details" });
+            }
+        }
+        public record KpiChartItem(string ShortName, string Name, decimal? Value, int? CityID);
 
         #endregion
     }

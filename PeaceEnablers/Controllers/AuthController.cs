@@ -1,9 +1,12 @@
 
-using PeaceEnablers.Dtos.CityDto;
-using PeaceEnablers.Dtos.UserDtos;
-using PeaceEnablers.IServices;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+
+using PeaceEnablers.Dtos.CityDto;
+using PeaceEnablers.Dtos.EmailExistDto;
+using PeaceEnablers.Dtos.UserDtos;
+using PeaceEnablers.IServices;
+using PeaceEnablers.Services;
 
 namespace PeaceEnablers.Controllers
 {
@@ -93,6 +96,20 @@ namespace PeaceEnablers.Controllers
         }
 
         [HttpPost]
+        [AllowAnonymous]
+        [Route("CheckEmailExist")]        
+        public async Task<IActionResult> CheckEmailExist([FromBody] EmailExistRequestDto request)
+        {
+
+            var response = await _authService.CheckEmailExist(request);
+
+            if (response == null)
+                return StatusCode(500, "Email Check Validation failed due to a server error.");
+
+            return Ok(response);
+        }
+
+        [HttpPost]
         [Route("UpdateInviteUser")]
         [Authorize]
         public async Task<IActionResult> UpdateInviteUser([FromBody] UpdateInviteUserDto request)
@@ -106,7 +123,7 @@ namespace PeaceEnablers.Controllers
                 return StatusCode(500, "User Invitation failed due to a server error.");
 
             return Ok(response);
-        }
+        }        
 
         [HttpPost("register")]
         [Authorize(Roles = "Admin")]
@@ -189,6 +206,24 @@ namespace PeaceEnablers.Controllers
             if (user == null)
                 return Unauthorized();
             return Ok(user);
+        }
+        [HttpPost]
+        [Route("updateUser")]
+        public async Task<IActionResult> UpdateUser([FromForm] UpdateUserDto dto)
+        {
+            var claimUserId = GetUserIdFromClaims();
+            if (claimUserId == null || claimUserId != dto.UserID)
+                return Unauthorized("User ID not found.");
+
+            return Ok(await _authService.UpdateUser(dto));
+        }
+        private int? GetUserIdFromClaims()
+        {
+            var userIdClaim = User.FindFirst("UserId")?.Value;
+            if (int.TryParse(userIdClaim, out int userId))
+                return userId;
+
+            return null;
         }
     }
 

@@ -62,7 +62,7 @@ namespace PeaceEnablers.Services
                                 UnitAmount = request.Amount * 100,
                                 ProductData = new SessionLineItemPriceDataProductDataOptions
                                 {
-                                    Name = "Veridian Urban Index Payment Please don't close the window after clicking on pay button",
+                                    Name = "Peace Enablers Matrix Payment Please don't close the window after clicking on pay button",
                                     Metadata = new Dictionary<string, string>
                                     {
                                         {request.Tier.ToString(), $"Provide {request.Tier.ToString()} Paid subsciption" }

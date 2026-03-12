@@ -23,7 +23,7 @@ namespace PeaceEnablers.Services
             _appLogger = appLogger;
             _env = env;
         }
-        public User GetByEmail(string email)
+        public User? GetByEmail(string email)
         {
             return _context.Users.FirstOrDefault(u => u.Email == email);
         }
@@ -47,10 +47,10 @@ namespace PeaceEnablers.Services
                 // Build one-row-per-user by taking at most 1 mapping row per user
                 // NOTE: use a deterministic column to order (e.g., CreatedAt or primary key).
                 var query =
-                    from u in _context.Users.Where(predicate)
+                    from u in _context.Users.Where(predicate)                    
                     from uc in filteredMappings
                                 .Where(m => m.UserID == u.UserID)
-                                .Take(1)
+                                .Take(1).DefaultIfEmpty()
                     from ab in _context.Users
                                 .Where(p => uc != null && p.UserID == uc.AssignedByUserId)
                                 .DefaultIfEmpty()
@@ -93,7 +93,7 @@ namespace PeaceEnablers.Services
                               Region = c.Region,
                               State = c.State
                           }
-                      })
+                      }).Distinct()
                 .ToListAsync();
 
                 var result = cityMap
@@ -156,69 +156,6 @@ namespace PeaceEnablers.Services
             }
         }
 
-
-        public async Task<ResultResponseDto<UpdateUserResponseDto>> UpdateUser(UpdateUserDto requestDto)
-        {
-            try
-            {
-                var user = await _context.Users.FindAsync(requestDto.UserID);
-                if (user == null)
-                    return ResultResponseDto<UpdateUserResponseDto>.Failure(new List<string>() { "Invalid request " });
-
-                // Update fields
-                user.FullName = requestDto.FullName;
-                user.Phone = requestDto.Phone;
-                user.Is2FAEnabled = requestDto.Is2FAEnabled;
-                // Handle profile image upload
-                if (requestDto.ProfileImage != null)
-                {
-                    string uploadsFolder = Path.Combine(_env.WebRootPath, "uploads");
-                    if (!Directory.Exists(uploadsFolder))
-                        Directory.CreateDirectory(uploadsFolder);
-
-                    // ?? Remove old image if exists
-                    if (!string.IsNullOrEmpty(user.ProfileImagePath))
-                    {
-                        string oldFilePath = Path.Combine(_env.WebRootPath, user.ProfileImagePath.TrimStart('/'));
-                        if (File.Exists(oldFilePath))
-                        {
-                            File.Delete(oldFilePath);
-                        }
-                    }
-
-                    // Save new image
-                    string fileName = Guid.NewGuid().ToString() + Path.GetExtension(requestDto.ProfileImage.FileName);
-                    string filePath = Path.Combine(uploadsFolder, fileName);
-
-                    using (var stream = new FileStream(filePath, FileMode.Create))
-                    {
-                        await requestDto.ProfileImage.CopyToAsync(stream);
-                    }
-
-                    user.ProfileImagePath = "/uploads/" + fileName;
-                }
-
-                _context.Users.Update(user);
-                await _context.SaveChangesAsync();
-
-                var response = new UpdateUserResponseDto
-                {
-                    UserID = user.UserID,
-                    FullName = user.FullName,
-                    Phone = user.Phone,
-                    Is2FAEnabled = user.Is2FAEnabled,
-                    ProfileImagePath = user.ProfileImagePath,
-                    Tier = user.Tier ?? Enums.TieredAccessPlan.Pending
-                };
-
-                return ResultResponseDto<UpdateUserResponseDto>.Success(response, new List<string> { "Updated successfully" });
-            }
-            catch (Exception ex)
-            {
-                await _appLogger.LogAsync("Error Occure UpdateUser", ex);
-                return ResultResponseDto<UpdateUserResponseDto>.Failure(new string[] { "There is an error please try later" });
-            }
-        }
         public async Task<ResultResponseDto<List<GetAssessmentResponseDto>>> GetUsersAssignedToCity(int cityId)
         {
             try

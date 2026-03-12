@@ -122,7 +122,7 @@ namespace PeaceEnablers.Controllers
                 var cityDetails = await _aIComputationService.GetCityAiSummeryDetail(userId ?? 0, userRole, request.CityID,request.Year);
 
                 // Generate PDF
-                var pdfBytes = await _aIComputationService.GenerateCityDetailsPdf(cityDetails, userRole);
+                var pdfBytes = await _aIComputationService.GenerateCityDetailsPdf(cityDetails, userRole, userId ?? 0);
 
                 // Return PDF with proper headers
                 var fileName = $"{cityDetails.CityName}_Details_{DateTime.Now:yyyyMMdd}.pdf";
@@ -283,6 +283,49 @@ namespace PeaceEnablers.Controllers
             }
 
             return Ok(await _aIComputationService.RegeneratePillarAiSearch(aiCityIdsDto, userId.Value, userRole));
+        }
+        [HttpGet("aiAllCityDetailsReport")]
+        public async Task<IActionResult> DownloadAllCityPdf()
+        {
+            try
+            {
+                var userId = GetUserIdFromClaims();
+                if (userId == null)
+                    return Unauthorized("User ID not found in token.");
+
+                var role = GetRoleFromClaims();
+                if (role == null)
+                    return Unauthorized("You Don't have access.");
+
+                if (!Enum.TryParse<UserRole>(role, true, out var userRole))
+                {
+                    return Unauthorized("You Don't have access.");
+                }
+                var year = DateTime.Now.Year;
+                var cityDetails = await _aIComputationService.GetAllCityAiSummeryDetail(userId ?? 0, userRole, year);
+
+                if (cityDetails.Count > 0)
+                {
+                    // Generate PDF
+                    var pdfBytes = await _aIComputationService.GenerateAllCityDetailsPdf(cityDetails, userRole, userId.GetValueOrDefault(), year);
+
+                    // Return PDF with proper headers
+                    var fileName = $"All_Details_{DateTime.Now:yyyyMMdd}.pdf";
+
+                    return File(pdfBytes, "application/pdf", fileName);
+                }
+                return NotFound("No City Found.");
+
+            }
+            catch (Exception ex)
+            {
+                // Log error
+                return StatusCode(500, new
+                {
+                    message = "Error generating PDF",
+                    error = ex.Message
+                });
+            }
         }
     }
 }

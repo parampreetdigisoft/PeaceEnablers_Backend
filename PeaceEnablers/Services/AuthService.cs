@@ -1,15 +1,22 @@
-﻿using PeaceEnablers.Common.Interface;
+﻿using DocumentFormat.OpenXml.InkML;
+using DocumentFormat.OpenXml.Spreadsheet;
+
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
+
+using PeaceEnablers.Common.Implementation;
+using PeaceEnablers.Common.Interface;
 using PeaceEnablers.Common.Models;
 using PeaceEnablers.Common.Models.settings;
 using PeaceEnablers.Data;
 using PeaceEnablers.Dtos.CityDto;
+using PeaceEnablers.Dtos.EmailExistDto;
 using PeaceEnablers.Dtos.UserDtos;
 using PeaceEnablers.IServices;
 using PeaceEnablers.Models;
 using PeaceEnablers.Views.EmailModels;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
+
 using System.Data;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -25,13 +32,15 @@ namespace PeaceEnablers.Services
         private readonly JwtSetting _jwtSetting;
         private readonly IEmailService _emailService;
         private readonly IAppLogger _appLogger;
-        public AuthService(ApplicationDbContext context, IOptions<AppSettings> appSettings, IEmailService emailService, IOptions<JwtSetting> jwtSetting, IAppLogger appLogger)
+        private readonly IWebHostEnvironment _env;
+        public AuthService(ApplicationDbContext context, IOptions<AppSettings> appSettings, IEmailService emailService, IOptions<JwtSetting> jwtSetting, IAppLogger appLogger, IWebHostEnvironment env)
         {
             _context = context;
             _appSettings = appSettings.Value;
             _emailService = emailService;
             _jwtSetting = jwtSetting.Value;
             _appLogger = appLogger;
+            _env = env;
         }
         #endregion
 
@@ -55,7 +64,7 @@ namespace PeaceEnablers.Services
             return user;
         }
 
-        public User GetByEmail(string email)
+        public User? GetByEmail(string email)
         {
             return _context.Users.FirstOrDefault(u => u.Email == email);
         }
@@ -93,7 +102,7 @@ namespace PeaceEnablers.Services
                     var url = user.Role != UserRole.CityUser ? _appSettings.ApplicationUrl : _appSettings.PublicApplicationUrl;
                     string passwordResetLink = url + "/auth/reset-password?PasswordToken=" + token;
 
-                    var sub = "Password Update Link – Veridian Urban Index Platform";
+                    var sub = "Password Update Link – Peace Enablers Matrix Platform";
                     var model = new EmailInvitationSendRequestDto
                     {
                         ResetPasswordUrl = passwordResetLink,
@@ -277,7 +286,7 @@ namespace PeaceEnablers.Services
                 var hash = BCrypt.Net.BCrypt.HashPassword(inviteUser.Email);
                 var passwordToken = hash;
                 var token = passwordToken.Replace("+", " ");
-                string sub = $"{inviteUser.Role.ToString()} Access Granted – Veridian Urban Index Platform";
+                string sub = $"{inviteUser.Role.ToString()} Access Granted – Peace Enablers Matrix Platform";
                 var url = _appSettings.ApplicationUrl; 
                 string passwordResetLink = url + "/auth/reset-password?PasswordToken=" + token;
 
@@ -363,6 +372,7 @@ namespace PeaceEnablers.Services
                 user.FullName = inviteUser.FullName;
                 user.Phone = inviteUser.Phone;
                 user.CreatedBy = inviteUser.InvitedUserID;
+                user.Email = inviteUser.Email;
                 _context.Users.Update(user);
 
                 var existingMappings = _context.UserCityMappings
@@ -418,7 +428,7 @@ namespace PeaceEnablers.Services
                     var invitedCityNames = string.Join(", ",
                         cities.Where(c => citiesToAdd.Contains(c.CityID)).Select(c => c.CityName));
 
-                    msgText = $"You are receiving this email because {invitedUser?.FullName} recently requested city assignment ({invitedCityNames}) for your USVI account.";
+                    msgText = $"You are receiving this email because {invitedUser?.FullName} recently requested city assignment ({invitedCityNames}) for your PEM account.";
                 }
 
                 if (citiesToDelete.Count > 0)
@@ -429,20 +439,20 @@ namespace PeaceEnablers.Services
 
                     if (isMailSent)
                     {
-                        msgText += $" Additionally, you no longer have access to the cities ({deleteCityNames}) for your USVI account.";
+                        msgText += $" Additionally, you no longer have access to the cities ({deleteCityNames}) for your PEM account.";
                     }
                     else
                     {
-                        msgText = $"You are receiving this email because {invitedUser?.FullName} recently removed your access to the following cities ({deleteCityNames}) for your USVI account.";
+                        msgText = $"You are receiving this email because {invitedUser?.FullName} recently removed your access to the following cities ({deleteCityNames}) for your PEM account.";
                     }
                     isMailSent = true;
                 }
-                if (isMailSent || !user.IsEmailConfirmed)
+                if (!user.IsEmailConfirmed)
                 {
                     var hash = BCrypt.Net.BCrypt.HashPassword(inviteUser.Email);
                     var passwordToken = hash;
                     var token = passwordToken.Replace("+", " ");
-                    string sub = $"{inviteUser.Role.ToString()} Access Granted – Veridian Urban Index Platform";
+                    string sub = $"{inviteUser.Role.ToString()} Access Granted – Peace Enablers Matrix Platform";
                     var url = user.Role != UserRole.CityUser ? _appSettings.ApplicationUrl : _appSettings.PublicApplicationUrl;
                     string passwordResetLink = url + "/auth/reset-password?PasswordToken=" + token;
 
@@ -523,7 +533,32 @@ namespace PeaceEnablers.Services
                 return ResultResponseDto<UserResponseDto>.Failure(new string[] { "There is an error please try later" });
             }
         }
+        public async Task<ResultResponseDto<object>> CheckEmailExist(EmailExistRequestDto request)
+        {
+            try
+            {
+                var user =  _context.Users.FirstOrDefault(u => u.Email == request.Email.Trim() && !u.IsDeleted);
+                bool exists = user != null && user.UserID != request.UserID;
 
+                if (exists)
+                {
+                    return ResultResponseDto<object>.Failure(
+                        new[] { "Email Already Exists" },
+                        isExist: true
+                    );
+                }
+
+                return ResultResponseDto<object>.Success(
+                    messages: new[] { "Email is Valid" }
+                    
+                );
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error Occured in fetch emails", ex);
+                return ResultResponseDto<object>.Failure(new string[] { "There is an error please try later" });
+            }
+        }
         public async Task<ResultResponseDto<object>> InviteBulkUser(InviteBulkUserDto inviteUserList)
         {
             try
@@ -608,7 +643,7 @@ namespace PeaceEnablers.Services
                          .Select(c => c.CityName));
                         var invitedUser = _context.Users.FirstOrDefault(x => x.UserID == inviteUser.InvitedUserID);
 
-                        string sub = $"{inviteUser.Role.ToString()} Access Granted – Veridian Urban Index Platform";
+                        string sub = $"{inviteUser.Role.ToString()} Access Granted – Peace Enablers Matrix Platform";
                         var model = new EmailInvitationSendRequestDto
                         {
                             ResetPasswordUrl = resetLink,
@@ -686,7 +721,7 @@ namespace PeaceEnablers.Services
                             Title = "Request to update city",
                             ApiUrl = _appSettings.ApiUrl,
                             ApplicationUrl = _appSettings.ApplicationUrl,
-                            MsgText = $"You are receiving this email because user {user?.FullName} recently requested to update city {city?.CityName} from their USVI account.",
+                            MsgText = $"You are receiving this email because user {user?.FullName} recently requested to update city {city?.CityName} from their PEM account.",
                             BtnText = "Give Access",
                             Mail = _appSettings.AdminMail
                         };
@@ -741,8 +776,11 @@ namespace PeaceEnablers.Services
                         Title = "Verify Your Email",
                         ApiUrl = _appSettings.ApiUrl,
                         ApplicationUrl = _appSettings.PublicApplicationUrl,
-                        MsgText = "Thank you for signing up! Please verify your email and reset your password to complete registration.",
-                        Mail = _appSettings.AdminMail
+                        MsgText = "Thank you for signing up! Please verify your email to complete registration.",
+                        Mail = _appSettings.AdminMail,
+                        BtnText = "Verify",
+                        DescriptionAboutBtnText = "Please verify your email address by clicking the button above.",
+                        IsLoginBtn = false
                     };
 
                     isMailSend = await _emailService.SendEmailAsync(
@@ -757,6 +795,7 @@ namespace PeaceEnablers.Services
                         user.ResetTokenDate = DateTime.Now;
                     }
                 }
+                user.TemporaryEmail = user.Email;                
 
                 _context.Users.Update(user);
 
@@ -792,29 +831,43 @@ namespace PeaceEnablers.Services
         {
             try
             {
-                var user = await _context.Users.Where(u => u.ResetToken == passwordToken).FirstOrDefaultAsync();
+                var user = await _context.Users
+                    .Where(u => u.ResetToken == passwordToken)
+                    .FirstOrDefaultAsync();
 
                 if (user == null)
                 {
                     return ResultResponseDto<object>.Failure(new string[] { "User not exist." });
                 }
+
                 if (_appSettings.LinkValidHours >= (DateTime.Now - user.ResetTokenDate).Hours)
                 {
-                    user.IsEmailConfirmed = true;
+                    if (!string.IsNullOrEmpty(user.TemporaryEmail))
+                    {
+                        user.Email = user.TemporaryEmail;
+                        user.TemporaryEmail = null;
+                        user.IsEmailConfirmed = true;
+                    }
+
                     _context.Users.Update(user);
                     await _context.SaveChangesAsync();
 
-                    return ResultResponseDto<object>.Success(new { }, new string[] { "Mail Confirmed Successfully, You Can Login Now!" });
+                    return ResultResponseDto<object>.Success(
+                        new { ResetToken = passwordToken },
+                        new string[] { "Mail Confirmed Successfully." }
+                    );
                 }
                 else
                 {
-                    return ResultResponseDto<object>.Failure(new string[] { "Link has been expired. You can reset your password" });
+                    return ResultResponseDto<object>.Failure(
+                        new string[] { "Link has been expired. You can reset your password" });
                 }
             }
             catch (Exception ex)
             {
                 await _appLogger.LogAsync("Error change password", ex);
-                return ResultResponseDto<object>.Failure(new string[] { "There is an error please try later" });
+                return ResultResponseDto<object>.Failure(
+                    new string[] { "There is an error please try later" });
             }
         }
         public async Task<ResultResponseDto<object>> ContactUs(ContactUsRequestDto requestDto)
@@ -954,6 +1007,122 @@ namespace PeaceEnablers.Services
             {
                 await _appLogger.LogAsync("Error in SendTwoFactorOTPAsync", ex);
                 return ResultResponseDto<string>.Failure(new[] { "There was an error while sending OTP. Please try again later." });
+            }
+        }
+
+        public async Task<ResultResponseDto<UpdateUserResponseDto>> UpdateUser(UpdateUserDto requestDto)
+        {
+            try
+            {
+                var user = await _context.Users.FindAsync(requestDto.UserID);
+                if (user == null)
+                    return ResultResponseDto<UpdateUserResponseDto>.Failure(new List<string>() { "Invalid request " });
+
+                // Handle profile image upload
+                if (requestDto.ProfileImage != null)
+                {
+                    string uploadsFolder = Path.Combine(_env.WebRootPath, "uploads");
+                    if (!Directory.Exists(uploadsFolder))
+                        Directory.CreateDirectory(uploadsFolder);
+
+                    // ?? Remove old image if exists
+                    if (!string.IsNullOrEmpty(user.ProfileImagePath))
+                    {
+                        string oldFilePath = Path.Combine(_env.WebRootPath, user.ProfileImagePath.TrimStart('/'));
+                        if (File.Exists(oldFilePath))
+                        {
+                            File.Delete(oldFilePath);
+                        }
+                    }
+
+                    // Save new image
+                    string fileName = Guid.NewGuid().ToString() + Path.GetExtension(requestDto.ProfileImage.FileName);
+                    string filePath = Path.Combine(uploadsFolder, fileName);
+
+                    using (var stream = new FileStream(filePath, FileMode.Create))
+                    {
+                        await requestDto.ProfileImage.CopyToAsync(stream);
+                    }
+
+                    user.ProfileImagePath = "/uploads/" + fileName;
+                }
+               
+                bool isMailSent = false;
+                if (requestDto.Email != user.Email)
+                {
+                    var existUser = _context.Users.FirstOrDefault(u => u.Email == requestDto.Email.Trim() && !u.IsDeleted && u.UserID != requestDto.UserID);
+                    if (existUser != null)
+                    {
+                        return ResultResponseDto<UpdateUserResponseDto>.Failure(new List<string>() { "Email Already Exists" });
+                    }
+                    user.TemporaryEmail = requestDto.Email;
+                    var hash = BCrypt.Net.BCrypt.HashPassword(requestDto.Email);
+                    var token = hash.Replace("+", " ");
+                    var passwordResetLink = $"{_appSettings.PublicApplicationUrl}/auth/confirm-mail?PasswordToken={token}";
+
+                    var emailModel = new EmailInvitationSendRequestDto
+                    {
+                        ResetPasswordUrl = passwordResetLink,
+                        Title = "Verify Your Email",
+                        ApiUrl = _appSettings.ApiUrl,
+                        ApplicationUrl = _appSettings.PublicApplicationUrl,
+                        MsgText = "A request was made to update the Email for your Peace Enablers Matrix (PEM) account. Please verify your email or reset your password.",
+                        Mail = _appSettings.AdminMail,
+                        BtnText = "Verify",
+                        DescriptionAboutBtnText = "Please verify your email address by clicking the button above."
+                    };
+
+                    isMailSent = await _emailService.SendEmailAsync(requestDto.Email, "Verify Your Email",
+                        "~/Views/EmailTemplates/ChangePassword.cshtml", emailModel
+                    );
+
+                    if (isMailSent)
+                    {                       
+                        user.IsEmailConfirmed = false; // Require reconfirmation for new email                       
+                        user.ResetToken = token;
+                        user.ResetTokenDate = DateTime.Now;
+                    }
+                    else
+                    {                        
+                        return ResultResponseDto<UpdateUserResponseDto>.Failure(new List<string>()
+                            { "Failed to send email confirmation. Please try again later." }
+                        );
+                    }
+                }
+
+                // Update fields
+                user.FullName = requestDto.FullName;
+                user.Phone = requestDto.Phone;
+                user.Is2FAEnabled = requestDto.Is2FAEnabled;
+
+                _context.Users.Update(user);
+                await _context.SaveChangesAsync();
+
+                var response = new UpdateUserResponseDto
+                {
+                    UserID = user.UserID,
+                    FullName = user.FullName,
+                    Phone = user.Phone,
+                    Email = user.Email,
+                    Is2FAEnabled = user.Is2FAEnabled,
+                    ProfileImagePath = user.ProfileImagePath,
+                    Tier = user.Tier ?? Enums.TieredAccessPlan.Pending
+                };
+                var messages = new List<string>();
+                if (isMailSent)
+                {
+                    messages.Add("Confirmation Mail Sent and Details Updated Successfully");
+                }
+                else
+                {
+                    messages.Add("Updated Successfully");
+                }
+                return ResultResponseDto<UpdateUserResponseDto>.Success(response, messages);               
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error Occure UpdateUser", ex);
+                return ResultResponseDto<UpdateUserResponseDto>.Failure(new string[] { "There is an error please try later" });
             }
         }
 

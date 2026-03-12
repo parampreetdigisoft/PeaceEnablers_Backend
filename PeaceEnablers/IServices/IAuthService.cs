@@ -1,5 +1,6 @@
 ﻿using PeaceEnablers.Common.Models;
 using PeaceEnablers.Dtos.CityDto;
+using PeaceEnablers.Dtos.EmailExistDto;
 using PeaceEnablers.Dtos.UserDtos;
 using PeaceEnablers.Models;
 
@@ -16,6 +17,7 @@ namespace PeaceEnablers.IServices
         Task<ResultResponseDto<object>> ChangePassword(string passwordToken, string password);
         Task<ResultResponseDto<object>> InviteUser(InviteUserDto inviteUser);
         Task<ResultResponseDto<object>> InviteBulkUser(InviteBulkUserDto inviteUser);
+        Task<ResultResponseDto<object>> CheckEmailExist(EmailExistRequestDto request);
         Task<ResultResponseDto<object>> UpdateInviteUser(UpdateInviteUserDto inviteUser);
         Task<ResultResponseDto<object>> DeleteUser(int userId);
         Task<ResultResponseDto<UserResponseDto>> RefreshToken(int userId);
@@ -25,5 +27,6 @@ namespace PeaceEnablers.IServices
         Task<ResultResponseDto<object>> ContactUs(ContactUsRequestDto passwordToken);
         Task<ResultResponseDto<UserResponseDto>> TwofaVerification(string email, int otp);
         Task<ResultResponseDto<string>> ReSendLoginOtp(string email);
+        Task<ResultResponseDto<UpdateUserResponseDto>> UpdateUser(UpdateUserDto requestDto);
     }
 }

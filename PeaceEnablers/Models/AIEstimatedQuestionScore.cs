@@ -10,24 +10,43 @@
 
         public decimal? AIScore { get; set; }
         public decimal? AIProgress { get; set; }
-        public decimal? EvaluatorProgress { get; set; }
+        public decimal? EvaluatorScore { get; set; }   // ✅ renamed
         public decimal? Discrepancy { get; set; }
 
-        public string ConfidenceLevel { get; set; }
-        public int? DataSourcesUsed { get; set; }
+        public string? ConfidenceLevel { get; set; }
+        public string? EvidenceSummary { get; set; }
 
-        public string EvidenceSummary { get; set; }
-        public string RedFlags { get; set; }
-        public string GeographicEquityNote { get; set; }
+        // New Evidence Dimensions
+        public string? StructuralEvidence { get; set; }
+        public string? OperationalEvidence { get; set; }
+        public string? OutcomeEvidence { get; set; }
+        public string? PerceptionEvidence { get; set; }
 
-        public string SourceType { get; set; }
-        public string SourceName { get; set; }
-        public string SourceURL { get; set; }
+        public string? TemporalScope { get; set; }
+        public string? DistortionScreening { get; set; }
+        public string? RelationalDependencies { get; set; }
+
+        // Stress Tests
+        public string? StressPoliticalShock { get; set; }
+        public string? StressEconomicShock { get; set; }
+        public string? StressNarrativeShock { get; set; }
+        public string? StressOverallResilienceShock { get; set; }
+
+        public string? InequalityAdjustment { get; set; }
+        public string? OpacityRisk { get; set; }
+
+        public string? RedFlag { get; set; }   // ✅ renamed
+
+        // Source Metadata
+        public string? SourceName { get; set; }
+        public string? SourceType { get; set; }
+        public string? SourceURL { get; set; }
         public int? SourceDataYear { get; set; }
-        public string SourceDataExtract { get; set; }
-        public int? SourceTrustLevel { get; set; }
+        public int? SourceHierarchyLevel { get; set; }   // ✅ renamed
+        public string? SourceDataExtract { get; set; }
+        public int? SourcesConsulted { get; set; }       // ✅ renamed
 
-        public DateTime? UpdatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
 
         // Navigation Properties
         public City? City { get; set; }

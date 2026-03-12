@@ -88,33 +88,18 @@ namespace PeaceEnablers.Services
             LayerID = ar.LayerID,
             CityID = ar.CityID,
             InterpretationID = ar.InterpretationID,
-            NormalizeValue = ar.NormalizeValue,
-            CalValue1 = ar.CalValue1,
-            CalValue2 = ar.CalValue2,
-            CalValue3 = ar.CalValue3,
-            CalValue4 = ar.CalValue4,
+            NormalizeValue = ar.NormalizeValue,            
             CalValue5 = ar.CalValue5,
             LastUpdated = ar.LastUpdated,
-
             AiInterpretationID = ar.AiInterpretationID,
-            AiNormalizeValue = ar.AiNormalizeValue,
-            AiCalValue1 = ar.AiCalValue1,
-            AiCalValue2 = ar.AiCalValue2,
-            AiCalValue3 = ar.AiCalValue3,
-            AiCalValue4 = ar.AiCalValue4,
             AiCalValue5 = ar.AiCalValue5,
+            AiNormalizeValue = ar.AiNormalizeValue,           
             AiLastUpdated = ar.AiLastUpdated,
-
             LayerCode = ar.AnalyticalLayer.LayerCode,
             LayerName = ar.AnalyticalLayer.LayerName,
-            Purpose = ar.AnalyticalLayer.Purpose,
-            CalText1 = ar.AnalyticalLayer.CalText1,
-            CalText2 = ar.AnalyticalLayer.CalText2,
-            CalText3 = ar.AnalyticalLayer.CalText3,
-            CalText4 = ar.AnalyticalLayer.CalText4,
+            Purpose = ar.AnalyticalLayer.Purpose,            
             CalText5 = ar.AnalyticalLayer.CalText5,
-            FiveLevelInterpretations = ar.AnalyticalLayer.FiveLevelInterpretations,
-
+            FiveLevelInterpretations = ar.AnalyticalLayer.FiveLevelInterpretations.OrderByDescending(f => f.MaxRange).ToList(),
             City = ar.City
         };
 
@@ -351,11 +336,7 @@ namespace PeaceEnablers.Services
 
                         LayerCode = g.Select(x => x.AnalyticalLayer.LayerCode).FirstOrDefault()?? string.Empty,
                         LayerName = g.Select(x => x.AnalyticalLayer.LayerName).FirstOrDefault() ?? string.Empty,
-                        Purpose = g.Select(x => x.AnalyticalLayer.Purpose).FirstOrDefault() ?? string.Empty,
-                        CalText1 = g.Select(x => x.AnalyticalLayer.CalText1).FirstOrDefault(),
-                        CalText2 = g.Select(x => x.AnalyticalLayer.CalText2).FirstOrDefault(),
-                        CalText3 = g.Select(x => x.AnalyticalLayer.CalText3).FirstOrDefault(),
-                        CalText4 = g.Select(x => x.AnalyticalLayer.CalText4).FirstOrDefault(),
+                        Purpose = g.Select(x => x.AnalyticalLayer.Purpose).FirstOrDefault() ?? string.Empty,                        
                         CalText5 = g.Select(x => x.AnalyticalLayer.CalText5).FirstOrDefault(),
 
                         FiveLevelInterpretations = g.First().AnalyticalLayer.FiveLevelInterpretations,
@@ -364,22 +345,12 @@ namespace PeaceEnablers.Services
                         {
                             CityID = x.CityID,
                             InterpretationID = x.InterpretationID,
-                            NormalizeValue = x.NormalizeValue,
-                            CalValue1 = x.CalValue1,
-                            CalValue2 = x.CalValue2,
-                            CalValue3 = x.CalValue3,
-                            CalValue4 = x.CalValue4,
+                            NormalizeValue = x.NormalizeValue,                            
                             CalValue5 = x.CalValue5,
                             LastUpdated = x.LastUpdated,
-
                             AiInterpretationID = x.AiInterpretationID,
-                            AiNormalizeValue = x.AiNormalizeValue,
-                            AiCalValue1 = x.AiCalValue1,
-                            AiCalValue2 = x.AiCalValue2,
-                            AiCalValue3 = x.AiCalValue3,
-                            AiCalValue4 = x.AiCalValue4,
+                            AiNormalizeValue = x.AiNormalizeValue,                            
                             AiCalValue5 = x.AiCalValue5,
-
                             AiLastUpdated = x.AiLastUpdated,
                             City = x.City
                         }).ToList()
