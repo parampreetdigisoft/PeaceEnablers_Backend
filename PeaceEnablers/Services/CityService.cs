@@ -1,4 +1,8 @@
-﻿using PeaceEnablers.Common.Implementation;
+﻿using AssessmentPlatform.Models;
+using ClosedXML.Excel;
+using Microsoft.EntityFrameworkCore;
+using PeaceEnablers.Backgroundjob;
+using PeaceEnablers.Common.Implementation;
 using PeaceEnablers.Common.Interface;
 using PeaceEnablers.Common.Models;
 using PeaceEnablers.Data;
@@ -7,8 +11,6 @@ using PeaceEnablers.Dtos.CityDto;
 using PeaceEnablers.Dtos.CommonDto;
 using PeaceEnablers.IServices;
 using PeaceEnablers.Models;
-using ClosedXML.Excel;
-using Microsoft.EntityFrameworkCore;
 using System.Data;
 using System.Linq.Expressions;
 
@@ -22,12 +24,14 @@ namespace PeaceEnablers.Services
         private readonly IAppLogger _appLogger;
         private readonly IWebHostEnvironment _env;
         private readonly ICommonService _commonService;
-        public CityService(ApplicationDbContext context, IAppLogger appLogger, IWebHostEnvironment env, ICommonService commonService)
+        private readonly Download _download;
+        public CityService(ApplicationDbContext context, IAppLogger appLogger, IWebHostEnvironment env, ICommonService commonService, Download download)
         {
             _context = context;
             _appLogger = appLogger;
             _env = env;
             _commonService = commonService;
+            _download = download;
         }
 
         #endregion
@@ -87,8 +91,12 @@ namespace PeaceEnablers.Services
                     existing.Country = q.Country;
                     existing.Latitude = q.Latitude;
                     existing.Longitude = q.Longitude;
+                    existing.Income = q.Income;
+                    existing.Population = q.Population;
+                    existing.CityAliasName = q.CityAliasName;
                     _context.Cities.Update(existing);
                     await _context.SaveChangesAsync();
+                    await UpdatePeerCities(existing.CityID, q.PeerCities ?? new List<int>());
 
                     return ResultResponseDto<string>.Success("", new string[] { "City edited Successfully" });
                 }
@@ -105,84 +113,180 @@ namespace PeaceEnablers.Services
                 return ResultResponseDto<string>.Failure(new string[] { "There is an error please try later" });
             }
         }
-        public async Task<ResultResponseDto<string>> AddBulkCityAsync(BulkAddCityDto request, string image="")
+        public async Task UpdatePeerCities(int cityId, List<int> peerCityIds)
+        {
+            if (peerCityIds == null)
+                peerCityIds = new List<int>();
+
+            // Remove self and duplicates
+            peerCityIds = peerCityIds
+                .Where(x => x != cityId)
+                .Distinct()
+                .ToList();
+
+            var existingPeers = await _context.CityPeers
+                .Where(x => x.CityID == cityId && !x.IsDeleted)
+                .ToListAsync();
+
+            var existingPeerIds = existingPeers
+                .Select(x => x.PeerCityID)
+                .ToList();
+
+            // Soft delete removed peers
+            var removePeers = existingPeers
+                .Where(x => !peerCityIds.Contains(x.PeerCityID))
+                .ToList();
+
+            foreach (var peer in removePeers)
+            {
+                peer.IsDeleted = true;
+                peer.IsActive = false;
+                peer.UpdatedDate = DateTime.UtcNow;
+            }
+
+            // Add new peers
+            var newPeers = peerCityIds
+                .Where(x => !existingPeerIds.Contains(x))
+                .ToList();
+
+            foreach (var peerId in newPeers)
+            {
+                await _context.CityPeers.AddAsync(new CityPeer
+                {
+                    CityID = cityId,
+                    PeerCityID = peerId,
+                    IsActive = true,
+                    UpdatedDate = DateTime.UtcNow
+                });
+            }
+            if (newPeers.Count > 0 || removePeers.Count > 0)
+            {
+                _download.InsertAnalyticalLayerResults(cityId);
+            }
+
+            await _context.SaveChangesAsync();
+        }
+        public async Task<ResultResponseDto<string>> AddBulkCityAsync(BulkAddCityDto request, string image = "")
         {
             try
             {
-                // Normalize input list
+                // ✅ Normalize input
                 var inputCities = request.Cities
-                    .Select(c => new { Country = c.Country,PostalCode = c.PostalCode, CityName = c.CityName.Trim(), State = c.State.Trim(), Region = c.Region?.Trim(), Longitude = c.Longitude, Latitude = c.Latitude })
-                    .Distinct()
+                    .Select(c => new
+                    {
+                        Country = c.Country,
+                        PostalCode = c.PostalCode,
+                        CityName = c.CityName.Trim().ToLower(),
+                        State = c.State.Trim().ToLower(),
+                        Region = c.Region?.Trim(),
+                        Longitude = c.Longitude,
+                        Latitude = c.Latitude,
+                        Income = c.Income,
+                        Population = c.Population,
+                        CityAliasName = c.CityAliasName,
+                        PeerCities = c.PeerCities
+                    })
+                    .GroupBy(c => new { c.CityName, c.State })
+                    .Select(g => g.First())
                     .ToList();
 
-                // Get already existing cities (match by CityName + State)
+                // ✅ Get existing cities (correct matching)
                 var existingCities = await _context.Cities
-                    .Where(x => x.IsActive && !x.IsDeleted &&
-                                inputCities.Select(c => c.CityName.ToLower()).Contains(x.CityName.ToLower()) &&
-                                inputCities.Select(c => c.State.ToLower()).Contains(x.State.ToLower()))
-                    .Select(x => new { x.CityName, x.State })
+                    .Where(x => x.IsActive && !x.IsDeleted)
+                    .Select(x => new
+                    {
+                        CityName = x.CityName.ToLower(),
+                        State = x.State.ToLower()
+                    })
                     .ToListAsync();
 
-                var existingCityNames = existingCities
-                    .Select(x => $"{x.CityName}, {x.State}")
-                    .ToList();
+                var existingSet = new HashSet<string>(
+                    existingCities.Select(x => $"{x.CityName}_{x.State}")
+                );
 
-                // Filter out cities that already exist
+                // ✅ Filter new cities
                 var newCities = inputCities
-                    .Where(c => !existingCities.Any(e =>
-                        e.CityName.Equals(c.CityName, StringComparison.OrdinalIgnoreCase) &&
-                        e.State.Equals(c.State, StringComparison.OrdinalIgnoreCase)))
+                    .Where(c => !existingSet.Contains($"{c.CityName}_{c.State}"))
                     .ToList();
 
-                // Add only non-existing cities
-                foreach (var cityDto in newCities)
-                {
-                    var city = new City
-                    {
-                        CityID = 0,
-                        Country = cityDto.Country,
-                        CityName = cityDto.CityName,
-                        State = cityDto.State,
-                        Region = cityDto.Region,
-                        CreatedDate = DateTime.Now,
-                        PostalCode = cityDto.PostalCode,
-                        IsActive = true,
-                        IsDeleted = false,
-                        Image = image,
-                        Longitude = cityDto.Longitude,
-                        Latitude = cityDto.Latitude
-                    };
-                    _context.Cities.Add(city);
-                }
+                var existingCityNames = inputCities
+                    .Where(c => existingSet.Contains($"{c.CityName}_{c.State}"))
+                    .Select(c => $"{c.CityName}, {c.State}")
+                    .ToList();
 
+                // ✅ Create city entities
+                var cityEntities = newCities.Select(cityDto => new City
+                {
+                    Country = cityDto.Country,
+                    CityName = cityDto.CityName,
+                    State = cityDto.State,
+                    Region = cityDto.Region,
+                    CreatedDate = DateTime.UtcNow,
+                    PostalCode = cityDto.PostalCode,
+                    IsActive = true,
+                    IsDeleted = false,
+                    Image = image,
+                    Longitude = cityDto.Longitude,
+                    Latitude = cityDto.Latitude,
+                    Income = cityDto.Income,
+                    Population = cityDto.Population,
+                    CityAliasName = cityDto.CityAliasName
+                }).ToList();
+
+                await _context.Cities.AddRangeAsync(cityEntities);
                 await _context.SaveChangesAsync();
 
-                // Build response message
+                var cityPeers = new List<CityPeer>();
+
+                for (int i = 0; i < newCities.Count; i++)
+                {
+                    var dto = newCities[i];
+                    var city = cityEntities[i];
+
+                    if (dto.PeerCities != null && dto.PeerCities.Any())
+                    {
+                        cityPeers.AddRange(dto.PeerCities.Select(peerId => new CityPeer
+                        {
+                            CityID = city.CityID,
+                            PeerCityID = peerId,
+                            IsActive = true,
+                            UpdatedDate = DateTime.UtcNow
+                        }));
+                    }
+                }
+
+                if (cityPeers.Any())
+                {
+                    await _context.CityPeers.AddRangeAsync(cityPeers);
+                    await _context.SaveChangesAsync();
+                }
+
+                // ✅ Response handling
                 if (existingCityNames.Any() && newCities.Any())
                 {
                     return ResultResponseDto<string>.Success(
                         "",
-                        new string[] { $"{string.Join(", ", existingCityNames)} already exist" }
+                        new[] { $"{string.Join(", ", existingCityNames)} already exist" }
                     );
                 }
                 else if (existingCityNames.Any())
                 {
                     return ResultResponseDto<string>.Failure(
-                        new string[] { $"{string.Join(", ", existingCityNames)} already exist" }
+                        new[] { $"{string.Join(", ", existingCityNames)} already exist" }
                     );
                 }
                 else
                 {
                     return ResultResponseDto<string>.Success(
                         "",
-                        new string[] { $"City added successfully" }
+                        new[] { "City added successfully" }
                     );
                 }
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in AddCityAsync", ex);
-                return ResultResponseDto<string>.Failure(new string[] { "There is an error please try later" });
+                await _appLogger.LogAsync("Error Occurred in AddBulkCityAsync", ex);
+                return ResultResponseDto<string>.Failure(new[] { "There is an error please try later" });
             }
         }
 
@@ -193,7 +297,30 @@ namespace PeaceEnablers.Services
                 var q = await _context.Cities.FindAsync(id);
                 if (q == null) return ResultResponseDto<bool>.Failure(new string[] { "City not exists" });
 
-                _context.Cities.Remove(q);
+                q.IsActive = false;
+                q.IsDeleted = true;
+                q.UpdatedDate = DateTime.UtcNow;
+                _context.Cities.Update(q);
+
+                await _context.CityPeers.Where(x => x.CityID == id).ForEachAsync(x =>
+                {
+                    x.IsActive = false;
+                    x.IsDeleted = true;
+                    x.UpdatedDate = DateTime.UtcNow;
+                });
+
+                await _context.CityPeers.Where(x => x.PeerCityID == id).ForEachAsync(x =>
+                {
+                    x.IsActive = false;
+                    x.IsDeleted = true;
+                    x.UpdatedDate = DateTime.UtcNow;
+                });
+
+                await _context.UserCityMappings.Where(x => x.CityID == id).ForEachAsync(x =>
+                {
+                    x.IsDeleted = true;
+                });
+
                 await _context.SaveChangesAsync();
                 return ResultResponseDto<bool>.Success(true, new string[] { "City deleted Successfully" });
             }
@@ -220,6 +347,7 @@ namespace PeaceEnablers.Services
                 existing.UpdatedDate = DateTime.Now;
                 existing.Region = q.Region;
                 existing.State = q.State;
+                existing.CityAliasName = q.CityAliasName;
                 _context.Cities.Update(existing);
                 await _context.SaveChangesAsync();
 
@@ -233,13 +361,13 @@ namespace PeaceEnablers.Services
         }
 
         #region GetCitiesAsync
-        public async Task<PaginationResponse<CityResponseDto>> GetCitiesAsync(PaginationRequest request, UserRole role)
+        public async Task<PaginationResponse<UserCityMappingResponseDto>> GetCitiesAsync(PaginationRequest request, UserRole role)
         {
             try
             {
                 int year = DateTime.UtcNow.Year;
 
-                IQueryable<CityResponseDto> query = role == UserRole.Admin
+                IQueryable<UserCityMappingResponseDto> query = role == UserRole.Admin
                     ? GetAdminCityQuery(year)
                     : GetUserCityQuery(request.UserId, year);
 
@@ -266,7 +394,7 @@ namespace PeaceEnablers.Services
             catch (Exception ex)
             {
                 await _appLogger.LogAsync("Error Occurred in GetCitiesAsync", ex);
-                return new PaginationResponse<CityResponseDto>();
+                return new PaginationResponse<UserCityMappingResponseDto>();
             }
         }
         private IQueryable<UserCityMappingResponseDto> GetAdminCityQuery(int year)
@@ -278,7 +406,6 @@ namespace PeaceEnablers.Services
                         .Where(x => x.IsVerified && x.Year == year)
                     on c.CityID equals ai.CityID into aiJoin
                 from ai in aiJoin.DefaultIfEmpty()
-
                 select new UserCityMappingResponseDto
                 {
                     CityID = c.CityID,
@@ -295,7 +422,11 @@ namespace PeaceEnablers.Services
                     UpdatedDate = c.UpdatedDate,
                     IsDeleted = c.IsDeleted,
                     Score = 0,
-                   // AiScore = ai != null ? ai.AIScore : 0
+                    AiScore = ai != null ? ai.AIScore : 0,
+                    CityPeers = c.CityPeers,
+                    Population = c.Population,
+                    Income = c.Income,
+                    CityAliasName = c.CityAliasName
                 };
         }
 
@@ -310,10 +441,10 @@ namespace PeaceEnablers.Services
                     on c.CityID equals cm.CityID
                 join u in _context.Users
                     on cm.AssignedByUserId equals u.UserID
-               join ai in _context.AICityScores
-               .Where(x => x.IsVerified && x.Year == year)
-                on c.CityID equals ai.CityID into aiJoin
-               from ai in aiJoin.DefaultIfEmpty()
+                join ai in _context.AICityScores
+                .Where(x => x.IsVerified && x.Year == year)
+            on c.CityID equals ai.CityID into aiJoin
+                from ai in aiJoin.DefaultIfEmpty()
 
                 where !c.IsDeleted
                 select new UserCityMappingResponseDto
@@ -331,10 +462,14 @@ namespace PeaceEnablers.Services
                     AssignedBy = u.FullName,
                     UserCityMappingID = cm.UserCityMappingID,
                     Score = 0,
-                    //AiScore = ai.AIProgress
+                    AiScore = ai.AIProgress,
+                    CityAliasName = c.CityAliasName,
+                    CityPeers = c.CityPeers,
+                    Population = c.Population,
+                    Income = c.Income,
                 };
         }
-        private async Task ApplyManualScoresAsync(PaginationResponse<CityResponseDto> response,PaginationRequest request,UserRole role, int year)
+        private async Task ApplyManualScoresAsync(PaginationResponse<UserCityMappingResponseDto> response,PaginationRequest request, UserRole role, int year)
         {
             var scores = await _commonService.GetCitiesProgressAsync(request.UserId.GetValueOrDefault(),(int)role, year);
 
@@ -346,6 +481,7 @@ namespace PeaceEnablers.Services
 
             foreach (var city in response.Data)
             {
+                city.PeerCitiesIDs = city.CityPeers?.Where(x => x.IsActive && !x.IsDeleted).Select(x => x.PeerCityID).ToList() ?? new List<int>();
                 if (scoreMap.TryGetValue(city.CityID, out var score))
                 {
                     city.Score = score;
@@ -357,7 +493,7 @@ namespace PeaceEnablers.Services
                 ? response.Data.OrderByDescending(x => x.Score)
                 : response.Data.OrderBy(x => x.Score);
         }
-        
+
         #endregion
         public async Task<ResultResponseDto<List<UserCityMappingResponseDto>>> getAllCityByUserId(int userId, UserRole userRole)
         {

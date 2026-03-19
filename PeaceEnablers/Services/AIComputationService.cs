@@ -175,8 +175,7 @@ namespace PeaceEnablers.Services
 
             var query =
                 from c in _context.Cities
-                where allowedCityIds.Contains(c.CityID) || (userRole == UserRole.Admin && !cityID.HasValue)
-
+                where !c.IsDeleted && ( allowedCityIds.Contains(c.CityID) || (userRole == UserRole.Admin && !cityID.HasValue))
                 join score in baseQuery
                     on c.CityID equals score.CityID
                     into scoreJoin

@@ -12,5 +12,6 @@ namespace PeaceEnablers.Dtos.CityDto
     {
         public int UserCityMappingID { get; set; }
         public double? Distance { get; set; }
+        public List<int>? PeerCitiesIDs { get; set; }
     }
 }

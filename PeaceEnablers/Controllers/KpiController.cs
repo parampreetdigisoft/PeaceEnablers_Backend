@@ -1,11 +1,16 @@
 ﻿
+using DocumentFormat.OpenXml.Spreadsheet;
+
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
 using PeaceEnablers.Dtos.CityUserDto;
 using PeaceEnablers.Dtos.kpiDto;
 using PeaceEnablers.Enums;
 using PeaceEnablers.IServices;
 using PeaceEnablers.Models;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
+using PeaceEnablers.Services;
+
 using System.Security.Claims;
 
 namespace PeaceEnablers.Controllers
@@ -97,8 +102,51 @@ namespace PeaceEnablers.Controllers
             {
                 return Unauthorized("You Don't have access.");
             }
-           var result = await _kpiService.CompareCities(r, userId.GetValueOrDefault(), userRole);
+           var result = await _kpiService.CompareCities(r, userId.GetValueOrDefault(), userRole, true);
             return Ok(result);
+        }
+
+        [HttpGet("ExportCompareCities")]
+        public async Task<IActionResult> ExportCompareCities( string cities, string? kpis, DateTime updatedAt)
+        {
+            var userId = GetUserIdFromClaims();
+            if (userId == null)
+                return Unauthorized("User ID not found in token.");
+
+            var role = GetRoleFromClaims();
+            if (role == null)
+                return Unauthorized("You Don't have access.");
+
+            if (!Enum.TryParse<UserRole>(role, true, out var userRole))
+                return Unauthorized("You Don't have access.");
+
+            var cityIds = cities.Split(',')
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(int.Parse)
+                .ToList();
+
+            var kpiIds = new List<int>();
+
+            if (!string.IsNullOrWhiteSpace(kpis) && kpis.ToLower() != "null")
+            {
+                kpiIds = kpis.Split(',')
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Select(int.Parse)
+                    .ToList();
+            }
+
+            var request = new CompareCityRequestDto
+            {
+                Cities = cityIds,
+                Kpis = kpiIds,
+                UpdatedAt = updatedAt
+            };
+
+            var content = await _kpiService.ExportCompareCities(request, userId.Value, userRole);
+
+            return File(content.Item2,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                content.Item1);
         }
 
 

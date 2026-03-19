@@ -12,6 +12,10 @@
         public string? ImageUrl { get; set; }
         public double Latitude { get; set; }
         public double Longitude { get; set; }
+        public int Population { get; set; }
+        public decimal Income { get; set; }
+        public string? CityAliasName { get; set; }
+        public List<int>? PeerCities { get; set; }
 
     }
     public class BulkAddCityDto

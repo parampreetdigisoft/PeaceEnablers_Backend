@@ -1,4 +1,6 @@
-﻿namespace PeaceEnablers.Models
+﻿using AssessmentPlatform.Models;
+
+namespace PeaceEnablers.Models
 {
     public class City
     {
@@ -15,5 +17,10 @@
         public string? Image { get; set; }
         public double? Latitude { get; set; }
         public double? Longitude { get; set; }
+
+        public int? Population { get; set; }
+        public decimal? Income { get; set; }
+        public string? CityAliasName { get; set; }
+        public ICollection<CityPeer>? CityPeers { get; set; }
     }
 }

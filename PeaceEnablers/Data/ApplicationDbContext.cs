@@ -1,6 +1,9 @@
+using AssessmentPlatform.Models;
+
+using Microsoft.EntityFrameworkCore;
+
 using PeaceEnablers.Dtos.CityDto;
 using PeaceEnablers.Models;
-using Microsoft.EntityFrameworkCore;
 
 namespace PeaceEnablers.Data
 {
@@ -33,6 +36,7 @@ namespace PeaceEnablers.Data
         public DbSet<EvaluationCityProgressResultDto> CityProgressResults { get; set; }
         public DbSet<GetCitiesProgressAdminDto> GetCitiesProgressAdminDto { get; set; }
         public DbSet<AIUserCityMapping> AIUserCityMappings { get; set; }
+        public DbSet<CityPeer> CityPeers { get; set; } = default!;
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -116,7 +120,12 @@ namespace PeaceEnablers.Data
             modelBuilder.Entity<AnalyticalLayerPillarMapping>().HasKey(ur => ur.AnalyticalLayerPillarMappingID);
             modelBuilder.Entity<AIUserCityMapping>().HasKey(ur => ur.AIUserCityMappingID);
             modelBuilder.Entity<EvaluationCityProgressResultDto>().HasNoKey().ToView(null); 
-            modelBuilder.Entity<GetCitiesProgressAdminDto>().HasNoKey().ToView(null); 
+            modelBuilder.Entity<GetCitiesProgressAdminDto>().HasNoKey().ToView(null);
+            modelBuilder.Entity<CityPeer>(entity =>
+            {
+                entity.HasKey(e => e.CityPeerID);
+                entity.ToTable("CityPeer");
+            });
 
             base.OnModelCreating(modelBuilder);
         }
