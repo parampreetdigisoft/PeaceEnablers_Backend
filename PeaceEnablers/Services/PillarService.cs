@@ -1,4 +1,4 @@
-using PeaceEnablers.Backgroundjob;
+﻿using PeaceEnablers.Backgroundjob;
 using PeaceEnablers.Common.Models;
 using PeaceEnablers.Data;
 using PeaceEnablers.Dtos.AssessmentDto;
@@ -9,6 +9,8 @@ using PeaceEnablers.Models;
 using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
+using QuestPDF.Fluent;
+using QuestPDF.Infrastructure;
 
 namespace PeaceEnablers.Services
 {
@@ -77,9 +79,9 @@ namespace PeaceEnablers.Services
                 existing.PillarName = pillar.PillarName ?? "";
                 existing.Description = pillar.Description ?? "";
                 existing.DisplayOrder = pillar.DisplayOrder;
-                
+
                 if (pillar.ImageFile != null)
-                {                    
+                {
                     if (!string.IsNullOrEmpty(existing.ImagePath))
                     {
                         var oldFilePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", existing.ImagePath);
@@ -87,7 +89,7 @@ namespace PeaceEnablers.Services
                         {
                             File.Delete(oldFilePath);
                         }
-                    }                    
+                    }
                     var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/assets/pillars");
                     if (!Directory.Exists(uploadsFolder))
                         Directory.CreateDirectory(uploadsFolder);
@@ -97,7 +99,7 @@ namespace PeaceEnablers.Services
                     await pillar.ImageFile.CopyToAsync(stream);
                     existing.ImagePath = $"assets/pillars/{fileName}";
                 }
-                
+
                 if (existing.Weight != pillar.Weight || existing.Reliability != pillar.Reliability)
                 {
                     existing.Weight = pillar.Weight;
@@ -149,7 +151,7 @@ namespace PeaceEnablers.Services
                 Expression<Func<UserCityMapping, bool>> predicate = user.Role switch
                 {
                     UserRole.Analyst => x => !x.IsDeleted && x.CityID == request.CityID &&
-                                             (x.AssignedByUserId == request.UserID),
+                                             (x.AssignedByUserId == request.UserID || x.UserID == request.UserID),
                     UserRole.Evaluator => x => !x.IsDeleted && x.CityID == request.CityID && x.UserID == request.UserID,
                     _ => x => !x.IsDeleted && x.CityID == request.CityID
                 };
@@ -160,13 +162,19 @@ namespace PeaceEnablers.Services
                     .ToListAsync();
 
                 // 3. Get assessments with pillar + responses
-                var assessments = await _context.Assessments
-                    .Include(a => a.UserCityMapping)
-                    .Include(a => a.PillarAssessments)
-                        .ThenInclude(pa => pa.Responses)
-                    .Where(a => mappingIds.Contains(a.UserCityMappingID) && a.IsActive && a.UpdatedAt.Year == request.UpdatedAt.Year && (a.AssessmentPhase == AssessmentPhase.Completed || a.AssessmentPhase == AssessmentPhase.EditRejected || a.AssessmentPhase == AssessmentPhase.EditRequested))
-                    .AsNoTracking()
-                    .ToListAsync();
+                var assessmentsQuery = _context.Assessments.Include(a => a.UserCityMapping).Include(a => a.PillarAssessments).ThenInclude(pa => pa.Responses)
+                .Where(a => mappingIds.Contains(a.UserCityMappingID) && a.IsActive && a.UpdatedAt.Year == request.UpdatedAt.Year);
+
+                if (request.ExportType?.ToLower() != "pdf")
+                {
+                    // Apply AssessmentPhase filter only if NOT PDF
+                    assessmentsQuery = assessmentsQuery.Where(a =>
+                        a.AssessmentPhase == AssessmentPhase.Completed
+                        || a.AssessmentPhase == AssessmentPhase.EditRejected
+                        || a.AssessmentPhase == AssessmentPhase.EditRequested);
+                }
+
+                var assessments = await assessmentsQuery.AsNoTracking().ToListAsync();
 
                 // 4. Get pillar list with questions + options
                 var pillars = await _context.Pillars
@@ -182,7 +190,8 @@ namespace PeaceEnablers.Services
                 var usersDict = await _context.Users
                     .Where(u => userIds.Contains(u.UserID))
                     .ToDictionaryAsync(u => u.UserID, u => u.FullName);
-
+                var aiAssessmentData = await _context.AIEstimatedQuestionScores
+                    .Where(x => x.CityID == request.CityID && x.Year == request.UpdatedAt.Year).AsNoTracking().ToListAsync();
                 // 6. Build response
                 var result = pillars.Select(p => new PillarWithQuestionsDto
                 {
@@ -192,7 +201,7 @@ namespace PeaceEnablers.Services
                     TotalQuestions = p.Questions.Count,
                     Questions = p.Questions
                         .OrderBy(q => q.DisplayOrder)
-                        .Where(q=>!q.IsDeleted)
+                        .Where(q => !q.IsDeleted)
                         .Select(q =>
                         {
                             var userAnswers = userIds.Select(uid =>
@@ -215,7 +224,53 @@ namespace PeaceEnablers.Services
                                     Justification = response?.Justification ?? "",
                                     OptionText = option?.OptionText ?? ""
                                 };
-                            }).ToDictionary(x=>x.UserID);
+                            }).ToDictionary(x => x.UserID);
+
+
+                            // ✅ ------------------ ADD AI RESPONSE ------------------
+
+                            var aiData = aiAssessmentData
+                                .FirstOrDefault(x => x.QuestionID == q.QuestionID && x.PillarID == p.PillarID);
+
+                            if (aiData != null)
+                            {
+                                // Map AI score to option text (same like user)
+                                var aiOption = q.QuestionOptions
+                                    .FirstOrDefault(o => o.ScoreValue == aiData.AIScore);
+
+                                userAnswers[-1] = new QuestionUserAnswerDto
+                                {
+                                    UserID = -1,
+                                    FullName = "AI",
+
+                                    // Score
+                                    Score = aiData.AIScore != null ? (int?)Convert.ToInt32(aiData.AIScore) : null,
+
+                                    // Justification
+                                    Justification = (aiData.EvidenceSummary ?? "") +
+                                                    (!string.IsNullOrEmpty(aiData.SourceDataExtract)
+                                                        ? $" | {aiData.SourceDataExtract}"
+                                                        : "") +
+                                                    (!string.IsNullOrEmpty(aiData.SourceURL)
+                                                        ? $" SourceURL : {aiData.SourceURL}"
+                                                        : ""),
+
+                                    // Option text from score
+                                    OptionText = aiOption?.OptionText ?? ""
+                                };
+                            }
+                            else
+                            {
+                                // ✅ Empty AI column if no data
+                                userAnswers[-1] = new QuestionUserAnswerDto
+                                {
+                                    UserID = -1,
+                                    FullName = "AI",
+                                    Score = null,
+                                    Justification = "",
+                                    OptionText = ""
+                                };
+                            }
 
                             return new QuestionWithUserDto
                             {
@@ -226,7 +281,7 @@ namespace PeaceEnablers.Services
                             };
                         }).ToList()
                 }).ToList();
-
+                var resu = result;
                 return ResultResponseDto<List<PillarWithQuestionsDto>>.Success(result);
             }
             catch (Exception ex)
@@ -241,22 +296,174 @@ namespace PeaceEnablers.Services
             try
             {
                 var response = await GetPillarsWithQuestions(requestDto);
-                var city = await _context.Cities.FirstOrDefaultAsync(x => x.CityID == requestDto.CityID);
+                var city = await _context.Cities
+                    .FirstOrDefaultAsync(x => x.CityID == requestDto.CityID);
 
-                if (!response.Succeeded)
+                if (!response.Succeeded || response.Result == null)
                 {
                     return new Tuple<string, byte[]>("", Array.Empty<byte>());
                 }
 
-                var byteArray = MakePillarSheet(response.Result, city);
+                byte[] fileBytes;
+                string fileName;
 
-                return new("ExportPillarsHistory"+ requestDto.CityID+""+requestDto.PillarID, byteArray);
+                if (requestDto.ExportType?.ToLower() == "pdf")
+                {
+                    // ✅ Use structured data directly (NO flattening)
+                    fileBytes = GeneratePdf(response.Result, city, requestDto.UpdatedAt.Year);
+
+                    fileName = $"ExportPillarsHistory_{requestDto.CityID}_{requestDto.PillarID}.pdf";
+                }
+                else
+                {
+                    // ✅ Excel (existing)
+                    fileBytes = MakePillarSheet(response.Result, city);
+                    fileName = $"ExportPillarsHistory_{requestDto.CityID}_{requestDto.PillarID}.xlsx";
+                }
+
+                return new Tuple<string, byte[]>(fileName, fileBytes);
             }
             catch (Exception ex)
             {
                 await _appLogger.LogAsync("Error Occure in ExportPillarsHistoryByUserId", ex);
                 return new Tuple<string, byte[]>("", Array.Empty<byte>());
             }
+        }
+        public byte[] GeneratePdf(List<PillarWithQuestionsDto> data, City city, int year)
+        {
+            return Document.Create(container =>
+            {
+                container.Page(page =>
+                {
+                    page.Margin(20);
+
+                    page.Content().Column(col =>
+                    {
+                        int pillarIndex = 1;
+
+                        foreach (var pillar in data)
+                        {
+                            // ================= HEADER =================
+                            col.Item()
+                                .Background("#1f4b3f")
+                                .Padding(15)
+                                .Row(row =>
+                                {
+                                    row.RelativeItem().Column(left =>
+                                    {
+                                        left.Item().Text($"{pillarIndex}. {pillar.PillarName}")
+                                            .FontSize(18)
+                                            .Bold()
+                                            .FontColor("#ffffff");
+
+                                        left.Item().Text($"{city?.CityName}, {city?.State}, USA | Data Year: {year}")
+                                            .FontSize(10)
+                                            .FontColor("#cfe7df");
+
+                                        left.Item().Text($"Generated: {DateTime.Now:MMM dd, yyyy}")
+                                            .FontSize(9)
+                                            .FontColor("#cfe7df");
+                                    });
+
+                                    row.ConstantItem(70)
+                                        .Height(50)
+                                        .Background("#ffffff")
+                                        .AlignCenter()
+                                        .AlignMiddle()
+                                        .Text("PEM")
+                                        .FontSize(16)
+                                        .Bold()
+                                        .FontColor("#1f4b3f");
+                                });
+
+                            col.Item().PaddingBottom(10);
+
+                            int questionIndex = 1;
+
+                            foreach (var question in pillar.Questions)
+                            {
+                                string questionNumber = $"{pillarIndex}.{questionIndex}";
+
+                                // ================= QUESTION CARD =================
+                                col.Item()
+                                    .Background("#ffffff")
+                                    .Border(1)
+                                    .BorderColor("#e5e5e5")
+                                    .Padding(12)
+                                    .Column(qCol =>
+                                    {
+                                        // Question Title
+                                        qCol.Item().Text($"{questionNumber} {question.QuestionText}")
+                                            .FontSize(12)
+                                            .Bold();
+
+                                        qCol.Item().PaddingTop(10);
+
+                                        // ================= CLEAN TABLE =================
+                                        qCol.Item().Table(table =>
+                                        {
+                                            table.ColumnsDefinition(columns =>
+                                            {
+                                                columns.RelativeColumn(2); // Name
+                                                columns.RelativeColumn(1); // Score
+                                                columns.RelativeColumn(5); // Option
+                                            });
+
+                                            // HEADER
+                                            table.Header(header =>
+                                            {
+                                                header.Cell().PaddingBottom(5)
+                                                    .Text("Name").SemiBold().FontSize(10);
+
+                                                header.Cell().PaddingBottom(5)
+                                                    .Text("Score").SemiBold().FontSize(10);
+
+                                                header.Cell().PaddingBottom(5)
+                                                    .Text("Option").SemiBold().FontSize(10);
+                                            });
+
+                                            // ROWS
+                                            foreach (var user in question.Users.Values
+                                                         .OrderBy(x => x.UserID == -1 ? 1 : 0))
+                                            {
+                                                bool isAI = user.UserID == -1;
+                                                string bgColor = isAI ? "#e6f4ef" : "#ffffff";
+
+                                                // NAME
+                                                var nameCell = table.Cell()
+                                                    .Padding(8)
+                                                    .Background(bgColor)
+                                                    .Text(isAI ? "AI" : user.FullName)
+                                                    .FontColor(isAI ? "#0a7d5e" : "#000");
+
+                                                if (isAI)
+                                                    nameCell.Bold();
+
+                                                // SCORE
+                                                table.Cell()
+                                                    .Padding(8)
+                                                    .Background(bgColor)
+                                                    .Text(user.Score?.ToString() ?? "");
+
+                                                // OPTION
+                                                table.Cell()
+                                                    .Padding(8)
+                                                    .Background(bgColor)
+                                                    .Text(user.OptionText ?? "");
+                                            }
+                                        });
+                                    });
+
+                                questionIndex++;
+                                col.Item().PaddingBottom(10);
+                            }
+
+                            pillarIndex++;
+                            col.Item().PaddingBottom(15);
+                        }
+                    });
+                });
+            }).GeneratePdf();
         }
 
         private byte[] MakePillarSheet(List<PillarWithQuestionsDto> pillars, Models.City? city)
@@ -354,7 +561,7 @@ namespace PeaceEnablers.Services
                         ws.Cell(row, c++).Value = $"{pillarCounter - 1}.{questionCounter++}";
                         ws.Cell(row, 1).Style.Font.Bold = true;
                         ws.Cell(row, c++).Value = question.QuestionText;
-    
+
 
                         foreach (var user in names)
                         {
@@ -514,6 +721,23 @@ namespace PeaceEnablers.Services
 
                 return new PaginationResponse<PillarsHistroyResponseDto>();
             }
+        }
+        IContainer HeaderCell(IContainer container)
+        {
+            return container
+                .Padding(6)
+                .Background("#f1f5f4")
+                .Border(1)
+                .BorderColor("#dcdcdc");
+        }
+
+        IContainer BodyCell(IContainer container, bool isAI)
+        {
+            return container
+                .Padding(6)
+                .Background(isAI ? "#e6f4ef" : "#ffffff")
+                .Border(1)
+                .BorderColor("#e0e0e0");
         }
     }
 }

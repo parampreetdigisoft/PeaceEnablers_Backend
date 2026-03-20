@@ -112,20 +112,38 @@ namespace PeaceEnablers.Services
         };
 
         #endregion
-        public async Task<ResultResponseDto<List<AnalyticalLayer>>> GetAllKpi()
+        public async Task<ResultResponseDto<List<AnalyticalLayer>>> GetAllKpi(int userId, UserRole role)
         {
             try
             {
-                var result = await _context.AnalyticalLayers
-                    .Where(ar => !ar.IsDeleted)
+                IQueryable<AnalyticalLayer> query = _context.AnalyticalLayers
+                    .Where(x => !x.IsDeleted);
+
+                if (role == UserRole.CityUser)
+                {
+                    query =
+                        from layer in _context.AnalyticalLayers
+                        join map in _context.AnalyticalLayerPillarMappings
+                            on layer.LayerID equals map.LayerID
+                        join userMap in _context.CityUserPillarMappings
+                            on map.PillarID equals userMap.PillarID
+                        where !layer.IsDeleted
+                              && userMap.IsActive
+                              && userMap.UserID == userId
+                        select layer;
+                }
+
+                var result = await query
+                    .AsNoTracking()
+                    .Distinct()
                     .ToListAsync();
-                    
-                 return ResultResponseDto<List<AnalyticalLayer>>.Success(result); 
+
+                return ResultResponseDto<List<AnalyticalLayer>>.Success(result);
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error occurred in GetAnalyticalLayers", ex);
-                return  ResultResponseDto<List<AnalyticalLayer>>.Failure(new List<string> { "an error occure"});
+                await _appLogger.LogAsync("Error occurred in GetAllKpi", ex);
+                return ResultResponseDto<List<AnalyticalLayer>>.Failure(new List<string> { "An error occurred" });
             }
         }
         public async Task<ResultResponseDto<CompareCityResponseDto>> CompareCities(CompareCityRequestDto c, int userId, UserRole role, bool applyPagination = true)

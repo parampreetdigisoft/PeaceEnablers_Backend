@@ -701,7 +701,7 @@ namespace PeaceEnablers.Services
             return ResultResponseDto<string>.Failure(new[] { "Failed to Changed assessment status" });
         }
 
-        public async Task<ResultResponseDto<string>> TransferAssessment(TransferAssessmentRequestDto r)
+        public async Task<ResultResponseDto<string>> TransferAssessment(TransferAssessmentRequestDto r, int userID, UserRole userRole)
         {
             try
             {
@@ -738,11 +738,15 @@ namespace PeaceEnablers.Services
                         CreatedAt = currentDate,
                         UpdatedAt = currentDate,
                         IsActive = true,
-                        AssessmentPhase = transferAssessment.AssessmentPhase == AssessmentPhase.Completed ?  transferAssessment.AssessmentPhase: AssessmentPhase.InProgress,
+                        AssessmentPhase = transferAssessment.AssessmentPhase == AssessmentPhase.Completed ? transferAssessment.AssessmentPhase : AssessmentPhase.InProgress,
                         PillarAssessments = new List<PillarAssessment>()
                     };
 
                     _context.Assessments.Add(existingAssessment);
+                }
+                else if (existingAssessment.AssessmentPhase == AssessmentPhase.Completed && userRole != UserRole.Admin)
+                {
+                    return ResultResponseDto<string>.Failure(new[] { "Need approval for this assessment , Please send request to admin to edit" });
                 }
                 else
                 {
@@ -779,7 +783,8 @@ namespace PeaceEnablers.Services
                                 QuestionID = response.QuestionID,
                                 QuestionOptionID = response.QuestionOptionID,
                                 Justification = response.Justification,
-                                Score = response.Score
+                                Score = response.Score,
+                                Source =response.Source
                             });
                         }
                         else

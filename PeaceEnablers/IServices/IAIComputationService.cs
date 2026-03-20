@@ -1,4 +1,5 @@
-﻿using PeaceEnablers.Common.Models;
+﻿using AssessmentPlatform.Dtos.AiDto;
+using PeaceEnablers.Common.Models;
 using PeaceEnablers.Dtos.AiDto;
 using PeaceEnablers.Dtos.CityDto;
 using PeaceEnablers.Dtos.CommonDto;
@@ -23,5 +24,7 @@ namespace PeaceEnablers.IServices
         Task<AiCitySummeryDto> GetCityAiSummeryDetail(int userID, UserRole userRole, int? cityID, int year);
         Task<List<AiCitySummeryDto>> GetAllCityAiSummeryDetail(int userID, UserRole userRole, int year);
         Task<byte[]> GenerateAllCityDetailsPdf(List<AiCitySummeryDto> cityDetails, UserRole userRole, int userID, int year);
+
+        Task<ResultResponseDto<string>> AITransferAssessment(AITransferAssessmentRequestDto r, int userID, UserRole userRole);
     }
 }

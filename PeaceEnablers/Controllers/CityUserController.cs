@@ -1,11 +1,14 @@
-﻿using PeaceEnablers.Dtos.AiDto;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using PeaceEnablers.Dtos.AiDto;
 using PeaceEnablers.Dtos.AssessmentDto;
 using PeaceEnablers.Dtos.CityUserDto;
 using PeaceEnablers.Dtos.CommonDto;
 using PeaceEnablers.Enums;
 using PeaceEnablers.IServices;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
+using PeaceEnablers.Models;
+using PeaceEnablers.Services;
+using System.Security.Claims;
 
 namespace PeaceEnablers.Controllers
 {
@@ -203,5 +206,55 @@ namespace PeaceEnablers.Controllers
 
             return Ok(await _cityUserService.GetAICityPillars(request, userId.Value, tierName));
         }
+
+        [HttpGet("ExportCompareCities")]
+        public async Task<IActionResult> ExportCompareCities(string cities, string? kpis, DateTime updatedAt)
+        {
+            var userId = GetUserIdFromClaims();
+            if (userId == null)
+                return Unauthorized("User ID not found in token.");
+
+            var role = GetRoleFromClaims();
+            if (role == null)
+                return Unauthorized("You Don't have access.");
+
+            var tierName = GetTierFromClaims();
+            if (tierName == null)
+                return Unauthorized("You Don't have access.");
+
+            var cityIds = cities.Split(',')
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(int.Parse)
+                .ToList();
+
+            var kpiIds = new List<int>();
+
+            if (!string.IsNullOrWhiteSpace(kpis) && kpis.ToLower() != "null")
+            {
+                kpiIds = kpis.Split(',')
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Select(int.Parse)
+                    .ToList();
+            }
+
+            var request = new CompareCityRequestDto
+            {
+                Cities = cityIds,
+                Kpis = kpiIds,
+                UpdatedAt = updatedAt
+            };
+
+            var content = await _cityUserService.ExportCompareCities(request, userId.Value, tierName);
+
+            return File(content.Item2,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                content.Item1);
+        }
+
+        private string? GetRoleFromClaims()
+        {
+            return User.FindFirst(ClaimTypes.Role)?.Value;
+        }
+
     }
 }

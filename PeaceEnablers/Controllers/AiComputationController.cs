@@ -1,11 +1,11 @@
-﻿using PeaceEnablers.Dtos.AiDto;
-using PeaceEnablers.IServices;
-using PeaceEnablers.Models;
-
+﻿using AssessmentPlatform.Dtos.AiDto;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-
+using PeaceEnablers.Dtos.AiDto;
+using PeaceEnablers.Dtos.AssessmentDto;
+using PeaceEnablers.IServices;
+using PeaceEnablers.Models;
 using System.Security.Claims;
 
 namespace PeaceEnablers.Controllers
@@ -326,6 +326,25 @@ namespace PeaceEnablers.Controllers
                     error = ex.Message
                 });
             }
+        }
+        [HttpPost("aiResultTransfer")]
+        [Authorize(Policy = "StaffOnly")]
+        public async Task<IActionResult> AiResultTransfer([FromBody] AITransferAssessmentRequestDto aiCityIdsDto)
+        {
+            var userId = GetUserIdFromClaims();
+            if (userId == null)
+                return Unauthorized("User ID not found in token.");
+
+            var role = GetRoleFromClaims();
+            if (role == null)
+                return Unauthorized("You Don't have access.");
+
+            if (!Enum.TryParse<UserRole>(role, true, out var userRole))
+            {
+                return Unauthorized("You Don't have access.");
+            }
+
+            return Ok(await _aIComputationService.AITransferAssessment(aiCityIdsDto, userId.Value, userRole));
         }
     }
 }

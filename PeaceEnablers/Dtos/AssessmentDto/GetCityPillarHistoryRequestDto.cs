@@ -17,6 +17,8 @@ namespace PeaceEnablers.Dtos.AssessmentDto
         public int CityID { get; set; }
         public int? PillarID { get; set; }
         public DateTime UpdatedAt { get; set; } = new DateTime(DateTime.Now.Year, 1, 1);
+
+        public string? ExportType { get; set; }
     }
     public class UserCityRequstDto : UserCityDashBoardRequstDto
     {
@@ -59,5 +61,14 @@ namespace PeaceEnablers.Dtos.AssessmentDto
         public int UserID { get; set; }
         public int AssessmentID { get; set; }
         public AssessmentPhase AssessmentPhase { get; set; }
+    }
+    public class QuestionPdfRowDto
+    {
+        public string PillarName { get; set; }
+        public string QuestionText { get; set; }
+        public string UserName { get; set; }
+        public int? Score { get; set; }
+        public string OptionText { get; set; }
+        public string Justification { get; set; }
     }
 }
