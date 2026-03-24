@@ -879,6 +879,7 @@ namespace PeaceEnablers.Services
                     {
                         ar.CityID,
                         ar.LayerID,
+                        ar.AnalyticalLayer.Purpose,
                         ar.AnalyticalLayer.LayerCode,
                         ar.AnalyticalLayer.LayerName,
                         ar.CalValue5,
@@ -887,8 +888,9 @@ namespace PeaceEnablers.Services
                     .ToListAsync();
 
                 // Step 4: Get all distinct layers
+               
                 var allLayers = analyticalResults
-                    .Select(x => new { x.LayerID, x.LayerCode, x.LayerName })
+                    .Select(x => new { x.LayerID, x.LayerCode, x.LayerName, x.Purpose })
                     .Distinct()
                     .OrderBy(x => x.LayerName)
                     .ToList();
@@ -950,6 +952,7 @@ namespace PeaceEnablers.Services
                         LayerID=layer.LayerID,
                         LayerCode = layer.LayerCode,
                         LayerName = layer.LayerName,
+                        Purpose = layer.Purpose,
                         CityValues = selectedCities.Select(c => new CityValueDto
                         {
                             CityID = c.CityID,
@@ -1080,14 +1083,11 @@ namespace PeaceEnablers.Services
                     var ws = workbook.Worksheets.Add("City Comparison");
 
                     // =========================
-                    // 📊 DYNAMIC HEADER SETUP
-                    // =========================
-                    var cities = data.TableData.First().CityValues;
-                    int totalCols = 2 + (cities.Count * 2);
-
-                    // =========================
                     // 🎯 REPORT HEADER (TOP)
                     // =========================
+                    var cities = data.TableData.First().CityValues;
+                    int totalCols = 2 + cities.Count; // 2 fixed columns (KPI Name, Purpose) + 1 column per city (Score)
+
                     ws.Range(1, 1, 1, totalCols).Merge().Value = "Key Performance Integrated Report";
                     ws.Range(2, 1, 2, totalCols).Merge().Value = $"Report Year: {DateTime.Now.Year}";
                     ws.Range(3, 1, 3, totalCols).Merge().Value = $"Generated On: {DateTime.Now:dd-MMM-yyyy HH:mm}";
@@ -1117,19 +1117,12 @@ namespace PeaceEnablers.Services
                     ws.Range(row, col, row + 1, col).Merge().Value = "Purpose";
                     col++;
 
-                    // Dynamic Cities
+                    // Dynamic Cities (only Score)
                     foreach (var city in cities)
                     {
-                        int startCol = col;
-
-                        // City Name (merged)
-                        ws.Range(row, startCol, row, startCol + 1).Merge().Value = city.CityName;
-
-                        // Sub headers
-                        ws.Cell(row + 1, startCol).Value = "Eval";
-                        ws.Cell(row + 1, startCol + 1).Value = "AI";
-
-                        col += 2;
+                        ws.Range(row, col, row + 1, col).Merge().Value = city.CityName;
+                        ws.Cell(row + 1, col).Value = "Score";
+                        col++;
                     }
 
                     // Style header (both rows)
@@ -1165,8 +1158,7 @@ namespace PeaceEnablers.Services
 
                         foreach (var city in kpi.CityValues)
                         {
-                            ws.Cell(row, col++).Value = city.Value;
-                            ws.Cell(row, col++).Value = city.AiValue;
+                            ws.Cell(row, col++).Value = city.AiValue; // Only AI value
                         }
 
                         row++;
@@ -1177,35 +1169,26 @@ namespace PeaceEnablers.Services
                     // =========================
                     // 🎨 STYLING
                     // =========================
-
-                    // Column widths
-                    ws.Column(1).Width = 30;
-                    ws.Column(2).Width = 55;
+                    ws.Column(1).Width = 30;  // KPI Name
+                    ws.Column(2).Width = 55;  // Purpose
 
                     for (int i = 3; i <= totalCols; i++)
                     {
                         ws.Column(i).Width = 18;
                     }
 
-                    // Wrap text
                     ws.Column(2).Style.Alignment.WrapText = true;
                     ws.Column(2).Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
 
-                    // Center numbers
                     ws.Columns(3, totalCols).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
 
-                    // Auto height
                     ws.Rows().AdjustToContents();
-
-                    // Freeze (after 2 header rows)
                     ws.SheetView.FreezeRows(6);
 
-                    // Borders
                     var dataRange = ws.Range(5, 1, endDataRow, totalCols);
                     dataRange.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
                     dataRange.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
 
-                    // Zebra rows
                     for (int i = startDataRow; i <= endDataRow; i++)
                     {
                         if (i % 2 == 0)
@@ -1214,14 +1197,12 @@ namespace PeaceEnablers.Services
                         }
                     }
 
-                    // Auto filter (second header row)
                     ws.Range(6, 1, 6, totalCols).SetAutoFilter();
 
                     // =========================
-                    // 📄 SHEET 2
+                    // 📄 SHEET 2: KPI Details
                     // =========================
                     var ws2 = workbook.Worksheets.Add("KPI Details");
-
                     int r = 1;
 
                     ws2.Cell(r, 1).Value = "KPI Name";
@@ -1244,7 +1225,6 @@ namespace PeaceEnablers.Services
                     ws2.Column(1).Width = 40;
                     ws2.Column(2).Width = 100;
                     ws2.Column(2).Style.Alignment.WrapText = true;
-
                     ws2.Rows().AdjustToContents();
                     ws2.SheetView.FreezeRows(1);
 
