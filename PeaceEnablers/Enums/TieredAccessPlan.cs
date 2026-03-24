@@ -7,4 +7,9 @@
         Standard = 2, 
         Premium = 3 
     }
+    public enum ExportType
+    {
+        Excel = 1,
+        Pdf = 2
+    }
 }

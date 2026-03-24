@@ -139,6 +139,8 @@ namespace PeaceEnablers.Services
         {
             try
             {
+                var year = request.UpdatedAt.Year;
+
                 // 1. Validate user
                 var user = await _context.Users
                     .AsNoTracking()
@@ -147,11 +149,10 @@ namespace PeaceEnablers.Services
                 if (user == null)
                     return ResultResponseDto<List<PillarWithQuestionsDto>>.Failure(new[] { "Invalid user" });
 
-                // 2. Filter user-city mappings based on role
+                // 2. Role-based mapping filter
                 Expression<Func<UserCityMapping, bool>> predicate = user.Role switch
                 {
-                    UserRole.Analyst => x => !x.IsDeleted && x.CityID == request.CityID &&
-                                             (x.AssignedByUserId == request.UserID || x.UserID == request.UserID),
+                    UserRole.Analyst => x => !x.IsDeleted && x.CityID == request.CityID && x.AssignedByUserId == request.UserID || x.UserID == request.UserID,
                     UserRole.Evaluator => x => !x.IsDeleted && x.CityID == request.CityID && x.UserID == request.UserID,
                     _ => x => !x.IsDeleted && x.CityID == request.CityID
                 };
@@ -161,22 +162,21 @@ namespace PeaceEnablers.Services
                     .Select(x => x.UserCityMappingID)
                     .ToListAsync();
 
-                // 3. Get assessments with pillar + responses
-                var assessmentsQuery = _context.Assessments.Include(a => a.UserCityMapping).Include(a => a.PillarAssessments).ThenInclude(pa => pa.Responses)
-                .Where(a => mappingIds.Contains(a.UserCityMappingID) && a.IsActive && a.UpdatedAt.Year == request.UpdatedAt.Year);
+                // 3. Load assessments
+                var assessments = await _context.Assessments
+                    .Include(a => a.UserCityMapping)
+                    .Include(a => a.PillarAssessments)
+                        .ThenInclude(pa => pa.Responses)
+                    .Where(a => mappingIds.Contains(a.UserCityMappingID)
+                                && a.IsActive
+                                && a.UpdatedAt.Year == year
+                                && (a.AssessmentPhase == AssessmentPhase.Completed
+                                    || a.AssessmentPhase == AssessmentPhase.EditRejected
+                                    || a.AssessmentPhase == AssessmentPhase.EditRequested))
+                    .AsNoTracking()
+                    .ToListAsync();
 
-                if (request.ExportType?.ToLower() != "pdf")
-                {
-                    // Apply AssessmentPhase filter only if NOT PDF
-                    assessmentsQuery = assessmentsQuery.Where(a =>
-                        a.AssessmentPhase == AssessmentPhase.Completed
-                        || a.AssessmentPhase == AssessmentPhase.EditRejected
-                        || a.AssessmentPhase == AssessmentPhase.EditRequested);
-                }
-
-                var assessments = await assessmentsQuery.AsNoTracking().ToListAsync();
-
-                // 4. Get pillar list with questions + options
+                // 4. Load pillars
                 var pillars = await _context.Pillars
                     .Include(p => p.Questions)
                         .ThenInclude(q => q.QuestionOptions)
@@ -185,91 +185,97 @@ namespace PeaceEnablers.Services
                     .AsNoTracking()
                     .ToListAsync();
 
-                // 5. Preload users dictionary
+                // 5. Users dictionary
                 var userIds = assessments.Select(a => a.UserCityMapping.UserID).Distinct().ToList();
+
                 var usersDict = await _context.Users
                     .Where(u => userIds.Contains(u.UserID))
                     .ToDictionaryAsync(u => u.UserID, u => u.FullName);
-                var aiAssessmentData = await _context.AIEstimatedQuestionScores
-                    .Where(x => x.CityID == request.CityID && x.Year == request.UpdatedAt.Year).AsNoTracking().ToListAsync();
+
+                // =========================================
+                // ? Pre-group responses (Performance Boost)
+                // =========================================
+                var responseLookup = assessments
+                    .SelectMany(a => a.PillarAssessments.Select(pa => new { a, pa }))
+                    .SelectMany(x => x.pa.Responses.Select(r => new
+                    {
+                        Response = r,
+                        x.pa.PillarID,
+                        UserID = x.a.UserCityMapping.UserID
+                    }))
+                    .GroupBy(x => (x.Response.QuestionID, x.PillarID, x.UserID))
+                    .ToDictionary(g => g.Key, g => g.First().Response);
+
+                // =========================================
+                // ? AI DATA FIXED
+                // =========================================
+                var aiRaw = await _context.AIEstimatedQuestionScores
+                    .Where(x => x.CityID == request.CityID
+                                && (!request.PillarID.HasValue || x.PillarID == request.PillarID)
+                                && x.Year == year)
+                    .ToListAsync();
+
+                var aiDict = aiRaw
+                    .GroupBy(x => new { x.PillarID, x.QuestionID })
+                    .ToDictionary(
+                        g => (g.Key.PillarID, g.Key.QuestionID),
+                        g => g.Select(x => new QuestionUserAnswerDto
+                        {
+                            UserID = int.MaxValue,
+                            FullName = "AI_Result",
+                            QuestionID = x.QuestionID,
+                            Score = (int?)x.AIScore,
+                            Justification = x.EvidenceSummary,
+                            OptionText = ""
+                        }).FirstOrDefault()
+                    );
+
+                // =========================================
                 // 6. Build response
+                // =========================================
                 var result = pillars.Select(p => new PillarWithQuestionsDto
                 {
                     PillarID = p.PillarID,
                     PillarName = p.PillarName,
                     DisplayOrder = p.DisplayOrder,
-                    TotalQuestions = p.Questions.Count,
+                    TotalQuestions = p.Questions.Count(q => !q.IsDeleted),
+
                     Questions = p.Questions
-                        .OrderBy(q => q.DisplayOrder)
                         .Where(q => !q.IsDeleted)
+                        .OrderBy(q => q.DisplayOrder)
                         .Select(q =>
                         {
-                            var userAnswers = userIds.Select(uid =>
+                            var userAnswers = new Dictionary<int, QuestionUserAnswerDto>();
+
+                            foreach (var uid in userIds)
                             {
-                                var paResponses = assessments
-                                    .Where(a => a.UserCityMapping.UserID == uid)
-                                    .SelectMany(a => a.PillarAssessments)
-                                    .Where(pa => pa.PillarID == p.PillarID)
-                                    .SelectMany(pa => pa.Responses)
-                                    .ToList();
+                                responseLookup.TryGetValue((q.QuestionID, p.PillarID, uid), out var response);
 
-                                var response = paResponses.FirstOrDefault(r => r.QuestionID == q.QuestionID);
-                                var option = q.QuestionOptions.FirstOrDefault(o => o.OptionID == response?.QuestionOptionID);
+                                var option = q.QuestionOptions
+                                    .FirstOrDefault(o => o.OptionID == response?.QuestionOptionID);
 
-                                return new QuestionUserAnswerDto
+                                userAnswers[uid] = new QuestionUserAnswerDto
                                 {
                                     UserID = uid,
                                     FullName = usersDict.TryGetValue(uid, out var name) ? name : "",
+                                    QuestionID = q.QuestionID,
                                     Score = (int?)response?.Score,
                                     Justification = response?.Justification ?? "",
                                     OptionText = option?.OptionText ?? ""
                                 };
-                            }).ToDictionary(x => x.UserID);
-
-
-                            // ✅ ------------------ ADD AI RESPONSE ------------------
-
-                            var aiData = aiAssessmentData
-                                .FirstOrDefault(x => x.QuestionID == q.QuestionID && x.PillarID == p.PillarID);
-
-                            if (aiData != null)
-                            {
-                                // Map AI score to option text (same like user)
-                                var aiOption = q.QuestionOptions
-                                    .FirstOrDefault(o => o.ScoreValue == aiData.AIScore);
-
-                                userAnswers[-1] = new QuestionUserAnswerDto
-                                {
-                                    UserID = -1,
-                                    FullName = "AI",
-
-                                    // Score
-                                    Score = aiData.AIScore != null ? (int?)Convert.ToInt32(aiData.AIScore) : null,
-
-                                    // Justification
-                                    Justification = (aiData.EvidenceSummary ?? "") +
-                                                    (!string.IsNullOrEmpty(aiData.SourceDataExtract)
-                                                        ? $" | {aiData.SourceDataExtract}"
-                                                        : "") +
-                                                    (!string.IsNullOrEmpty(aiData.SourceURL)
-                                                        ? $" SourceURL : {aiData.SourceURL}"
-                                                        : ""),
-
-                                    // Option text from score
-                                    OptionText = aiOption?.OptionText ?? ""
-                                };
                             }
-                            else
+
+                            // ? Inject AI answer
+                            if (aiDict.TryGetValue((p.PillarID, q.QuestionID), out var aiAnswer))
                             {
-                                // ✅ Empty AI column if no data
-                                userAnswers[-1] = new QuestionUserAnswerDto
+                                if (aiAnswer !=null)
                                 {
-                                    UserID = -1,
-                                    FullName = "AI",
-                                    Score = null,
-                                    Justification = "",
-                                    OptionText = ""
-                                };
+                                    var option = q.QuestionOptions
+                                    .FirstOrDefault(o => o.ScoreValue == aiAnswer.Score);
+
+                                    aiAnswer.OptionText = option?.OptionText ?? "";
+                                    userAnswers[int.MaxValue] = aiAnswer;
+                                }
                             }
 
                             return new QuestionWithUserDto
@@ -281,7 +287,6 @@ namespace PeaceEnablers.Services
                             };
                         }).ToList()
                 }).ToList();
-                var resu = result;
                 return ResultResponseDto<List<PillarWithQuestionsDto>>.Success(result);
             }
             catch (Exception ex)
@@ -307,7 +312,7 @@ namespace PeaceEnablers.Services
                 byte[] fileBytes;
                 string fileName;
 
-                if (requestDto.ExportType?.ToLower() == "pdf")
+                if (requestDto.ExportType == Enums.ExportType.Pdf)
                 {
                     // ✅ Use structured data directly (NO flattening)
                     fileBytes = GeneratePdf(response.Result, city, requestDto.UpdatedAt.Year);
@@ -331,6 +336,10 @@ namespace PeaceEnablers.Services
         }
         public byte[] GeneratePdf(List<PillarWithQuestionsDto> data, City city, int year)
         {
+            var logoPath = Path.Combine(
+                Directory.GetCurrentDirectory(),
+                "wwwroot/assets/images/pem.png");
+
             return Document.Create(container =>
             {
                 container.Page(page =>
@@ -365,15 +374,15 @@ namespace PeaceEnablers.Services
                                             .FontColor("#cfe7df");
                                     });
 
-                                    row.ConstantItem(70)
-                                        .Height(50)
-                                        .Background("#ffffff")
+                                    // Right logo
+                                    row.ConstantItem(80)
+                                       .Background("#ffffff")
                                         .AlignCenter()
                                         .AlignMiddle()
-                                        .Text("PEM")
-                                        .FontSize(16)
-                                        .Bold()
-                                        .FontColor("#1f4b3f");
+                                        .Padding(4)
+                                        .Image(logoPath)
+                                        .FitArea();
+
                                 });
 
                             col.Item().PaddingBottom(10);

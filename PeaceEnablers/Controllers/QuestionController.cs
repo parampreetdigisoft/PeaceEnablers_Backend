@@ -114,5 +114,18 @@ namespace PeaceEnablers.Controllers
 
             return Ok(content);
         }
+        [HttpGet("getQuestionsByCityMappingIdForAnalyst")]
+        [Authorize]
+        public async Task<IActionResult> GetQuestionsByCityMappingIdForAnalyst([FromQuery] CityPillerRequestDto requestDto)
+        {
+            var userId = GetUserIdFromClaims();
+            if (userId == null)
+                return Unauthorized("User ID not found in token.");
+
+            var result = await _questionService.GetQuestionsByCityMappingIdForAnalyst(requestDto, userId.GetValueOrDefault());
+            if (result == null) return NotFound();
+
+            return Ok(result);
+        }
     }
 }

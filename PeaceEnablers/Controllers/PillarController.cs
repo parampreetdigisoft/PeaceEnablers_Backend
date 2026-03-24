@@ -88,9 +88,22 @@ namespace PeaceEnablers.Controllers
 
             var content = await _pillarService.ExportPillarsHistoryByUserId(requestDto);
 
-            return File(content.Item2 ?? new byte[1],
-               "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-               content.Item1);
+            var fileName = content.Item1;
+            var fileBytes = content.Item2 ?? new byte[1];
+
+            // Detect content type based on file extension
+            string contentType = "application/octet-stream";
+
+            if (fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+            {
+                contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            }
+            else if (fileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                contentType = "application/pdf";
+            }
+
+            return File(fileBytes, contentType, fileName);
         }
         [HttpPost("GetResponsesByUserId")]
         public async Task<IActionResult> GetResponsesByUserId([FromBody] GetPillarResponseHistoryRequestNewDto requestDto)

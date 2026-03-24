@@ -24,6 +24,7 @@ namespace PeaceEnablers.Dtos.QuestionDto
         public string QuestionText { get; set; }
         public bool IsSelected { get; set; } = false;
         public List<QuestionOptionDto> QuestionOptions { get; set; }
+        public List<HistoryQuestionAnswerRawDto> History { get; set; } = new();
     }
     public class QuestionOptionDto
     {
@@ -35,5 +36,17 @@ namespace PeaceEnablers.Dtos.QuestionDto
         public bool IsSelected { get; set; } = false;
         public string Justification { get; set; } 
         public string? Source { get; set; } 
+    }
+    public class HistoryQuestionAnswerRawDto
+    {
+        public int UserID { get; set; }
+        public int QuestionID { get; set; }
+        public int? OptionID { get; set; }
+        public string OptionText { get; set; }
+        public int? ScoreValue { get; set; }
+        public decimal? Progress { get; set; }
+        public string Justification { get; set; } = "";
+        public string Source { get; set; } = "";
+        public string FullName { get; set; } = "";
     }
 }
