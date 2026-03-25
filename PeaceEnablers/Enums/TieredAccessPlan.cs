@@ -12,4 +12,10 @@
         Excel = 1,
         Pdf = 2
     }
+
+    public enum ExportDocumentFormat
+    {
+        Pdf,
+        Docx
+    }
 }

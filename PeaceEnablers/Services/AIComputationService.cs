@@ -27,17 +27,17 @@ namespace PeaceEnablers.Services
         private readonly IAppLogger _appLogger;
         private readonly ICommonService _commonService;
         private readonly Download _download;
-        private readonly IAIAnalyzeService _iAIAnalayzeService;
-        private readonly IPdfGeneratorService _iPdfGeneratorService;
+        private readonly IAIAnalyzeService _iAIAnalayzeService;        
+        private readonly IDocumentGeneratorService _documentGeneratorService;
         public AIComputationService(ApplicationDbContext context, IAppLogger appLogger, ICommonService commonService, Download download, IAIAnalyzeService iAIAnalayzeService
-            , IPdfGeneratorService iPdfGeneratorService)
+            ,  IDocumentGeneratorService documentGeneratorService)
         {
             _context = context;
             _appLogger = appLogger;
             _commonService = commonService;
             _download = download;
-            _iAIAnalayzeService = iAIAnalayzeService;
-            _iPdfGeneratorService = iPdfGeneratorService;
+            _iAIAnalayzeService = iAIAnalayzeService;          
+            _documentGeneratorService = documentGeneratorService;
         }
         #endregion
 
@@ -461,22 +461,88 @@ namespace PeaceEnablers.Services
                 return new PaginationResponse<AIEstimatedQuestionScoreDto>();
             }
         }
-        public async Task<byte[]> GenerateCityDetailsPdf(AiCitySummeryDto cityDetails, UserRole userRole, int userID)
+        public async Task<byte[]> GenerateCityDetailsReport(AiCitySummeryDto cityDetails, UserRole userRole, int userID, IServices.DocumentFormat format = IServices.DocumentFormat.Pdf)
         {            
             try
             {
                 var pillars = await GetAICityPillars(
                     cityDetails.CityID, userID, userRole, cityDetails.Year);
 
-                var kpis = await GetAccessKpis(userID, userRole, cityDetails.CityID, cityDetails.Year);                
-                var pillarChartItems = pillars.Result.Pillars                    
-                    .Select(p => new KpiChartItem(
-                        p.PillarName?.Length > 20 ? p.PillarName[..20] : p.PillarName ?? "—",
-                        p.PillarName ?? "—",
-                        p.AIProgress, null))
-                    .ToList();
+                var kpis = await GetAccessKpis(userID, userRole, cityDetails.CityID, cityDetails.Year);
+                var peersCityIds = await _context.Cities
+                   .Where(x => x.CityID == cityDetails.CityID && x.IsActive && !x.IsDeleted)
+                   .SelectMany(x => x.CityPeers)
+                   .Where(x => x.IsActive && !x.IsDeleted)
+                   .Select(x => x.PeerCityID)
+                   .ToListAsync();
+                if (peersCityIds.Count > 0)
+                {
+                    peersCityIds.Add(cityDetails.CityID);
+                }
 
-                var document = await _iPdfGeneratorService.GenerateCityDetailsPdf(cityDetails, pillars.Result.Pillars, kpis, userRole);
+                var startYear = cityDetails.Year - 5;
+
+                var peerCities = await _context.Cities
+                    .Where(c => peersCityIds.Contains(c.CityID))
+                    .Select(c => new PeerCityHistoryReportDto
+                    {
+                        CityID = c.CityID,
+                        CityName = c.CityName,
+                        State = c.State,
+                        Country = c.Country,
+                        Region = c.Region,
+                        PostalCode = c.PostalCode,
+                        UpdatedDate = c.UpdatedDate,
+                        Image = c.Image,
+                        Latitude = c.Latitude,
+                        Longitude = c.Longitude,
+                        Population = c.Population,
+                        Income = c.Income,
+
+                        CityHistory = _context.AIPillarScores
+                            .Include(x => x.Pillar)
+                            .Where(x =>
+                                x.CityID == c.CityID &&
+                                x.Year >= startYear &&
+                                x.Year <= cityDetails.Year)
+                            .GroupBy(x => x.Year)
+                            .Select(yearGroup => new PeerCityYearHistoryDto
+                            {
+                                CityID = c.CityID,
+                                Year = yearGroup.Key,
+
+                                ScoreProgress = yearGroup.Average(x => x.AIProgress ?? 0),
+
+                                Pillars = yearGroup
+                                    .GroupBy(p => new
+                                    {
+                                        p.PillarID,
+                                        p.Pillar.PillarName,
+                                        p.Pillar.DisplayOrder
+                                    })
+                                    .Select(pillarGroup => new PeerCityPillarHistoryReportDto
+                                    {
+                                        PillarID = pillarGroup.Key.PillarID,
+                                        PillarName = pillarGroup.Key.PillarName,
+                                        DisplayOrder = pillarGroup.Key.DisplayOrder,
+                                        ScoreProgress = pillarGroup.Average(x => x.AIProgress ?? 0)
+                                    })
+                                    .OrderBy(x => x.DisplayOrder)
+                                    .ToList()
+                            })
+                            .OrderBy(x => x.Year)
+                            .ToList()
+                    })
+                    .ToListAsync();
+                //var pillarChartItems = pillars.Result.Pillars                    
+                //    .Select(p => new KpiChartItem(
+                //        p.PillarName?.Length > 20 ? p.PillarName[..20] : p.PillarName ?? "—",
+                //        p.PillarName ?? "—",
+                //        p.AIProgress, null))
+                //    .ToList();
+
+                //var documents = await _iPdfGeneratorService.GenerateCityDetailsPdf(cityDetails, pillars.Result.Pillars, kpis, userRole);
+                var document = await _documentGeneratorService.GenerateCityDetails(cityDetails, pillars.Result.Pillars, kpis, peerCities, userRole, format);
 
                 return document;
             }
@@ -485,23 +551,24 @@ namespace PeaceEnablers.Services
                 await _appLogger.LogAsync("Error Occured in GenerateCityDetailsPdf", ex);
                 return Array.Empty<byte>();
             }
-        }
-        public async Task<byte[]> GeneratePillarDetailsPdf(AiCityPillarResponse pillarData, UserRole userRole)
+        }        
+
+        public async Task<byte[]> GeneratePillarDetailsReport(AiCityPillarResponse pillarData, UserRole userRole, IServices.DocumentFormat format = IServices.DocumentFormat.Pdf)
         {
-            
             try
             {
-                var document = await _iPdfGeneratorService.GeneratePillarDetailsPdf(pillarData, userRole);
+                var document = await _documentGeneratorService.GeneratePillarDetails(pillarData, userRole, format);
+
 
                 return document;
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GeneratePillarDetailsPdf", ex);
+                await _appLogger.LogAsync("Error Occured in GeneratePillarDetailsReport", ex);
                 return Array.Empty<byte>();
             }
         }
-        
+
         void PillarProgressBar(ColumnDescriptor column, string label, decimal? percentage, string color)
         {
             var per = (float)(percentage ?? 0);
@@ -928,17 +995,39 @@ namespace PeaceEnablers.Services
             }
 
             var kpiRaw = baseQuery
-                .Where(x => !cityID.HasValue || x.CityID == cityID)
-                .Select(x => new
-                {
-                    KpiShortName = x.AnalyticalLayer.LayerCode,
-                    KpiName = x.AnalyticalLayer.LayerName,
-                    Value = x.AiCalValue5,
-                    CityID = x.CityID
-                });
+            .Where(x => !cityID.HasValue || x.CityID == cityID)
+            .Select(x => new
+            {
+                KpiShortName = x.AnalyticalLayer.LayerCode,
+                KpiName = x.AnalyticalLayer.LayerName,
+                CityID = x.CityID,
+                RawValue = x.AiCalValue5,
+                Definition = x.AnalyticalLayer.Purpose,
+                AnalyticalLayer = x.AnalyticalLayer
+            })
+            .Select(x => new
+            {
+                x.KpiShortName,
+                x.KpiName,
+                x.CityID,
+                Value = x.RawValue,
+                LayerID = x.AnalyticalLayer.LayerID,
+                Definition = x.Definition,
+
+                Interpretation = x.AnalyticalLayer.FiveLevelInterpretations.Select(i => new FiveLevelInterpretationsDto
+                (
+                   i.InterpretationID,
+                   i.LayerID,
+                   i.MinRange,
+                   i.MaxRange,
+                   i.Condition,
+                   i.StrategicAction
+                )).ToList()
+
+            }).OrderBy(x => x.LayerID);
 
             var kpis = await kpiRaw
-                .Select(k => new KpiChartItem(k.KpiShortName, k.KpiName, k.Value, k.CityID))
+                .Select(k => new KpiChartItem(k.KpiShortName, k.KpiName, k.Value, k.Definition, k.CityID, k.Interpretation))
                 .ToListAsync();
 
             return kpis ?? new List<KpiChartItem>();
@@ -970,8 +1059,9 @@ namespace PeaceEnablers.Services
 
             }
             return citiesDetails;
-        }
-        public async Task<byte[]> GenerateAllCityDetailsPdf(List<AiCitySummeryDto> citiesDetails, UserRole userRole, int userID, int year)
+        }        
+
+        public async Task<byte[]> GenerateAllCityDetailsReport(List<AiCitySummeryDto> citiesDetails, UserRole userRole, int userID, int year, IServices.DocumentFormat format = IServices.DocumentFormat.Pdf)
         {
             try
             {
@@ -979,13 +1069,21 @@ namespace PeaceEnablers.Services
 
                 var kpis = new List<KpiChartItem>();
 
-                var document = await _iPdfGeneratorService.GenerateAllCitiesDetailsPdf(citiesDetails, pillars.Result, kpis, userRole);
+                var recordAvailable = pillars.Result.Any(x => citiesDetails.Select(x => x.CityID).Contains(x.Key));
+                if (recordAvailable)
+                {
+                    var document = await _documentGeneratorService.GenerateAllCitiesDetails(citiesDetails, pillars.Result, kpis, userRole, format);
 
-                return document;
+                    return document;
+                }
+                else
+                {
+                    return Array.Empty<byte>();
+                }
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GenerateCityDetailsPdf", ex);
+                await _appLogger.LogAsync("Error Occured in GenerateCityDetailsReport", ex);
                 return Array.Empty<byte>();
             }
         }
@@ -1143,9 +1241,17 @@ namespace PeaceEnablers.Services
                     .Failure(new[] { "Error in getting cities pillar details" });
             }
         }
-        public record KpiChartItem(string ShortName, string Name, decimal? Value, int? CityID);
+        public record KpiChartItem(string ShortName, string Name, decimal? Value, string? Definition, int? CityID, List<FiveLevelInterpretationsDto> InterPretation);
 
-
+        public record FiveLevelInterpretationsDto(
+        int InterpretationID,
+        int LayerID,
+        decimal? MinRange,
+        decimal? MaxRange,
+        string Condition,
+        string StrategicAction
+   );
+        public record PillarChartItem(string ShortName, string Name, decimal? Value);
         #region TransferAssessment
         public async Task<ResultResponseDto<string>> AITransferAssessment(AITransferAssessmentRequestDto r, int userID, UserRole userRole)
         {

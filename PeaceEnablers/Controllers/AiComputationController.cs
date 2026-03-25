@@ -102,7 +102,7 @@ namespace PeaceEnablers.Controllers
         }
 
         [HttpGet("aiCityDetailsReport")]
-        public async Task<IActionResult> DownloadCityPdf([FromQuery] AiCitySummeryRequestPdfDto request)
+        public async Task<IActionResult> DownloadCityReport([FromQuery] AiCitySummeryRequestPdfDto request)
         {
             try
             {
@@ -121,26 +121,39 @@ namespace PeaceEnablers.Controllers
 
                 var cityDetails = await _aIComputationService.GetCityAiSummeryDetail(userId ?? 0, userRole, request.CityID,request.Year);
 
-                // Generate PDF
-                var pdfBytes = await _aIComputationService.GenerateCityDetailsPdf(cityDetails, userRole, userId ?? 0);
+                // Generate PDF               
 
-                // Return PDF with proper headers
-                var fileName = $"{cityDetails.CityName}_Details_{DateTime.Now:yyyyMMdd}.pdf";
+                string fileName;
+                byte[] fileBytes;
+                string contentType;
 
-                return File(pdfBytes,"application/pdf",fileName);
+                fileBytes = await _aIComputationService.GenerateCityDetailsReport(cityDetails, userRole, userId ?? 0, request.Format);
+
+                if (request.Format == IServices.DocumentFormat.Docx)
+                {
+                    contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+                    fileName = $"{cityDetails.CityName}_Details_{DateTime.Now:yyyyMMdd}.docx";
+                }
+                else
+                {
+                    contentType = "application/pdf";
+                    fileName = $"{cityDetails.CityName}_Details_{DateTime.Now:yyyyMMdd}.pdf";
+                }
+
+                return File(fileBytes, contentType, fileName);
             }
             catch (Exception ex)
             {
                 // Log error
                 return StatusCode(500, new
                 {
-                    message = "Error generating PDF",
+                    message = "Error generating report",
                     error = ex.Message
                 });
             }
         }
         [HttpGet("aiPillarDetailsReport")]
-        public async Task<IActionResult> DownloadPillarPdf([FromQuery] AiCitySummeryRequestPdfDto request)
+        public async Task<IActionResult> DownloadPillarReport([FromQuery] AiCitySummeryRequestPdfDto request)
         {
             try
             {
@@ -156,23 +169,37 @@ namespace PeaceEnablers.Controllers
                 {
                     return Unauthorized("You Don't have access.");
                 }
+                if (userRole != UserRole.Admin && userRole != UserRole.CityUser)
+                    return Unauthorized("You Don't have access.");
+
 
                 var pillars = await _aIComputationService.GetAICityPillars(request.CityID, userId.Value, userRole, request.Year);
 
-                var pillarDetails =  pillars.Result.Pillars.FirstOrDefault(x=>x.PillarID == request.PillarID);
+                var pillarDetails = pillars.Result.Pillars.FirstOrDefault(x => x.PillarID == request.PillarID);
                 if (pillarDetails != null)
                 {
+                    string contentType;
+                    string fileName;
 
                     // Generate PDF
-                    var pdfBytes = await _aIComputationService.GeneratePillarDetailsPdf(pillarDetails, userRole);
+                    var fileBytes = await _aIComputationService.GeneratePillarDetailsReport(pillarDetails, userRole, request.Format);
 
-                    // Return PDF with proper headers
-                    var fileName = $"{pillarDetails.PillarName}_Details_{DateTime.Now:yyyyMMdd}.pdf";
-                    return File(pdfBytes, "application/pdf", fileName);
+                    if (request.Format == IServices.DocumentFormat.Docx)
+                    {
+                        contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+                        fileName = $"{pillarDetails.PillarName}_Details_{DateTime.Now:yyyyMMdd}.docx";
+                    }
+                    else
+                    {
+                        contentType = "application/pdf";
+                        fileName = $"{pillarDetails.PillarName}_Details_{DateTime.Now:yyyyMMdd}.pdf";
+                    }
+
+                    return File(fileBytes, contentType, fileName);
                 }
                 return StatusCode(500, new
                 {
-                    message = "Error generating PDF"
+                    message = "Error generating Report"
                 });
 
             }
@@ -181,7 +208,7 @@ namespace PeaceEnablers.Controllers
                 // Log error
                 return StatusCode(500, new
                 {
-                    message = "Error generating PDF",
+                    message = "Error generating Report",
                     error = ex.Message
                 });
             }
@@ -285,7 +312,7 @@ namespace PeaceEnablers.Controllers
             return Ok(await _aIComputationService.RegeneratePillarAiSearch(aiCityIdsDto, userId.Value, userRole));
         }
         [HttpGet("aiAllCityDetailsReport")]
-        public async Task<IActionResult> DownloadAllCityPdf()
+        public async Task<IActionResult> DownloadAllCityPdf([FromQuery] DownloadReportDto request)
         {
             try
             {
@@ -303,17 +330,27 @@ namespace PeaceEnablers.Controllers
                 }
                 var year = DateTime.Now.Year;
                 var cityDetails = await _aIComputationService.GetAllCityAiSummeryDetail(userId ?? 0, userRole, year);
-
+                
                 if (cityDetails.Count > 0)
                 {
-                    // Generate PDF
-                    var pdfBytes = await _aIComputationService.GenerateAllCityDetailsPdf(cityDetails, userRole, userId.GetValueOrDefault(), year);
+                    string fileName;
+                    string contentType;
+                    var pdfBytes = await _aIComputationService.GenerateAllCityDetailsReport(cityDetails, userRole, userId.GetValueOrDefault(), year, request.Format);
 
-                    // Return PDF with proper headers
-                    var fileName = $"All_Details_{DateTime.Now:yyyyMMdd}.pdf";
+                    if (request.Format == IServices.DocumentFormat.Docx)
+                    {
+                        contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+                        fileName = $"Cities_Details_{DateTime.Now:yyyyMMdd}.docx";
+                    }
+                    else
+                    {
+                        contentType = "application/pdf";
+                        fileName = $"Cities_Details_{DateTime.Now:yyyyMMdd}.pdf";
+                    }
 
-                    return File(pdfBytes, "application/pdf", fileName);
+                    return File(pdfBytes, contentType, fileName);
                 }
+
                 return NotFound("No City Found.");
 
             }

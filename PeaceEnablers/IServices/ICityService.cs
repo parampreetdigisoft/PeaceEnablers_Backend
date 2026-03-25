@@ -22,7 +22,7 @@ namespace PeaceEnablers.IServices
         Task<ResultResponseDto<List<GetCitiesSubmitionHistoryReponseDto>>> GetCitiesProgressByUserId(int userID, DateTime updateAt, UserRole userRole);
         Task<ResultResponseDto<string>> AddUpdateCity(AddUpdateCityDto q);
         Task<ResultResponseDto<List<UserCityMappingResponseDto>>> getAllCityByLocation(GetNearestCityRequestDto r);
-        Task<ResultResponseDto<List<UserCityMappingResponseDto>>> GetAiAccessCity(int userId, UserRole userRole);
-        Task<ResultResponseDto<byte[]>> ExportCities(int userId, UserRole userRole);
+        Task<ResultResponseDto<List<UserCityMappingResponseDto>>> GetAiAccessCity(int userId, UserRole userRole);        
+        Task<ResultResponseDto<byte[]>> ExportCities(ExportCityWithOptionDto request, int userId, UserRole userRole);
     }
 }

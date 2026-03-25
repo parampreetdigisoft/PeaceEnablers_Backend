@@ -16,6 +16,7 @@ namespace PeaceEnablers.Dtos.AiDto
     public class AiCitySummeryRequestPdfDto : AiCityPillarRequestDto
     {
         public int? PillarID { get; set; }
+        public PeaceEnablers.IServices.DocumentFormat Format { get; set; } = PeaceEnablers.IServices.DocumentFormat.Pdf;
     }
     public class AiCityPillarRequestDto
     {
