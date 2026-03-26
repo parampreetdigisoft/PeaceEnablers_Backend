@@ -301,15 +301,15 @@ namespace PeaceEnablers.Common.Implementation
                 });
 
                 // ── Row 2 : KPI distribution stat cards ──────────────────────────
-                var topKpis = kpis
-                    .Where(x =>
-                        string.Equals(x.ShortName, "UDRI", StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(x.ShortName, "PRUPS", StringComparison.OrdinalIgnoreCase))
-                    .ToList();
+                //var topKpis = kpis
+                //    .Where(x =>
+                //        string.Equals(x.ShortName, "UDRI", StringComparison.OrdinalIgnoreCase) ||
+                //        string.Equals(x.ShortName, "PRUPS", StringComparison.OrdinalIgnoreCase))
+                //    .ToList();
 
-                if (topKpis.Any())
-                    col.Item().Height(130).Element(x =>
-                    DrawTopKpiBand(x, topKpis));
+                //if (topKpis.Any())
+                //    col.Item().Height(130).Element(x =>
+                //    DrawTopKpiBand(x, topKpis));
 
                 col.Item().Height(100).Element(x =>
                     RenderKpiDistributionBand(x, kpis.Count, kpiGreen, kpiAmber, kpiRed));
@@ -817,11 +817,11 @@ namespace PeaceEnablers.Common.Implementation
                 .Select(g => g.Select(x => x.k).ToList())
                 .ToList();
 
-            var topKpis = kpis
-                .Where(x =>
-                    string.Equals(x.ShortName, "UDRI", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(x.ShortName, "PRUPS", StringComparison.OrdinalIgnoreCase))
-                .ToList();
+            //var topKpis = kpis
+            //    .Where(x =>
+            //        string.Equals(x.ShortName, "UDRI", StringComparison.OrdinalIgnoreCase) ||
+            //        string.Equals(x.ShortName, "PRUPS", StringComparison.OrdinalIgnoreCase))
+            //    .ToList();
 
             container.Padding(14).Column(col =>
             {
@@ -831,9 +831,9 @@ namespace PeaceEnablers.Common.Implementation
                 col.Item().Height(70).Element(x =>
                     DrawKpiSummaryBand(x, total, green, amber, red, avg));
 
-                if(topKpis.Any())
-                    col.Item().Height(130).Element(x =>
-                    DrawTopKpiBand(x,topKpis));
+                //if(topKpis.Any())
+                //    col.Item().Height(130).Element(x =>
+                //    DrawTopKpiBand(x,topKpis));
 
                 // ── chart + reference-table sections ─────────────────────────────
                 int offset = 0;
@@ -1649,48 +1649,8 @@ namespace PeaceEnablers.Common.Implementation
                         .Text("City Assessment Platform").FontSize(8).FontColor("#9E9E9E");
                 });
             });
-        }
-
-        // ─────────────────────────────────────────────────────────────────────────────
-        //  CONTENT SECTIONS
-        // ─────────────────────────────────────────────────────────────────────────────
-
-        //void CitySummeryComposeContent(
-        //    IContainer container, AiCitySummeryDto data, UserRole userRole)
-        //{
-        //    container.PaddingTop(4).Column(column =>
-        //    {
-        //        var random = new AiCityPillarResponse
-        //        {
-        //            EvaluatorScore = data.EvaluatorScore,
-        //            Discrepancy = data.Discrepancy,
-        //            AIDataYear = data.Year,
-        //            AIProgress = data.AIProgress
-        //        };
-        //        column.Item().PaddingTop(10).Element(c => PillarProgressSection(c, random, userRole));
-
-        //        column.Item().PaddingTop(10).Element(c =>
-        //            PillarContentSection(c, "Executive Summary", data.EvidenceSummary, "#163329"));
-
-        //        column.Item().PageBreak();
-        //        column.Item().PaddingTop(10).Element(c =>
-        //            PillarContentSection(c, "Cross-Pillar System Dynamics", data.CrossPillarPatterns, "#6e9688"));
-        //        column.Item().PaddingTop(10).Element(c =>
-        //            PillarContentSection(c, "Institutional Capacity Assessment", data.InstitutionalCapacity, "#0d8057"));
-
-        //        //column.Item().PageBreak();
-        //        //column.Item().PaddingTop(10).Element(c =>
-        //        //    PillarContentSection(c, "Equity Assessment", data.EquityAssessment, "#a4bab2"));
-        //        //column.Item().PaddingTop(10).Element(c =>
-        //        //    PillarContentSection(c, "Sustainability Outlook", data.SustainabilityOutlook, "#373d3b"));
-
-        //        column.Item().PageBreak();
-        //        column.Item().PaddingTop(10).Element(c =>
-        //            PillarContentSection(c, "Strategic Policy Priorities", data.StrategicRecommendation, "#2e9975"));
-        //        column.Item().PaddingTop(10).Element(c =>
-        //            PillarContentSection(c, "Why This Assessment Matters", data.DataTransparencyNote, "#63a68f"));
-        //    });
-        //}
+        }       
+        
 
         void CitySummeryComposeContent(IContainer container, AiCitySummeryDto data, UserRole userRole)
         {
@@ -1819,23 +1779,101 @@ namespace PeaceEnablers.Common.Implementation
         {
             container.PaddingTop(8).Column(column =>
             {
-                column.Item().PaddingTop(10).Element(c => PillarProgressSection(c, data, userRole));
+                // Progress Section
+                column.Item().PaddingTop(10)
+                    .Element(c => PillarProgressSection(c, data, userRole));
 
+                // Evidence Summary
                 column.Item().PaddingTop(10).Element(c =>
                     PillarContentSection(c, "Evidence Summary", data.EvidenceSummary, "#163329"));
 
+                // =========================
+                // STRUCTURAL EVIDENCE
+                // =========================
+                column.Item().PageBreak();
+                column.Item().PaddingTop(10).Element(c =>
+                    PillarContentSection(c, "Structural Evidence", data.StructuralEvidence, "#1f4e79"));
+
+                column.Item().PaddingTop(10).Element(c =>
+                    PillarContentSection(c, "Operational Evidence", data.OperationalEvidence, "#2e75b6"));
+                column.Item().PageBreak();
+
+                column.Item().PaddingTop(10).Element(c =>
+                    PillarContentSection(c, "Outcome Evidence", data.OutcomeEvidence, "#5b9bd5"));
+
+                column.Item().PaddingTop(10).Element(c =>
+                  PillarContentSection(c, "Perception Evidence", data.PerceptionEvidence, "#9dc3e6"));
+                // =========================
+                // INTEGRITY CHECKS
+                // =========================
+                column.Item().PageBreak();
+               
+                column.Item().PaddingTop(10).Element(c =>
+                    PillarContentSection(c, "Temporal Scope", data.TemporalScope, "#5f497a"));
+
+                column.Item().PaddingTop(10).Element(c =>
+                    PillarContentSection(c, "Distortion Screening", data.DistortionScreening, "#8064a2"));
+                column.Item().PaddingTop(10).Element(c =>
+                    PillarContentSection(c, "Relational Integrity", data.RelationalIntegrity, "#b1a0c7"));
+                
+
+                // =========================
+                // STRESS TEST
+                // =========================
+                
+                
+                column.Item().PaddingTop(10).Element(c =>
+                    PillarContentSection(c, "Stress Political Shock", data.StressPoliticalShock, "#7f6000"));
+
+                column.Item().PaddingTop(10).Element(c =>
+                    PillarContentSection(c, "Stress Economic Shock", data.StressEconomicShock, "#bf9000"));
+
+                column.Item().PaddingTop(10).Element(c =>
+                    PillarContentSection(c, "Stress Narrative Shock", data.StressNarrativeShock, "#ffd966"));
+                column.Item().PageBreak();
+
+                column.Item().PaddingTop(10).Element(c =>
+                    PillarContentSection(c, "Stress Overall Resilience", data.StressOverallResilience, "#c55a11"));
+
+                column.Item().PaddingTop(10).Element(c =>
+                    PillarContentSection(c, "Stress Score Adjustment", data.StressScoreAdjustment, "#e26b0a"));
+
+                // =========================
+                // GOVERNANCE ADJUSTMENTS
+                // =========================
+                column.Item().PageBreak();
+                column.Item().PaddingTop(10).Element(c =>
+                    PillarContentSection(c, "Inequality Adjustment", data.InequalityAdjustment, "#274e13"));
+
+                column.Item().PaddingTop(10).Element(c =>
+                    PillarContentSection(c, "Opacity Risk", data.OpacityRisk, "#38761d"));
+
+                column.Item().PaddingTop(10).Element(c =>
+                    PillarContentSection(c, "Non-Compensation Note", data.NonCompensationNote, "#6aa84f"));
+
+                // =========================
+                // ALERTS & EQUITY
+                // =========================
                 column.Item().PageBreak();
                 column.Item().PaddingTop(10).Element(c =>
                     PillarContentSection(c, "Red Flags", data.RedFlag, "#ED561A", "#eb4634"));
+
                 column.Item().PaddingTop(10).Element(c =>
                     PillarContentSection(c, "Geographic Equity Note", data.GeographicEquityNote, "#0d8057"));
 
+                // =========================
+                // INSTITUTIONAL ANALYSIS
+                // =========================
                 column.Item().PageBreak();
                 column.Item().PaddingTop(10).Element(c =>
                     PillarContentSection(c, "Institutional Assessment", data.InstitutionalAssessment, "#2e9975"));
+
                 column.Item().PaddingTop(10).Element(c =>
                     PillarContentSection(c, "Analytical Foundations and Data Integration", data.DataGapAnalysis, "#a4bab2"));
 
+                // =========================
+                // DATA SOURCES
+                // =========================
                 if (data.DataSourceCitations?.Any() == true)
                 {
                     column.Item().PageBreak();

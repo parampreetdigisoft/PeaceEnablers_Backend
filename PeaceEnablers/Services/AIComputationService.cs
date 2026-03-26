@@ -533,15 +533,7 @@ namespace PeaceEnablers.Services
                             .OrderBy(x => x.Year)
                             .ToList()
                     })
-                    .ToListAsync();
-                //var pillarChartItems = pillars.Result.Pillars                    
-                //    .Select(p => new KpiChartItem(
-                //        p.PillarName?.Length > 20 ? p.PillarName[..20] : p.PillarName ?? "—",
-                //        p.PillarName ?? "—",
-                //        p.AIProgress, null))
-                //    .ToList();
-
-                //var documents = await _iPdfGeneratorService.GenerateCityDetailsPdf(cityDetails, pillars.Result.Pillars, kpis, userRole);
+                    .ToListAsync();                
                 var document = await _documentGeneratorService.GenerateCityDetails(cityDetails, pillars.Result.Pillars, kpis, peerCities, userRole, format);
 
                 return document;

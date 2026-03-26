@@ -274,15 +274,15 @@ namespace PeaceEnablers.Common.Implementation
                     validPillars));
 
             // Highlight KPIs (UDRI / PRUPS)
-            var topKpis = kpis.Where(x =>
-                string.Equals(x.ShortName, "UDRI", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(x.ShortName, "PRUPS", StringComparison.OrdinalIgnoreCase)).ToList();
-            if (topKpis.Any())
-            {
-                body.AppendChild(Gap(20));
-                body.AppendChild(CreateKpiCardTable(mainPart, topKpis));
+            //var topKpis = kpis.Where(x =>
+            //    string.Equals(x.ShortName, "UDRI", StringComparison.OrdinalIgnoreCase) ||
+            //    string.Equals(x.ShortName, "PRUPS", StringComparison.OrdinalIgnoreCase)).ToList();
+            //if (topKpis.Any())
+            //{
+            //    body.AppendChild(Gap(20));
+            //    body.AppendChild(CreateKpiCardTable(mainPart, topKpis));
 
-            }
+            //}
 
             body.AppendChild(Gap(20));
 
@@ -671,32 +671,71 @@ namespace PeaceEnablers.Common.Implementation
             body.AppendChild(CreateProgressBar("Score", (float)(data.AIProgress ?? 0), MedGreen));
             body.AppendChild(Gap(160));
 
-            // (Optional: match PDF richer progress data)
-            // AppendContentSection(body, "Evaluator Score", data.EvaluatorScore?.ToString(), "cccccc");
-            // AppendContentSection(body, "Discrepancy", data.Discrepancy?.ToString(), "cccccc");
-            // AppendContentSection(body, "Year", data.AIDataYear?.ToString(), "cccccc");
-
             // =========================
             // EVIDENCE SUMMARY
             // =========================
             AppendContentSection(body, "Evidence Summary", data.EvidenceSummary, "163329");
 
             // =========================
-            // RED FLAGS + EQUITY
+            // STRUCTURAL EVIDENCE
             // =========================
             body.AppendChild(PageBreak());
 
-            AppendContentSection(body, "Red Flags", data.RedFlag, "ED561A", "eb4634"); // match PDF dual color
+            AppendContentSection(body, "Structural Evidence", data.StructuralEvidence, "1f4e79");
+            AppendContentSection(body, "Operational Evidence", data.OperationalEvidence, "2e75b6");
+
+            body.AppendChild(PageBreak());
+
+            AppendContentSection(body, "Outcome Evidence", data.OutcomeEvidence, "5b9bd5");
+            AppendContentSection(body, "Perception Evidence", data.PerceptionEvidence, "9dc3e6");
+
+            // =========================
+            // INTEGRITY CHECKS
+            // =========================
+            body.AppendChild(PageBreak());
+
+            AppendContentSection(body, "Temporal Scope", data.TemporalScope, "5f497a");
+            AppendContentSection(body, "Distortion Screening", data.DistortionScreening, "8064a2");
+            AppendContentSection(body, "Relational Integrity", data.RelationalIntegrity, "b1a0c7");
+
+            // =========================
+            // STRESS TEST
+            // =========================
+            body.AppendChild(PageBreak());
+
+            AppendContentSection(body, "Stress Political Shock", data.StressPoliticalShock, "7f6000");
+            AppendContentSection(body, "Stress Economic Shock", data.StressEconomicShock, "bf9000");
+            AppendContentSection(body, "Stress Narrative Shock", data.StressNarrativeShock, "ffd966");
+
+            body.AppendChild(PageBreak());
+
+            AppendContentSection(body, "Stress Overall Resilience", data.StressOverallResilience, "c55a11");
+            AppendContentSection(body, "Stress Score Adjustment", data.StressScoreAdjustment, "e26b0a");
+
+            // =========================
+            // GOVERNANCE ADJUSTMENTS
+            // =========================
+            body.AppendChild(PageBreak());
+
+            AppendContentSection(body, "Inequality Adjustment", data.InequalityAdjustment, "274e13");
+            AppendContentSection(body, "Opacity Risk", data.OpacityRisk, "38761d");
+            AppendContentSection(body, "Non-Compensation Note", data.NonCompensationNote, "6aa84f");
+
+            // =========================
+            // ALERTS & EQUITY
+            // =========================
+            body.AppendChild(PageBreak());
+
+            AppendContentSection(body, "Red Flags", data.RedFlag, "ED561A", "eb4634");
             AppendContentSection(body, "Geographic Equity Note", data.GeographicEquityNote, "0d8057");
 
             // =========================
-            // INSTITUTIONAL + DATA
+            // INSTITUTIONAL ANALYSIS
             // =========================
             body.AppendChild(PageBreak());
 
             AppendContentSection(body, "Institutional Assessment", data.InstitutionalAssessment, "2e9975");
 
-            // 🔥 FIX: match exact PDF title
             AppendContentSection(
                 body,
                 "Analytical Foundations and Data Integration",
@@ -755,14 +794,14 @@ namespace PeaceEnablers.Common.Implementation
             body.AppendChild(Gap(100));
 
             // Highlight KPIs
-            var topKpis = kpis.Where(x =>
-                string.Equals(x.ShortName, "UDRI",  StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(x.ShortName, "PRUPS", StringComparison.OrdinalIgnoreCase)).ToList();
-            if (topKpis.Any())
-            {
-                body.AppendChild(CreateKpiCardTable(mainPart, topKpis));
-                body.AppendChild(Gap(100));
-            }
+            //var topKpis = kpis.Where(x =>
+            //    string.Equals(x.ShortName, "UDRI",  StringComparison.OrdinalIgnoreCase) ||
+            //    string.Equals(x.ShortName, "PRUPS", StringComparison.OrdinalIgnoreCase)).ToList();
+            //if (topKpis.Any())
+            //{
+            //    body.AppendChild(CreateKpiCardTable(mainPart, topKpis));
+            //    body.AppendChild(Gap(100));
+            //}
 
             // Groups of 18 KPIs — bar chart + interpretation cards
             var groups = kpis
