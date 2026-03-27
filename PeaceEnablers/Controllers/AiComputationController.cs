@@ -127,7 +127,7 @@ namespace PeaceEnablers.Controllers
                 byte[] fileBytes;
                 string contentType;
 
-                fileBytes = await _aIComputationService.GenerateCityDetailsReport(cityDetails, userRole, userId ?? 0, request.Format);
+                fileBytes = await _aIComputationService.GenerateCityDetailsReport(cityDetails, userRole, userId ?? 0, request.Format, request.ReportType);
 
                 if (request.Format == IServices.DocumentFormat.Docx)
                 {

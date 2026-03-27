@@ -119,18 +119,29 @@ namespace PeaceEnablers.Backgroundjob
                     },
                     onFinalFailure: ex =>
                     {
-                       
+
                         _appLogger.LogAsync("ChannelWorker", ex);
                     });
 
                 await ExecuteWithRetry(
                     async () =>
                     {
-                        await dbContext.Database.ExecuteSqlRawAsync("EXEC sp_AiInsertAnalyticalLayerResults @CityID",cityIdParam);
+                        await dbContext.Database.ExecuteSqlRawAsync("EXEC sp_AiRecalculateCityScore @CityID", cityIdParam);
                     },
                     onFinalFailure: ex =>
                     {
-                         _appLogger.LogAsync("sp_AiInsertAnalyticalLayerResults", ex);
+
+                        _appLogger.LogAsync("ChannelWorker", ex);
+                    });
+
+                await ExecuteWithRetry(
+                    async () =>
+                    {
+                        await dbContext.Database.ExecuteSqlRawAsync("EXEC sp_AiInsertAnalyticalLayerResults @CityID", cityIdParam);
+                    },
+                    onFinalFailure: ex =>
+                    {
+                        _appLogger.LogAsync("sp_AiInsertAnalyticalLayerResults", ex);
                     });
             }
             catch (Exception ex)

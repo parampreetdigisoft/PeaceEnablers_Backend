@@ -212,7 +212,10 @@ namespace PeaceEnablers.Services
 
                 await _context.SaveChangesAsync();
 
-                _download.InsertAnalyticalLayerResults(assessment.UserCityMapping.CityID);
+                if (assessment.AssessmentPhase == AssessmentPhase.Completed)
+                {
+                    _download.InsertAnalyticalLayerResults(assessment.UserCityMapping.CityID);
+                }
 
                 return ResultResponseDto<string>.Success("", new[] { "Pillar saved successfully" }, 1);
             }
@@ -843,7 +846,10 @@ namespace PeaceEnablers.Services
                     //existingAssessment.PillarAssessments.Remove(pillar);
                     _context.PillarAssessments.Remove(pillar);
                 }
-                _download.InsertAnalyticalLayerResults(transferAssessment.UserCityMapping.CityID);
+                if (existingAssessment.AssessmentPhase == AssessmentPhase.Completed)
+                {
+                    _download.InsertAnalyticalLayerResults(transferAssessment.UserCityMapping.CityID);
+                }
                 await _context.SaveChangesAsync();
 
                 return ResultResponseDto<string>.Success("", new[] { "Assessment transferred successfully." });

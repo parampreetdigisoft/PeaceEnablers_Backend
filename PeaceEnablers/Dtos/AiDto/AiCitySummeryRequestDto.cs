@@ -17,6 +17,7 @@ namespace PeaceEnablers.Dtos.AiDto
     {
         public int? PillarID { get; set; }
         public PeaceEnablers.IServices.DocumentFormat Format { get; set; } = PeaceEnablers.IServices.DocumentFormat.Pdf;
+        public string ReportType { get; set; } = "ai";
     }
     public class AiCityPillarRequestDto
     {

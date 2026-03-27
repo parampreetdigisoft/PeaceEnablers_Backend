@@ -460,92 +460,183 @@ namespace PeaceEnablers.Services
                 await _appLogger.LogAsync("Error Occured in GetAICityPillars", ex);
                 return new PaginationResponse<AIEstimatedQuestionScoreDto>();
             }
-        }
-        public async Task<byte[]> GenerateCityDetailsReport(AiCitySummeryDto cityDetails, UserRole userRole, int userID, IServices.DocumentFormat format = IServices.DocumentFormat.Pdf)
-        {            
-            try
-            {
-                var pillars = await GetAICityPillars(
-                    cityDetails.CityID, userID, userRole, cityDetails.Year);
+        }        
+        private async Task<List<PeerCityHistoryReportDto>> GetPeerCities(int userID, UserRole role, int cityID, int year, bool isAiScore = true)
+        {
+            var peerCities = new List<PeerCityHistoryReportDto>();
 
-                var kpis = await GetAccessKpis(userID, userRole, cityDetails.CityID, cityDetails.Year);
-                var peersCityIds = await _context.Cities
-                   .Where(x => x.CityID == cityDetails.CityID && x.IsActive && !x.IsDeleted)
+            var peersCityIds = await _context.Cities
+                   .Where(x => x.CityID == cityID && x.IsActive && !x.IsDeleted)
                    .SelectMany(x => x.CityPeers)
                    .Where(x => x.IsActive && !x.IsDeleted)
                    .Select(x => x.PeerCityID)
                    .ToListAsync();
-                if (peersCityIds.Count > 0)
+            if (peersCityIds.Count > 0)
+            {
+                peersCityIds.Add(cityID);
+            }
+
+            var startYear = year - 5;
+
+            peerCities = await _context.Cities
+                .Where(c => peersCityIds.Contains(c.CityID))
+                .Select(c => new PeerCityHistoryReportDto
                 {
-                    peersCityIds.Add(cityDetails.CityID);
-                }
+                    CityID = c.CityID,
+                    CityName = c.CityName,
+                    State = c.State,
+                    Country = c.Country,
+                    Region = c.Region,
+                    PostalCode = c.PostalCode,
+                    UpdatedDate = c.UpdatedDate,
+                    Image = c.Image,
+                    Latitude = c.Latitude,
+                    Longitude = c.Longitude,
+                    Population = c.Population,
+                    Income = c.Income,
+                    PPP = c.PPP
 
-                var startYear = cityDetails.Year - 5;
+                }).ToListAsync();
 
-                var peerCities = await _context.Cities
-                    .Where(c => peersCityIds.Contains(c.CityID))
-                    .Select(c => new PeerCityHistoryReportDto
+            if (isAiScore)
+            {
+                foreach (var c in peerCities)
+                {
+                    c.CityHistory = _context.AIPillarScores
+                    .Include(x => x.Pillar)
+                    .Where(x =>
+                        x.CityID == c.CityID &&
+                        x.Year >= startYear &&
+                        x.Year <= year)
+                    .GroupBy(x => x.Year)
+                    .Select(yearGroup => new PeerCityYearHistoryDto
                     {
                         CityID = c.CityID,
-                        CityName = c.CityName,
-                        State = c.State,
-                        Country = c.Country,
-                        Region = c.Region,
-                        PostalCode = c.PostalCode,
-                        UpdatedDate = c.UpdatedDate,
-                        Image = c.Image,
-                        Latitude = c.Latitude,
-                        Longitude = c.Longitude,
-                        Population = c.Population,
-                        Income = c.Income,
-                        PPP = c.PPP,
+                        Year = yearGroup.Key,
 
-                        CityHistory = _context.AIPillarScores
-                            .Include(x => x.Pillar)
-                            .Where(x =>
-                                x.CityID == c.CityID &&
-                                x.Year >= startYear &&
-                                x.Year <= cityDetails.Year)
-                            .GroupBy(x => x.Year)
-                            .Select(yearGroup => new PeerCityYearHistoryDto
+                        ScoreProgress = yearGroup.Average(x => x.AIProgress ?? 0),
+
+                        Pillars = yearGroup
+                            .GroupBy(p => new
                             {
-                                CityID = c.CityID,
-                                Year = yearGroup.Key,
-
-                                ScoreProgress = yearGroup.Average(x => x.AIProgress ?? 0),
-
-                                Pillars = yearGroup
-                                    .GroupBy(p => new
-                                    {
-                                        p.PillarID,
-                                        p.Pillar.PillarName,
-                                        p.Pillar.DisplayOrder
-                                    })
-                                    .Select(pillarGroup => new PeerCityPillarHistoryReportDto
-                                    {
-                                        PillarID = pillarGroup.Key.PillarID,
-                                        PillarName = pillarGroup.Key.PillarName,
-                                        DisplayOrder = pillarGroup.Key.DisplayOrder,
-                                        ScoreProgress = pillarGroup.Average(x => x.AIProgress ?? 0)
-                                    })
-                                    .OrderBy(x => x.DisplayOrder)
-                                    .ToList()
+                                p.PillarID,
+                                p.Pillar.PillarName,
+                                p.Pillar.DisplayOrder
                             })
-                            .OrderBy(x => x.Year)
+                            .Select(pillarGroup => new PeerCityPillarHistoryReportDto
+                            {
+                                PillarID = pillarGroup.Key.PillarID,
+                                PillarName = pillarGroup.Key.PillarName,
+                                DisplayOrder = pillarGroup.Key.DisplayOrder,
+                                ScoreProgress = pillarGroup.Average(x => x.AIProgress ?? 0)
+                            })
+                            .OrderBy(x => x.DisplayOrder)
                             .ToList()
                     })
-                    .ToListAsync();                
+                    .OrderBy(x => x.Year)
+                    .ToList();
+                }
+            }
+            else
+            {
+                var pillars = await _context.Pillars.Select(x => new
+                {
+                    x.PillarID,
+                    x.PillarName,
+                    x.DisplayOrder
+                }).ToListAsync();
+
+                var cityProgress = await _commonService
+                    .GetCitiesProgressHistoryAsync(userID, (int)role, year - 5, year);
+
+                var filterCites = cityProgress
+                    .Where(x => peersCityIds.Contains(x.CityID))
+                    .ToList();
+
+                foreach (var city in peerCities)
+                {
+                    var progress = filterCites
+                        .Where(x => x.CityID == city.CityID)
+                        .ToList();
+
+                    // ✅ Build Year-wise history first
+                    city.CityHistory = progress
+                        .GroupBy(x => x.Year)
+                        .Select(yearGroup => new PeerCityYearHistoryDto
+                        {
+                            CityID = city.CityID,
+                            Year = yearGroup.Key,
+
+                            // City level score
+                            ScoreProgress = Math.Round(
+                                yearGroup.Select(x => x.ScoreProgress)
+                                         .DefaultIfEmpty(0)
+                                         .Average(), 2),
+
+                            // Pillar level score
+                            Pillars = pillars
+                                .Select(p => new PeerCityPillarHistoryReportDto
+                                {
+                                    PillarID = p.PillarID,
+                                    PillarName = p.PillarName,
+                                    DisplayOrder = p.DisplayOrder,
+
+                                    ScoreProgress = Math.Round(
+                                        yearGroup
+                                            .Where(x => x.PillarID == p.PillarID)
+                                            .Select(x => x.ScoreProgress)
+                                            .DefaultIfEmpty(0)
+                                            .Average(), 2)
+                                })
+                                .OrderBy(x => x.DisplayOrder)
+                                .ToList()
+                        })
+                        .OrderBy(x => x.Year)
+                        .ToList();
+                }
+            }
+
+            return peerCities;
+        }
+
+        // ─────────────────────────────────────────────────────────────────────────────
+        //  ENTRY POINTS  (GenerateCityDetailsPdf / GeneratePillarDetailsPdf)
+        // ─────────────────────────────────────────────────────────────────────────────
+
+        public async Task<byte[]> GenerateCityDetailsReport(AiCitySummeryDto cityDetails, UserRole userRole, int userID,
+           IServices.DocumentFormat format = IServices.DocumentFormat.Pdf, string reportType = "ai")
+        {
+            try
+            {
+                var isManual = reportType != "ai" && userRole == UserRole.Admin ? true : false;
+
+                var pillars = await GetAICityPillars(cityDetails.CityID, userID, userRole, cityDetails.Year);
+
+                var kpis = await GetAccessKpis(userID, userRole, cityDetails.CityID, cityDetails.Year, !isManual);
+
+                if (isManual)
+                {
+                    cityDetails.AIProgress = cityDetails.EvaluatorScore;
+
+                    foreach (var pillar in pillars.Result.Pillars)
+                    {
+                        pillar.AIProgress = pillar.EvaluatorScore;
+                    }
+                }
+
+                var peerCities = await GetPeerCities(userID, userRole, cityDetails.CityID, cityDetails.Year, !isManual);
+
+
                 var document = await _documentGeneratorService.GenerateCityDetails(cityDetails, pillars.Result.Pillars, kpis, peerCities, userRole, format);
 
                 return document;
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GenerateCityDetailsPdf", ex);
+                await _appLogger.LogAsync("Error Occured in GenerateCityDetailsReport", ex);
                 return Array.Empty<byte>();
             }
-        }        
-
+        }
         public async Task<byte[]> GeneratePillarDetailsReport(AiCityPillarResponse pillarData, UserRole userRole, IServices.DocumentFormat format = IServices.DocumentFormat.Pdf)
         {
             try
@@ -954,7 +1045,7 @@ namespace PeaceEnablers.Services
             }
             return cityDetails;
         }
-        private async Task<List<KpiChartItem>> GetAccessKpis(int userID, UserRole role, int? cityID, int year = 0)
+        private async Task<List<KpiChartItem>> GetAccessKpis(int userID, UserRole role, int? cityID, int year = 0, bool isAiScore = true)
         {
             var startDate = new DateTime(year, 1, 1);
             var endDate = new DateTime(year + 1, 1, 1);
@@ -994,7 +1085,8 @@ namespace PeaceEnablers.Services
                 KpiShortName = x.AnalyticalLayer.LayerCode,
                 KpiName = x.AnalyticalLayer.LayerName,
                 CityID = x.CityID,
-                RawValue = x.AiCalValue5,
+                AiCalValue5 = x.AiCalValue5,
+                CalValue5 = x.CalValue5,
                 Definition = x.AnalyticalLayer.Purpose,
                 AnalyticalLayer = x.AnalyticalLayer
             })
@@ -1003,10 +1095,10 @@ namespace PeaceEnablers.Services
                 x.KpiShortName,
                 x.KpiName,
                 x.CityID,
-                Value = x.RawValue,
+                x.AiCalValue5,
+                x.CalValue5,
                 LayerID = x.AnalyticalLayer.LayerID,
                 Definition = x.Definition,
-
                 Interpretation = x.AnalyticalLayer.FiveLevelInterpretations.Select(i => new FiveLevelInterpretationsDto
                 (
                    i.InterpretationID,
@@ -1020,7 +1112,7 @@ namespace PeaceEnablers.Services
             }).OrderBy(x => x.LayerID);
 
             var kpis = await kpiRaw
-                .Select(k => new KpiChartItem(k.KpiShortName, k.KpiName, k.Value, k.Definition, k.CityID, k.Interpretation))
+                .Select(k => new KpiChartItem(k.KpiShortName, k.KpiName, isAiScore && role == UserRole.Admin ? k.AiCalValue5 : k.CalValue5, k.Definition, k.CityID, k.Interpretation))
                 .ToListAsync();
 
             return kpis ?? new List<KpiChartItem>();
@@ -1303,7 +1395,7 @@ namespace PeaceEnablers.Services
                         CreatedAt = currentDate,
                         UpdatedAt = currentDate,
                         IsActive = true,
-                        AssessmentPhase = AssessmentPhase.InProgress,
+                        AssessmentPhase = userRole == UserRole.Admin ? AssessmentPhase.Completed : AssessmentPhase.InProgress,
                         PillarAssessments = new List<PillarAssessment>()
                     };
 
@@ -1394,7 +1486,10 @@ namespace PeaceEnablers.Services
                     //existingAssessment.PillarAssessments.Remove(pillar);
                     _context.PillarAssessments.Remove(pillar);
                 }
-                _download.InsertAnalyticalLayerResults(r.CityID);
+                if (existingAssessment.AssessmentPhase == AssessmentPhase.Completed)
+                {
+                    _download.InsertAnalyticalLayerResults(r.CityID);
+                }                
                 await _context.SaveChangesAsync();
 
                 return ResultResponseDto<string>.Success("", new[] { "Assessment transferred successfully." });

@@ -37,6 +37,7 @@ namespace PeaceEnablers.Data
         public DbSet<GetCitiesProgressAdminDto> GetCitiesProgressAdminDto { get; set; }
         public DbSet<AIUserCityMapping> AIUserCityMappings { get; set; }
         public DbSet<CityPeer> CityPeers { get; set; } = default!;
+        public DbSet<EvaluationCityProgressHistoryResultDto> CityProgressHistoryResults { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
