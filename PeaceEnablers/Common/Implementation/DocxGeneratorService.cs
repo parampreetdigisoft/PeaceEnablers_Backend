@@ -194,7 +194,7 @@ namespace PeaceEnablers.Common.Implementation
             ResetSectionState();
 
             var kpiChartItems = kpis.Take(109).ToList();
-            var pillarChartItems = pillars.Take(14)
+            var pillarChartItems = pillars.Take(23)
                 .Select(p => new PillarChartItem(
                     p.PillarName?.Length > 20 ? p.PillarName[..20] : p.PillarName ?? "—",
                     p.PillarName ?? "—",
@@ -257,7 +257,7 @@ namespace PeaceEnablers.Common.Implementation
             List<KpiChartItem> kpis)
         {
             float overall = (float)city.AIProgress.GetValueOrDefault();
-            var validPillars = pillars.Where(p => p.Value.HasValue).ToList();
+            var validPillars = pillars.ToList();
             // ── Call site ────────────────────────────────────────────────────────────────
             var donutPng = RenderPng((c, s) => PaintDonut(c, s, overall), 320, 220);
             var radarPng = RenderPng((c, s) => PaintSpiderChart(c, s, validPillars), 460, 280);
@@ -646,7 +646,7 @@ namespace PeaceEnablers.Common.Implementation
             Body body, MainDocumentPart mainPart,
             List<PillarChartItem> pillars)
         {
-            var data = pillars.Where(p => p.Value.HasValue).Take(14).ToList();
+            var data = pillars.Where(p => p.Value.HasValue).Take(23).ToList();
             if (!data.Any()) return;
 
             var radialPng = RenderPng((c, s) => PaintPillarRadialChart(c, s, data), 340, 340);
@@ -1886,7 +1886,7 @@ namespace PeaceEnablers.Common.Implementation
                     .SelectMany(h => h.Pillars ?? Enumerable.Empty<PeerCityPillarHistoryReportDto>())
                     .GroupBy(p => p.PillarID)
                     .Select(g => g.OrderBy(p => p.DisplayOrder).First())
-                    .OrderBy(p => p.DisplayOrder).Take(14).ToList();
+                    .OrderBy(p => p.DisplayOrder).Take(23).ToList();
 
                 if (pillars.Any())
                 {

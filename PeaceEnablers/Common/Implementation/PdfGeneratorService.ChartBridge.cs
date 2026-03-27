@@ -120,7 +120,7 @@ namespace PeaceEnablers.Common.Implementation
         internal static void DrawPillarsRadialChartCanvas(
             SKCanvas c, QPDF.Size s, List<PillarChartItem> pillars)
         {
-            var data = pillars.Where(p => p.Value.HasValue).Take(14).ToList();
+            var data = pillars.Where(p => p.Value.HasValue).Take(23).ToList();
             if (!data.Any()) return;
             float cx = s.Width / 2f, cy = s.Height / 2f;
             float maxR = Math.Min(cx, cy) - 18f;

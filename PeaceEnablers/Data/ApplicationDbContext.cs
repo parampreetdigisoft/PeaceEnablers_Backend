@@ -122,6 +122,7 @@ namespace PeaceEnablers.Data
             modelBuilder.Entity<AIUserCityMapping>().HasKey(ur => ur.AIUserCityMappingID);
             modelBuilder.Entity<EvaluationCityProgressResultDto>().HasNoKey().ToView(null); 
             modelBuilder.Entity<GetCitiesProgressAdminDto>().HasNoKey().ToView(null);
+            modelBuilder.Entity<EvaluationCityProgressHistoryResultDto>().HasNoKey().ToView(null);
             modelBuilder.Entity<CityPeer>(entity =>
             {
                 entity.HasKey(e => e.CityPeerID);

@@ -571,7 +571,7 @@ namespace PeaceEnablers.Common.Implementation
             {
                 var tip = RadarPt(cx, cy, radius + 26f, i, n);
                 canvas.DrawText(
-                    Shorten(pillars[i].ShortName ?? pillars[i].Name, 10),
+                    Shorten(pillars[i].ShortName ?? pillars[i].Name, 5),
                     tip.X, tip.Y + 3f, lblPaint);
             }
         }
@@ -1219,7 +1219,7 @@ namespace PeaceEnablers.Common.Implementation
 
         void PillarLineChartPage(IContainer container, List<PillarChartItem> pillars)
         {
-            var data = pillars.Where(p => p.Value.HasValue).Take(14).ToList();
+            var data = pillars.Where(p => p.Value.HasValue).Take(23).ToList();
             if (!data.Any()) return;
 
             float avg = (float)data.Average(x => x.Value ?? 0);
@@ -1383,7 +1383,7 @@ namespace PeaceEnablers.Common.Implementation
 
         void DrawPillarsRadialChart(IContainer container, List<PillarChartItem> pillars)
         {
-            var data = pillars.Where(p => p.Value.HasValue).Take(14).ToList();
+            var data = pillars.Where(p => p.Value.HasValue).Take(23).ToList();
             if (!data.Any()) return;
 
             float avg = (float)data.Average(x => x.Value ?? 0);
