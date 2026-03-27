@@ -498,6 +498,7 @@ namespace PeaceEnablers.Services
                         Longitude = c.Longitude,
                         Population = c.Population,
                         Income = c.Income,
+                        PPP = c.PPP,
 
                         CityHistory = _context.AIPillarScores
                             .Include(x => x.Pillar)

@@ -7,6 +7,7 @@ using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 using SkiaSharp;
+using System.Text;
 using static PeaceEnablers.Services.AIComputationService;
 
 namespace PeaceEnablers.Common.Implementation
@@ -108,15 +109,11 @@ namespace PeaceEnablers.Common.Implementation
         public void AddCityDetailsPdf(IDocumentContainer container, AiCitySummeryDto cityDetails, List<AiCityPillarResponse> pillars, List<KpiChartItem> kpis,
             List<PeerCityHistoryReportDto> peerCities, UserRole userRole, bool isAllCities = false)
         {
-            var kpiChartItems = kpis.Take(109).ToList(); 
+            var kpiChartItems = kpis.Take(109).ToList();
 
             // Build pillar chart items (max 14)
-            var pillarChartItems = pillars            
-            .Select(p => new PillarChartItem(
-                p.PillarName?.Length > 20 ? p.PillarName[..20] : p.PillarName ?? "—",
-                p.PillarName ?? "—",
-                p.AIProgress))
-            .ToList();
+            var pillarChartItems = pillars.Select(p => new PillarChartItem( SanitizeText(p.PillarName)?.Length > 20   ? SanitizeText(p.PillarName)[..20]
+                  : SanitizeText(p.PillarName) ?? "-",  SanitizeText(p.PillarName) ?? "-", p.AIProgress)).ToList();
 
             // ── Section 1 : Global Dashboard ─────────────────────────────────
             if (!isAllCities)
@@ -171,7 +168,7 @@ namespace PeaceEnablers.Common.Implementation
                 {
                     ApplyPageDefaults(page);
                     page.Header().Element(x =>
-                        CityComposeHeader(x, cityDetails, userRole, p.PillarName));
+                        CityComposeHeader(x, cityDetails, userRole, SanitizeText(p.PillarName)));
                     page.Content().Element(content =>
                     {
                         content.Column(column =>
@@ -221,33 +218,7 @@ namespace PeaceEnablers.Common.Implementation
             {
                 x.CurrentPageNumber(); x.Span(" / "); x.TotalPages();
             });
-        }
-
-
-        /// <summary>
-        /// Inserts the attractive full-page dashboard as page 1 of the city report.
-        /// Pillars: max 14 · KPIs: max 107
-        /// </summary>
-        //void AddGlobalDashboardPage(
-        //    IDocumentContainer doc,
-        //    AiCitySummeryDto city,
-        //    List<PillarChartItem> pillars,   // already filtered to max 14
-        //    List<KpiChartItem> kpis,      // already filtered to max 107
-        //    UserRole userRole)
-        //{
-        //    var vPillars = pillars.Where(p => p.Value.HasValue).ToList();
-        //    //var vKpis = kpis.Where(k => k.Value.HasValue).ToList();
-
-        //    doc.Page(page =>
-        //    {
-        //        ApplyPageDefaults(page);
-        //        page.Header().Element(x =>
-        //            CityComposeHeader(x, city, userRole, "City Performance Dashboard"));
-        //        page.Content().Element(x =>
-        //            RenderDashboardContent(x, vPillars, kpis, city));
-        //        PageFooter(page);
-        //    });
-        //}
+        }        
         void AddGlobalDashboardPage(
             IDocumentContainer doc,
             AiCitySummeryDto city,
@@ -1649,8 +1620,22 @@ namespace PeaceEnablers.Common.Implementation
                         .Text("City Assessment Platform").FontSize(8).FontColor("#9E9E9E");
                 });
             });
-        }       
-        
+        }
+        string SanitizeText(string input)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input;
+
+            return input
+                .Replace('\u2011', '-') // non-breaking hyphen
+                .Replace('\u2010', '-') // hyphen
+                .Replace('\u2012', '-') // figure dash
+                .Replace('\u2013', '-') // en dash
+                .Replace('\u2014', '-') // em dash
+                .Replace('\u2212', '-') // minus sign
+                .Replace('\u00AD', ' ') // soft hyphen (invisible troublemaker)
+                .Normalize(NormalizationForm.FormKC);
+        }
 
         void CitySummeryComposeContent(IContainer container, AiCitySummeryDto data, UserRole userRole)
         {
@@ -1675,72 +1660,72 @@ namespace PeaceEnablers.Common.Implementation
                 // EXECUTIVE SUMMARY
                 // =========================
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Executive Summary", data.EvidenceSummary, "#163329"));
+                    PillarContentSection(c, "Executive Summary", SanitizeText(data.EvidenceSummary), "#163329"));
 
                 // =========================
                 // EVIDENCE LAYERS
                 // =========================
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Structural Evidence", data.StructuralEvidence, "#e6ccff"));
+                    PillarContentSection(c, "Structural Evidence", SanitizeText(data.StructuralEvidence), "#e6ccff"));
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Operational Evidence", data.OperationalEvidence, "#c2f0f0"));
+                    PillarContentSection(c, "Operational Evidence", SanitizeText(data.OperationalEvidence), "#c2f0f0"));
 
                 column.Item().PageBreak();
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Outcome Evidence", data.OutcomeEvidence, "#ffe6cc"));
+                    PillarContentSection(c, "Outcome Evidence", SanitizeText(data.OutcomeEvidence), "#ffe6cc"));
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Perception Evidence", data.PerceptionEvidence, "#e6f7ff"));
+                    PillarContentSection(c, "Perception Evidence", SanitizeText(data.PerceptionEvidence), "#e6f7ff"));
 
                 // =========================
                 // INTEGRITY CHECKS
                 // =========================
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Temporal Scope", data.TemporalScope, "#d9e6ff"));
+                    PillarContentSection(c, "Temporal Scope", SanitizeText(data.TemporalScope), "#d9e6ff"));
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Distortion Screening", data.DistortionScreening, "#f2d9e6"));
+                    PillarContentSection(c, "Distortion Screening", SanitizeText(data.DistortionScreening), "#f2d9e6"));
 
                 column.Item().PageBreak();
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Relational Integrity", data.RelationalIntegrity, "#f0ffe6"));
+                    PillarContentSection(c, "Relational Integrity", SanitizeText(data.RelationalIntegrity), "#f0ffe6"));
 
                 // =========================
                 // STRESS TESTS
                 // =========================
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Political Shock", data.PoliticalShock, "#ffd9cc"));
+                    PillarContentSection(c, "Political Shock", SanitizeText(data.PoliticalShock), "#ffd9cc"));
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Economic Shock", data.EconomicShock, "#fff2cc"));
+                    PillarContentSection(c, "Economic Shock", SanitizeText(data.EconomicShock), "#fff2cc"));
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Narrative Shock", data.NarrativeShock, "#e6f2ff"));
+                    PillarContentSection(c, "Narrative Shock", SanitizeText(data.NarrativeShock), "#e6f2ff"));
 
                 column.Item().PageBreak();
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Overall Stress Resilience", data.OverallStressResilience, "#e6ffe6"));
+                    PillarContentSection(c, "Overall Stress Resilience", SanitizeText(data.OverallStressResilience), "#e6ffe6"));
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Stress Score Adjustment", data.StressScoreAdjustment, "#ffe6f2"));
+                    PillarContentSection(c, "Stress Score Adjustment", SanitizeText(data.StressScoreAdjustment), "#ffe6f2"));
 
                 // =========================
                 // GOVERNANCE ADJUSTMENTS
                 // =========================
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Inequality Adjustment", data.InequalityAdjustment, "#f9e6ff"));
+                    PillarContentSection(c, "Inequality Adjustment", SanitizeText(data.InequalityAdjustment), "#f9e6ff"));
 
                 column.Item().PageBreak();
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Opacity Risk", data.OpacityRisk, "#fff0e6"));
+                    PillarContentSection(c, "Opacity Risk", SanitizeText(data.OpacityRisk), "#fff0e6"));
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Non Compensation Note", data.NonCompensationNote, "#e6fff9"));
+                    PillarContentSection(c, "Non Compensation Note", SanitizeText(data.NonCompensationNote), "#e6fff9"));
 
                 // =========================
                 // SYSTEM ANALYSIS
@@ -1748,18 +1733,18 @@ namespace PeaceEnablers.Common.Implementation
                 column.Item().PageBreak();
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Cross-Pillar System Dynamics", data.CrossPillarPatterns, "#6e9688"));
+                    PillarContentSection(c, "Cross-Pillar System Dynamics", SanitizeText(data.CrossPillarPatterns), "#6e9688"));
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Institutional Capacity Assessment", data.InstitutionalCapacity, "#0d8057"));
+                    PillarContentSection(c, "Institutional Capacity Assessment", SanitizeText(data.InstitutionalCapacity), "#0d8057"));
 
                 column.Item().PageBreak();
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Equity Assessment", data.EquityAssessment, "#e8f5e9"));
+                    PillarContentSection(c, "Equity Assessment", SanitizeText(data.EquityAssessment), "#e8f5e9"));
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Conflict Risk Outlook", data.ConflictRiskOutlook, "#fce4ec"));
+                    PillarContentSection(c, "Conflict Risk Outlook", SanitizeText(data.ConflictRiskOutlook), "#fce4ec"));
 
                 // =========================
                 // STRATEGIC OUTPUT
@@ -1767,10 +1752,10 @@ namespace PeaceEnablers.Common.Implementation
                 column.Item().PageBreak();
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Strategic Policy Priorities", data.StrategicRecommendation, "#2e9975"));
+                    PillarContentSection(c, "Strategic Policy Priorities", SanitizeText(data.StrategicRecommendation), "#2e9975"));
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Why This Assessment Matters", data.DataTransparencyNote, "#63a68f"));
+                    PillarContentSection(c, "Why This Assessment Matters", SanitizeText(data.DataTransparencyNote), "#63a68f"));
             });
         }
 
@@ -1785,36 +1770,36 @@ namespace PeaceEnablers.Common.Implementation
 
                 // Evidence Summary
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Evidence Summary", data.EvidenceSummary, "#163329"));
+                    PillarContentSection(c, "Evidence Summary", SanitizeText(data.EvidenceSummary), "#163329"));
 
                 // =========================
                 // STRUCTURAL EVIDENCE
                 // =========================
                 column.Item().PageBreak();
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Structural Evidence", data.StructuralEvidence, "#1f4e79"));
+                    PillarContentSection(c, "Structural Evidence", SanitizeText(data.StructuralEvidence), "#1f4e79"));
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Operational Evidence", data.OperationalEvidence, "#2e75b6"));
+                    PillarContentSection(c, "Operational Evidence", SanitizeText(data.OperationalEvidence), "#2e75b6"));
                 column.Item().PageBreak();
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Outcome Evidence", data.OutcomeEvidence, "#5b9bd5"));
+                    PillarContentSection(c, "Outcome Evidence", SanitizeText(data.OutcomeEvidence), "#5b9bd5"));
 
                 column.Item().PaddingTop(10).Element(c =>
-                  PillarContentSection(c, "Perception Evidence", data.PerceptionEvidence, "#9dc3e6"));
+                  PillarContentSection(c, "Perception Evidence", SanitizeText(data.PerceptionEvidence), "#9dc3e6"));
                 // =========================
                 // INTEGRITY CHECKS
                 // =========================
                 column.Item().PageBreak();
                
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Temporal Scope", data.TemporalScope, "#5f497a"));
+                    PillarContentSection(c, "Temporal Scope", SanitizeText(data.TemporalScope), "#5f497a"));
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Distortion Screening", data.DistortionScreening, "#8064a2"));
+                    PillarContentSection(c, "Distortion Screening", SanitizeText(data.DistortionScreening), "#8064a2"));
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Relational Integrity", data.RelationalIntegrity, "#b1a0c7"));
+                    PillarContentSection(c, "Relational Integrity", SanitizeText(data.RelationalIntegrity), "#b1a0c7"));
                 
 
                 // =========================
@@ -1823,53 +1808,53 @@ namespace PeaceEnablers.Common.Implementation
                 
                 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Stress Political Shock", data.StressPoliticalShock, "#7f6000"));
+                    PillarContentSection(c, "Stress Political Shock", SanitizeText(data.StressPoliticalShock), "#7f6000"));
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Stress Economic Shock", data.StressEconomicShock, "#bf9000"));
+                    PillarContentSection(c, "Stress Economic Shock", SanitizeText(data.StressEconomicShock), "#bf9000"));
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Stress Narrative Shock", data.StressNarrativeShock, "#ffd966"));
+                    PillarContentSection(c, "Stress Narrative Shock", SanitizeText(data.StressNarrativeShock), "#ffd966"));
                 column.Item().PageBreak();
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Stress Overall Resilience", data.StressOverallResilience, "#c55a11"));
+                    PillarContentSection(c, "Stress Overall Resilience", SanitizeText(data.StressOverallResilience), "#c55a11"));
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Stress Score Adjustment", data.StressScoreAdjustment, "#e26b0a"));
+                    PillarContentSection(c, "Stress Score Adjustment", SanitizeText(data.StressScoreAdjustment), "#e26b0a"));
 
                 // =========================
                 // GOVERNANCE ADJUSTMENTS
                 // =========================
                 column.Item().PageBreak();
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Inequality Adjustment", data.InequalityAdjustment, "#274e13"));
+                    PillarContentSection(c, "Inequality Adjustment", SanitizeText(data.InequalityAdjustment), "#274e13"));
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Opacity Risk", data.OpacityRisk, "#38761d"));
+                    PillarContentSection(c, "Opacity Risk", SanitizeText(data.OpacityRisk), "#38761d"));
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Non-Compensation Note", data.NonCompensationNote, "#6aa84f"));
+                    PillarContentSection(c, "Non Compensation Note", SanitizeText(data.NonCompensationNote), "#6aa84f"));
 
                 // =========================
                 // ALERTS & EQUITY
                 // =========================
                 column.Item().PageBreak();
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Red Flags", data.RedFlag, "#ED561A", "#eb4634"));
+                    PillarContentSection(c, "Red Flags", SanitizeText(data.RedFlag), "#ED561A", "#eb4634"));
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Geographic Equity Note", data.GeographicEquityNote, "#0d8057"));
+                    PillarContentSection(c, "Geographic Equity Note", SanitizeText(data.GeographicEquityNote), "#0d8057"));
 
                 // =========================
                 // INSTITUTIONAL ANALYSIS
                 // =========================
                 column.Item().PageBreak();
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Institutional Assessment", data.InstitutionalAssessment, "#2e9975"));
+                    PillarContentSection(c, "Institutional Assessment", SanitizeText(data.InstitutionalAssessment), "#2e9975"));
 
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Analytical Foundations and Data Integration", data.DataGapAnalysis, "#a4bab2"));
+                    PillarContentSection(c, "Analytical Foundations and Data Integration", SanitizeText(data.DataGapAnalysis), "#a4bab2"));
 
                 // =========================
                 // DATA SOURCES
@@ -1950,53 +1935,102 @@ namespace PeaceEnablers.Common.Implementation
 
         void DataSourcesSection(IContainer container, List<AIDataSourceCitation> sources)
         {
+            // 🔒 Sanitize entire list first (best practice)
+            var safeSources = sources?
+                .Select(s => new AIDataSourceCitation
+                {
+                    SourceName = SanitizeText(s.SourceName),
+                    SourceType = SanitizeText(s.SourceType),
+                    DataExtract = SanitizeText(s.DataExtract),
+                    SourceURL = SanitizeText(s.SourceURL),
+                    TrustLevel = s.TrustLevel,
+                    DataYear = s.DataYear
+                })
+                .ToList() ?? new List<AIDataSourceCitation>();
+
             container.Column(column =>
             {
+                // Header
                 column.Item().Row(row =>
                 {
                     row.ConstantItem(5).Background("#396154");
-                    row.RelativeItem().Background("#F5F5F5").Padding(12)
-                        .Text("Data Source Citations").FontSize(15).Bold().FontColor("#212121");
+
+                    row.RelativeItem()
+                        .Background("#F5F5F5")
+                        .Padding(12)
+                        .Text(SanitizeText("Data Source Citations")) // 🔒 safe
+                        .FontSize(15).Bold().FontColor("#212121");
                 });
 
+                // Content Box
                 column.Item().PaddingTop(10)
-                    .Background(Colors.White).Border(1).BorderColor("#E0E0E0").Padding(15)
+                    .Background(Colors.White)
+                    .Border(1)
+                    .BorderColor("#E0E0E0")
+                    .Padding(15)
                     .Column(col =>
                     {
-                        foreach (var source in sources.Take(10))
+                        foreach (var source in safeSources.Take(10))
                         {
                             col.Item().PaddingBottom(15).Column(sourceCol =>
                             {
+                                // ── Row 1: Name + Type ─────────────────────
                                 sourceCol.Item().Row(row =>
                                 {
-                                    row.RelativeItem().Text(source.SourceName)
+                                    row.RelativeItem()
+                                        .Text(source.SourceName ?? "-")
                                         .FontSize(11).Bold().FontColor("#2c423b");
+
                                     row.ConstantItem(100).AlignRight()
                                         .Background(GetSourceTypeBadgeColor(source.SourceType))
                                         .Padding(3)
-                                        .Text(source.SourceType).FontSize(8).FontColor(Colors.White);
+                                        .Text(source.SourceType ?? "-")
+                                        .FontSize(8)
+                                        .FontColor(Colors.White);
                                 });
 
+                                // ── Row 2: Trust + Year ────────────────────
                                 sourceCol.Item().PaddingTop(4).Row(row =>
                                 {
-                                    row.AutoItem().Text($"Trust Level: {source.TrustLevel}/7")
+                                    row.AutoItem()
+                                        .Text(SanitizeText($"Trust Level: {source.TrustLevel}/7"))
                                         .FontSize(9).FontColor("#757575");
-                                    row.AutoItem().PaddingLeft(15).Text($"Year: {source.DataYear}")
+
+                                    row.AutoItem()
+                                        .PaddingLeft(15)
+                                        .Text(SanitizeText($"Year: {source.DataYear}"))
                                         .FontSize(9).FontColor("#757575");
                                 });
 
-                                if (!string.IsNullOrEmpty(source.DataExtract))
+                                // ── Data Extract ───────────────────────────
+                                if (!string.IsNullOrWhiteSpace(source.DataExtract))
+                                {
                                     sourceCol.Item().PaddingTop(6)
                                         .Text(TruncateText(source.DataExtract, 200))
-                                        .FontSize(9).FontColor("#616161").Italic();
+                                        .FontSize(9)
+                                        .FontColor("#616161")
+                                        .Italic();
+                                }
 
-                                if (!string.IsNullOrEmpty(source.SourceURL))
+                                // ── URL ────────────────────────────────────
+                                if (!string.IsNullOrWhiteSpace(source.SourceURL))
+                                {
                                     sourceCol.Item().PaddingTop(4)
-                                        .Text(source.SourceURL).FontSize(8).FontColor("#305246").Underline();
+                                        .Text(source.SourceURL)
+                                        .FontSize(8)
+                                        .FontColor("#305246")
+                                        .Underline();
+                                }
                             });
 
-                            if (source != sources.Last())
-                                col.Item().PaddingBottom(10).LineHorizontal(1).LineColor("#EEEEEE");
+                            // Divider
+                            if (source != safeSources.Last())
+                            {
+                                col.Item()
+                                    .PaddingBottom(10)
+                                    .LineHorizontal(1)
+                                    .LineColor("#EEEEEE");
+                            }
                         }
                     });
             });

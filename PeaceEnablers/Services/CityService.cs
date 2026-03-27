@@ -94,6 +94,7 @@ namespace PeaceEnablers.Services
                     existing.Income = q.Income;
                     existing.Population = q.Population;
                     existing.CityAliasName = q.CityAliasName;
+                    existing.PPP = q.PPP;
                     _context.Cities.Update(existing);
                     await _context.SaveChangesAsync();
                     await UpdatePeerCities(existing.CityID, q.PeerCities ?? new List<int>());
@@ -184,6 +185,7 @@ namespace PeaceEnablers.Services
                         Income = c.Income,
                         Population = c.Population,
                         CityAliasName = c.CityAliasName,
+                        PPP = c.PPP,
                         PeerCities = c.PeerCities
                     })
                     .GroupBy(c => new { c.CityName, c.State })
@@ -229,6 +231,7 @@ namespace PeaceEnablers.Services
                     Longitude = cityDto.Longitude,
                     Latitude = cityDto.Latitude,
                     Income = cityDto.Income,
+                    PPP = cityDto.PPP,
                     Population = cityDto.Population,
                     CityAliasName = cityDto.CityAliasName
                 }).ToList();
@@ -426,6 +429,7 @@ namespace PeaceEnablers.Services
                     CityPeers = c.CityPeers,
                     Population = c.Population,
                     Income = c.Income,
+                    PPP = c.PPP,
                     CityAliasName = c.CityAliasName
                 };
         }
