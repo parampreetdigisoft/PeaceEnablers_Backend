@@ -1,10 +1,12 @@
 ﻿using AssessmentPlatform.Models;
 using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using PeaceEnablers.Backgroundjob;
 using PeaceEnablers.Common.Implementation;
 using PeaceEnablers.Common.Interface;
 using PeaceEnablers.Common.Models;
+using PeaceEnablers.Common.Models.settings;
 using PeaceEnablers.Data;
 using PeaceEnablers.Dtos.AssessmentDto;
 using PeaceEnablers.Dtos.CityDto;
@@ -25,13 +27,15 @@ namespace PeaceEnablers.Services
         private readonly IWebHostEnvironment _env;
         private readonly ICommonService _commonService;
         private readonly Download _download;
-        public CityService(ApplicationDbContext context, IAppLogger appLogger, IWebHostEnvironment env, ICommonService commonService, Download download)
+        private readonly AppSettings _appSettings;
+        public CityService(ApplicationDbContext context, IAppLogger appLogger, IWebHostEnvironment env, ICommonService commonService, Download download, IOptions<AppSettings> appSettings)
         {
             _context = context;
             _appLogger = appLogger;
             _env = env;
             _commonService = commonService;
             _download = download;
+            _appSettings = appSettings.Value;
         }
 
         #endregion
@@ -476,12 +480,12 @@ namespace PeaceEnablers.Services
         private async Task ApplyManualScoresAsync(PaginationResponse<UserCityMappingResponseDto> response,PaginationRequest request, UserRole role, int year)
         {
             var scores = await _commonService.GetCitiesProgressAsync(request.UserId.GetValueOrDefault(),(int)role, year);
-
+            int pillarCount = _appSettings.PillarCount;
             var scoreMap = scores
                 .GroupBy(x => x.CityID)
                 .ToDictionary(
                     g => g.Key,
-                    g => g.Average(x => (decimal?)x.ScoreProgress) ?? 0);
+                    g => Math.Round(g.Sum(x => (decimal?)x.ScoreProgress) ?? 0 / pillarCount, 2));
 
             foreach (var city in response.Data)
             {

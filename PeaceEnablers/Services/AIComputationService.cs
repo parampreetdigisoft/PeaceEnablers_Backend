@@ -2,11 +2,12 @@
 using DocumentFormat.OpenXml.Spreadsheet;
 
 using Microsoft.EntityFrameworkCore;
-
+using Microsoft.Extensions.Options;
 using PeaceEnablers.Backgroundjob;
 using PeaceEnablers.Common.Implementation;
 using PeaceEnablers.Common.Interface;
 using PeaceEnablers.Common.Models;
+using PeaceEnablers.Common.Models.settings;
 using PeaceEnablers.Data;
 using PeaceEnablers.Dtos.AiDto;
 using PeaceEnablers.Dtos.CityDto;
@@ -29,8 +30,9 @@ namespace PeaceEnablers.Services
         private readonly Download _download;
         private readonly IAIAnalyzeService _iAIAnalayzeService;        
         private readonly IDocumentGeneratorService _documentGeneratorService;
+        private readonly AppSettings _appSettings;
         public AIComputationService(ApplicationDbContext context, IAppLogger appLogger, ICommonService commonService, Download download, IAIAnalyzeService iAIAnalayzeService
-            ,  IDocumentGeneratorService documentGeneratorService)
+            ,  IDocumentGeneratorService documentGeneratorService, IOptions<AppSettings> appSettings)
         {
             _context = context;
             _appLogger = appLogger;
@@ -38,6 +40,7 @@ namespace PeaceEnablers.Services
             _download = download;
             _iAIAnalayzeService = iAIAnalayzeService;          
             _documentGeneratorService = documentGeneratorService;
+            _appSettings = appSettings.Value;
         }
         #endregion
 
@@ -57,9 +60,10 @@ namespace PeaceEnablers.Services
             {
                 IQueryable<AiCitySummeryDto> query = await GetCityAiSummeryDetails(userID, userRole, request.CityID, request.Year);
 
-                var result = await query.ApplyPaginationAsync(request); 
+                var result = await query.ApplyPaginationAsync(request);
+                int pillarCount = _appSettings.PillarCount;
 
-                if(userRole != UserRole.CityUser)
+                if (userRole != UserRole.CityUser)
                 {
                     var progress = await _commonService.GetCitiesProgressAsync(userID, (int)userRole, DateTime.Now.Year);
 
@@ -84,15 +88,10 @@ namespace PeaceEnablers.Services
                         })
                         .ToListAsync();
 
-
                     foreach (var c in result.Data)
                     {
                         var pillars = cities.Where(x => x.CityID == c.CityID);
-
-                        var cityScore = pillars.Select(x => x.ScoreProgress)
-                            .DefaultIfEmpty(0)
-                            .Average();
-
+                        var cityScore = Math.Round(pillars.Sum(x => x.ScoreProgress) / pillarCount, 2);
                         c.EvaluatorScore = cityScore;
                         c.Discrepancy = Math.Abs(cityScore - (c.AIProgress ?? 0));
                         c.AICompletionRate = answeredQuestions.FirstOrDefault(x=>x.CityID== c.CityID)?.CompletionRate;
@@ -245,7 +244,7 @@ namespace PeaceEnablers.Services
             {
                 currentYear = currentYear == 0 ? DateTime.Now.Year : currentYear;
                 var firstDate = new DateTime(currentYear, 1, 1);
-
+                int pillarCount = _appSettings.PillarCount;
                 var res = await _context.AIPillarScores
                     .Where(x => x.CityID == cityID && x.UpdatedAt >= firstDate && x.Year == currentYear)
                     .Include(x=>x.City)
@@ -351,16 +350,13 @@ namespace PeaceEnablers.Services
                 {
                     var totalQuestions = pillars.FirstOrDefault(x => x.PillarID == c.PillarID)?.TotalQuestions ?? 0;
                     var answeredQuestion = answeredQuestions.FirstOrDefault(x => x.PillarID == c.PillarID)?.AnsweredQuestions ?? 0;
-
-                    var cityScore = cities
+                    var pillarScore = cities
                         .Where(x => x.PillarID == c.PillarID)
                         .Select(x => x.ScoreProgress)
                         .DefaultIfEmpty(0)
-                        .Average();
-
-
-                    c.EvaluatorScore = cityScore;
-                    c.Discrepancy = Math.Abs(cityScore - (c.AIProgress ?? 0));
+                        .Sum();
+                    c.EvaluatorScore = pillarScore;
+                    c.Discrepancy = Math.Abs(pillarScore - (c.AIProgress ?? 0));
                     c.AICompletionRate = answeredQuestion * 100.0M / totalQuestions;
                 }
 
@@ -464,7 +460,7 @@ namespace PeaceEnablers.Services
         private async Task<List<PeerCityHistoryReportDto>> GetPeerCities(int userID, UserRole role, int cityID, int year, bool isAiScore = true)
         {
             var peerCities = new List<PeerCityHistoryReportDto>();
-
+            int pillarCount = _appSettings.PillarCount;
             var peersCityIds = await _context.Cities
                    .Where(x => x.CityID == cityID && x.IsActive && !x.IsDeleted)
                    .SelectMany(x => x.CityPeers)
@@ -571,7 +567,7 @@ namespace PeaceEnablers.Services
                             ScoreProgress = Math.Round(
                                 yearGroup.Select(x => x.ScoreProgress)
                                          .DefaultIfEmpty(0)
-                                         .Average(), 2),
+                                         .Sum()/pillarCount, 2),
 
                             // Pillar level score
                             Pillars = pillars
@@ -1025,7 +1021,7 @@ namespace PeaceEnablers.Services
         {
             var query = await GetCityAiSummeryDetails(userID, userRole, cityID, year);
             var cityDetails = await query.FirstAsync();
-
+            int pillarCount = _appSettings.PillarCount;
             if (userRole != UserRole.CityUser)
             {
                 var progress = await _commonService.GetCitiesProgressAsync(userID, (int)userRole, DateTime.Now.Year);
@@ -1037,7 +1033,8 @@ namespace PeaceEnablers.Services
                     var cityScore = cities
                         .Select(x => x.ScoreProgress)
                         .DefaultIfEmpty(0)
-                        .Average();
+                        .Sum();
+                    cityScore = Math.Round(cityScore / pillarCount, 2);
 
                     cityDetails.EvaluatorScore = Math.Round(cityScore,2);
                     cityDetails.Discrepancy = Math.Abs(cityScore - (cityDetails.AIProgress ?? 0));
@@ -1121,7 +1118,7 @@ namespace PeaceEnablers.Services
         {
             var query = await GetCityAiSummeryDetails(userID, userRole, null, year);
             var citiesDetails = await query.ToListAsync();
-
+            int pillarCount = _appSettings.PillarCount;
             if (userRole != UserRole.CityUser)
             {
                 foreach (var cityDetails in citiesDetails)
@@ -1135,7 +1132,8 @@ namespace PeaceEnablers.Services
                         var cityScore = cities
                             .Select(x => x.ScoreProgress)
                             .DefaultIfEmpty(0)
-                            .Average();
+                            .Sum();
+                        cityScore = Math.Round(cityScore / pillarCount, 2);
 
                         cityDetails.EvaluatorScore = Math.Round(cityScore, 2);
                         cityDetails.Discrepancy = Math.Abs(cityScore - (cityDetails.AIProgress ?? 0));
@@ -1177,6 +1175,7 @@ namespace PeaceEnablers.Services
         {
             try
             {
+                int pillarCount = _appSettings.PillarCount;
                 currentYear = currentYear == 0 ? DateTime.Now.Year : currentYear;
                 var firstDate = new DateTime(currentYear, 1, 1);
 
@@ -1305,7 +1304,9 @@ namespace PeaceEnablers.Services
                             .Where(x => x.CityID == city.Key && x.PillarID == c.PillarID)
                             .Select(x => x.ScoreProgress)
                             .DefaultIfEmpty(0)
-                            .Average();
+                            .Sum();
+
+                        cityScore = Math.Round(cityScore / pillarCount, 2);
 
                         c.EvaluatorScore = cityScore;
                         c.Discrepancy = Math.Abs(cityScore - (c.AIProgress ?? 0));
@@ -1501,6 +1502,30 @@ namespace PeaceEnablers.Services
             }
         }
         #endregion TransferAssessment
+        public async Task<ResultResponseDto<string>> ReCalculateKpis(int userID, UserRole userRole)
+        {
+            try
+            {
+                if (userRole != UserRole.Admin)
+                {
+                    return ResultResponseDto<string>.Failure(new[] { "Failed to recalculate KPIs, You don't have access." });
+                }
+
+                await _context.Database.ExecuteSqlRawAsync("EXEC sp_AiRecalculateCityScore");
+
+                await _context.Database.ExecuteSqlRawAsync("EXEC sp_InsertAnalyticalLayerResults");
+
+                await _context.Database.ExecuteSqlRawAsync("EXEC sp_AiInsertAnalyticalLayerResults");
+
+                return ResultResponseDto<string>.Success("", new[] { "KPI recalculation has been initiated successfully." });
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error in ReCalculateKpis", ex);
+                return ResultResponseDto<string>.Failure(new[] { "Failed to recalculate KPIs, please try again later." });
+            }
+        }
+
 
         #endregion
     }

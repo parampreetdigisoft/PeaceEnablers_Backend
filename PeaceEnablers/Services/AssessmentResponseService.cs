@@ -1,7 +1,11 @@
-﻿using PeaceEnablers.Backgroundjob;
+﻿using ClosedXML.Excel;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using PeaceEnablers.Backgroundjob;
 using PeaceEnablers.Common.Implementation;
 using PeaceEnablers.Common.Interface;
 using PeaceEnablers.Common.Models;
+using PeaceEnablers.Common.Models.settings;
 using PeaceEnablers.Data;
 using PeaceEnablers.Dtos.AssessmentDto;
 using PeaceEnablers.Dtos.CityDto;
@@ -9,8 +13,6 @@ using PeaceEnablers.Dtos.CommonDto;
 using PeaceEnablers.Dtos.dashboard;
 using PeaceEnablers.IServices;
 using PeaceEnablers.Models;
-using ClosedXML.Excel;
-using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
 
 namespace PeaceEnablers.Services
@@ -21,12 +23,15 @@ namespace PeaceEnablers.Services
         private readonly IAppLogger _appLogger;
         private readonly Download _download;
         private readonly ICommonService _commonService;
-        public AssessmentResponseService(ApplicationDbContext context, IAppLogger appLogger, Download download, ICommonService commonService)
+        private readonly AppSettings _appSettings;
+        public AssessmentResponseService(ApplicationDbContext context, IAppLogger appLogger, Download download, ICommonService commonService,
+            IOptions<AppSettings> appSettings)
         {
             _context = context;
             _appLogger = appLogger;
             _download = download;
             _commonService = commonService;
+            _appSettings = appSettings.Value;
         }
 
         public async Task<List<AssessmentResponse>> GetAllAsync()
@@ -865,7 +870,7 @@ namespace PeaceEnablers.Services
             try
             {
                 var year = request.UpdatedAt.Year;
-
+                int pillarCount = _appSettings.PillarCount;
                 // 1. Validate city access
                 var hasAccess = await _context.UserCityMappings
                     .AnyAsync(x =>
@@ -922,7 +927,7 @@ namespace PeaceEnablers.Services
                     CityID = request.CityID,
                     CityName = city?.CityName ?? string.Empty,
                     AiValue = aiCityProgress ?? 0,
-                    EvaluationValue = Math.Round(pillarEvaluations.Average(x => x.ScoreProgress),2),
+                    EvaluationValue = Math.Round(pillarEvaluations.Select(x => x.ScoreProgress).DefaultIfEmpty(0).Sum()/pillarCount, 2),
                     Pillars = pillarResults
                 };
 

@@ -557,9 +557,7 @@ namespace PeaceEnablers.Common.Implementation
         //  CITY SUMMARY SECTION
         // ════════════════════════════════════════════════════════════════════
 
-        private void AddCitySummarySection(
-    Body body, MainDocumentPart mainPart,
-    AiCitySummeryDto data, UserRole userRole)
+        private void AddCitySummarySection( Body body, MainDocumentPart mainPart, AiCitySummeryDto data, UserRole userRole)
         {
             // =========================
             // PROGRESS SECTION
@@ -573,9 +571,9 @@ namespace PeaceEnablers.Common.Implementation
             // =========================
             AppendContentSection(body, "Executive Summary", data.EvidenceSummary, "163329");
 
-            // =========================
-            // EVIDENCE LAYERS
-            // =========================
+            // =====================================================
+            // EVIDENCE SECTION
+            // =====================================================
             AppendContentSection(body, "Structural Evidence", data.StructuralEvidence, "e6ccff");
             AppendContentSection(body, "Operational Evidence", data.OperationalEvidence, "c2f0f0");
 
@@ -584,42 +582,42 @@ namespace PeaceEnablers.Common.Implementation
             AppendContentSection(body, "Outcome Evidence", data.OutcomeEvidence, "ffe6cc");
             AppendContentSection(body, "Perception Evidence", data.PerceptionEvidence, "e6f7ff");
 
-            // =========================
+            // =====================================================
             // INTEGRITY CHECKS
-            // =========================
-            AppendContentSection(body, "Temporal Scope", data.TemporalScope, "d9e6ff");
-            AppendContentSection(body, "Distortion Screening", data.DistortionScreening, "f2d9e6");
-
+            // =====================================================
             body.AppendChild(PageBreak());
 
+            AppendContentSection(body, "Temporal Scope", data.TemporalScope, "d9e6ff");
+            AppendContentSection(body, "Distortion Screening", data.DistortionScreening, "f2d9e6");
             AppendContentSection(body, "Relational Integrity", data.RelationalIntegrity, "f0ffe6");
 
-            // =========================
+            // =====================================================
             // STRESS TESTS
-            // =========================
+            // =====================================================
+            //body.AppendChild(PageBreak());
+
             AppendContentSection(body, "Political Shock", data.PoliticalShock, "ffd9cc");
             AppendContentSection(body, "Economic Shock", data.EconomicShock, "fff2cc");
             AppendContentSection(body, "Narrative Shock", data.NarrativeShock, "e6f2ff");
 
-            body.AppendChild(PageBreak());
+            //body.AppendChild(PageBreak());
 
             AppendContentSection(body, "Overall Stress Resilience", data.OverallStressResilience, "e6ffe6");
             AppendContentSection(body, "Stress Score Adjustment", data.StressScoreAdjustment, "ffe6f2");
 
-            // =========================
+            // =====================================================
             // GOVERNANCE ADJUSTMENTS
-            // =========================
-            AppendContentSection(body, "Inequality Adjustment", data.InequalityAdjustment, "f9e6ff");
-
+            // =====================================================
             body.AppendChild(PageBreak());
 
+            AppendContentSection(body, "Inequality Adjustment", data.InequalityAdjustment, "f9e6ff");
             AppendContentSection(body, "Opacity Risk", data.OpacityRisk, "fff0e6");
             AppendContentSection(body, "Non Compensation Note", data.NonCompensationNote, "e6fff9");
 
-            // =========================
+            // =====================================================
             // SYSTEM ANALYSIS
-            // =========================
-            body.AppendChild(PageBreak());
+            // =====================================================
+            //body.AppendChild(PageBreak());
 
             AppendContentSection(body, "Cross-Pillar System Dynamics", data.CrossPillarPatterns, "6e9688");
             AppendContentSection(body, "Institutional Capacity Assessment", data.InstitutionalCapacity, "0d8057");
@@ -629,9 +627,9 @@ namespace PeaceEnablers.Common.Implementation
             AppendContentSection(body, "Equity Assessment", data.EquityAssessment, "e8f5e9");
             AppendContentSection(body, "Conflict Risk Outlook", data.ConflictRiskOutlook, "fce4ec");
 
-            // =========================
+            // =====================================================
             // STRATEGIC OUTPUT
-            // =========================
+            // =====================================================
             body.AppendChild(PageBreak());
 
             AppendContentSection(body, "Strategic Policy Priorities", data.StrategicRecommendation, "2e9975");
@@ -661,8 +659,8 @@ namespace PeaceEnablers.Common.Implementation
         // ════════════════════════════════════════════════════════════════════
 
         private void AddPillarSection(
-     Body body, MainDocumentPart mainPart,
-     AiCityPillarResponse data, UserRole userRole)
+    Body body, MainDocumentPart mainPart,
+    AiCityPillarResponse data, UserRole userRole)
         {
             // =========================
             // PROGRESS SECTION
@@ -676,11 +674,9 @@ namespace PeaceEnablers.Common.Implementation
             // =========================
             AppendContentSection(body, "Evidence Summary", data.EvidenceSummary, "163329");
 
-            // =========================
-            // STRUCTURAL EVIDENCE
-            // =========================
-            body.AppendChild(PageBreak());
-
+            // =====================================================
+            // EVIDENCE SECTION
+            // =====================================================
             AppendContentSection(body, "Structural Evidence", data.StructuralEvidence, "1f4e79");
             AppendContentSection(body, "Operational Evidence", data.OperationalEvidence, "2e75b6");
 
@@ -689,18 +685,18 @@ namespace PeaceEnablers.Common.Implementation
             AppendContentSection(body, "Outcome Evidence", data.OutcomeEvidence, "5b9bd5");
             AppendContentSection(body, "Perception Evidence", data.PerceptionEvidence, "9dc3e6");
 
-            // =========================
+            // =====================================================
             // INTEGRITY CHECKS
-            // =========================
+            // =====================================================
             body.AppendChild(PageBreak());
 
             AppendContentSection(body, "Temporal Scope", data.TemporalScope, "5f497a");
             AppendContentSection(body, "Distortion Screening", data.DistortionScreening, "8064a2");
             AppendContentSection(body, "Relational Integrity", data.RelationalIntegrity, "b1a0c7");
 
-            // =========================
+            // =====================================================
             // STRESS TEST
-            // =========================
+            // =====================================================
             body.AppendChild(PageBreak());
 
             AppendContentSection(body, "Stress Political Shock", data.StressPoliticalShock, "7f6000");
@@ -712,26 +708,26 @@ namespace PeaceEnablers.Common.Implementation
             AppendContentSection(body, "Stress Overall Resilience", data.StressOverallResilience, "c55a11");
             AppendContentSection(body, "Stress Score Adjustment", data.StressScoreAdjustment, "e26b0a");
 
-            // =========================
+            // =====================================================
             // GOVERNANCE ADJUSTMENTS
-            // =========================
+            // =====================================================
             body.AppendChild(PageBreak());
 
             AppendContentSection(body, "Inequality Adjustment", data.InequalityAdjustment, "274e13");
             AppendContentSection(body, "Opacity Risk", data.OpacityRisk, "38761d");
             AppendContentSection(body, "Non-Compensation Note", data.NonCompensationNote, "6aa84f");
 
-            // =========================
+            // =====================================================
             // ALERTS & EQUITY
-            // =========================
+            // =====================================================
             body.AppendChild(PageBreak());
 
             AppendContentSection(body, "Red Flags", data.RedFlag, "ED561A", "eb4634");
             AppendContentSection(body, "Geographic Equity Note", data.GeographicEquityNote, "0d8057");
 
-            // =========================
+            // =====================================================
             // INSTITUTIONAL ANALYSIS
-            // =========================
+            // =====================================================
             body.AppendChild(PageBreak());
 
             AppendContentSection(body, "Institutional Assessment", data.InstitutionalAssessment, "2e9975");
@@ -743,9 +739,9 @@ namespace PeaceEnablers.Common.Implementation
                 "a4bab2"
             );
 
-            // =========================
+            // =====================================================
             // DATA SOURCES
-            // =========================
+            // =====================================================
             if (data.DataSourceCitations?.Any() == true)
             {
                 body.AppendChild(PageBreak());
@@ -1393,7 +1389,7 @@ namespace PeaceEnablers.Common.Implementation
                 new TableRow(
                     Stat(green.ToString(), "Performing ≥70%", "E8F5E9", "2E7D32"),
                     Stat(amber.ToString(), "Developing 40–69%", "FFF8E1", "E65100"),
-                    Stat(red.ToString(), "Needs Improvement", "FDECEA", "C62828"),
+                    Stat(red.ToString(), "Needs Improvement < 40 %", "FDECEA", "C62828"),
                     Stat(total.ToString(), "Total KPIs", "EEF5F1", "12352F")
                 )
             );
@@ -1434,7 +1430,7 @@ namespace PeaceEnablers.Common.Implementation
                     Pill(total.ToString(),  "Total KPIs",        "4CAF50"),
                     Pill(green.ToString(),  "Performing ≥70%",   "4CAF50"),
                     Pill(amber.ToString(),  "Developing 40–69%", "FFC107"),
-                    Pill(red.ToString(),    "Needs Improvement", "EF5350"),
+                    Pill(red.ToString(), "Needs Improvement < 40 %", "EF5350"),
                     Pill($"{avg:F1}%",      "Average Score",     avgColor)));
         }
 

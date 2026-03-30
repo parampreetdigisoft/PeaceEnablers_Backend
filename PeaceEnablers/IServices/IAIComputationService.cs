@@ -25,5 +25,7 @@ namespace PeaceEnablers.IServices
         Task<List<AiCitySummeryDto>> GetAllCityAiSummeryDetail(int userID, UserRole userRole, int year);   
         Task<byte[]> GenerateAllCityDetailsReport(List<AiCitySummeryDto> cityDetails, UserRole userRole, int userID, int year, DocumentFormat format = DocumentFormat.Pdf);
         Task<ResultResponseDto<string>> AITransferAssessment(AITransferAssessmentRequestDto r, int userID, UserRole userRole);
+
+        Task<ResultResponseDto<string>> ReCalculateKpis(int userID, UserRole userRole);
     }
 }
