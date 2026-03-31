@@ -1,6 +1,5 @@
 ﻿using AssessmentPlatform.Dtos.AiDto;
 using DocumentFormat.OpenXml.Spreadsheet;
-
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using PeaceEnablers.Backgroundjob;
@@ -17,6 +16,8 @@ using PeaceEnablers.Models;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
+using System.Net;
+using System.Text.RegularExpressions;
 
 namespace PeaceEnablers.Services
 {
@@ -1084,7 +1085,7 @@ namespace PeaceEnablers.Services
                 CityID = x.CityID,
                 AiCalValue5 = x.AiCalValue5,
                 CalValue5 = x.CalValue5,
-                Definition = x.AnalyticalLayer.Purpose,
+                Definition = StripHtml(x.AnalyticalLayer.Purpose),
                 AnalyticalLayer = x.AnalyticalLayer
             })
             .Select(x => new
@@ -1524,6 +1525,18 @@ namespace PeaceEnablers.Services
                 await _appLogger.LogAsync("Error in ReCalculateKpis", ex);
                 return ResultResponseDto<string>.Failure(new[] { "Failed to recalculate KPIs, please try again later." });
             }
+        }
+
+        public static string StripHtml(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input))
+                return string.Empty;
+
+            // Remove HTML tags
+            var noTags = Regex.Replace(input, "<.*?>", string.Empty);
+
+            // Decode HTML entities (e.g., &mdash;)
+            return WebUtility.HtmlDecode(noTags);
         }
 
 
