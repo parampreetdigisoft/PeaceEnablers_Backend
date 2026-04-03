@@ -6,11 +6,11 @@ namespace PeaceEnablers.IServices
 {
     public interface IPublicService
     {
-        Task<ResultResponseDto<List<PartnerCityResponseDto>>> GetAllCities();
-        Task<ResultResponseDto<PartnerCityFilterResponse>> GetPartnerCitiesFilterRecord();
+        Task<ResultResponseDto<List<PartnerCountryResponseDto>>> getAllCountries();
+        Task<ResultResponseDto<PartnerCountryFilterResponse>> GetPartnerCountriesFilterRecord();
         Task<ResultResponseDto<List<PillarResponseDto>>> GetAllPillarAsync();
-        Task<PaginationResponse<PartnerCityResponseDto>> GetPartnerCities(PartnerCityRequestDto r);
-        Task<CountryCityResponse> GetCountriesAndCities_WithStaleSupport();
-        Task<ResultResponseDto<List<PromotedPillarsResponseDto>>> GetPromotedCities();
+        Task<PaginationResponse<PartnerCountryResponseDto>> GetPartnerCountries(PartnerCountryRequestDto r);
+        Task<CountryCityResponse> GetCountriesAndCountries_WithStaleSupport();
+        Task<ResultResponseDto<List<PromotedPillarsResponseDto>>> GetPromotedCountries();
     }
 }

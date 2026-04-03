@@ -1,4 +1,4 @@
-﻿using PeaceEnablers.Dtos.CityDto;
+﻿using PeaceEnablers.Dtos.CountryDto;
 
 namespace PeaceEnablers.Common.Interface
 {
@@ -11,8 +11,8 @@ namespace PeaceEnablers.Common.Interface
         /// <param name="role"></param>
         /// <param name="year"></param>
         /// <returns></returns>
-        public Task<List<EvaluationCityProgressResultDto>> GetCitiesProgressAsync(int userId,int role, int year);
-        public Task<List<EvaluationCityProgressHistoryResultDto>> GetCitiesProgressHistoryAsync(int userId, int role, int fromYear, int toYear);
-        public Task<List<GetCitiesProgressAdminDto>> GetCitiesProgressForAdmin(int userId, int role, int year);
+        public Task<List<EvaluationCountryProgressResultDto>> GetCountriesProgressAsync(int userId,int role, int year);
+        public Task<List<EvaluationCountryProgressHistoryResultDto>> GetCountriesProgressHistoryAsync(int userId, int role, int fromYear, int toYear);
+        public Task<List<GetCountriesProgressAdminDto>> GetCountriesProgressForAdmin(int userId, int role, int year);
     }
 }

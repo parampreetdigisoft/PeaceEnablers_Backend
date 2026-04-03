@@ -3,11 +3,11 @@
     public class Assessment
     {
         public int AssessmentID { get; set; }
-        public int UserCityMappingID { get; set; }
+        public int UserCountryMappingID { get; set; }
         public DateTime CreatedAt { get; set; } = DateTime.Now;
         public DateTime UpdatedAt { get; set; } = DateTime.Now;
         public bool IsActive { get; set; } = true;
-        public UserCityMapping UserCityMapping { get; set; }
+        public UserCountryMapping UserCountryMapping { get; set; }
         public AssessmentPhase? AssessmentPhase { get; set; } = Models.AssessmentPhase.InProgress;
         public ICollection<PillarAssessment> PillarAssessments { get; set; } = new List<PillarAssessment>();
     }

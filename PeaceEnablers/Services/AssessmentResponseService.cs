@@ -8,7 +8,7 @@ using PeaceEnablers.Common.Models;
 using PeaceEnablers.Common.Models.settings;
 using PeaceEnablers.Data;
 using PeaceEnablers.Dtos.AssessmentDto;
-using PeaceEnablers.Dtos.CityDto;
+using PeaceEnablers.Dtos.CountryDto;
 using PeaceEnablers.Dtos.CommonDto;
 using PeaceEnablers.Dtos.dashboard;
 using PeaceEnablers.IServices;
@@ -114,30 +114,30 @@ namespace PeaceEnablers.Services
             {
                 var now = DateTime.Now;
                 var assessment = await _context.Assessments
-                    .Include(x=>x.UserCityMapping)
+                    .Include(x=>x.UserCountryMapping)
                     .Include(x => x.PillarAssessments)
                     .ThenInclude(x => x.Responses)
                     .FirstOrDefaultAsync(x =>
                         x.IsActive && x.UpdatedAt.Year == now.Year &&
                         (x.AssessmentID == request.AssessmentID ||
-                         x.UserCityMappingID == request.UserCityMappingID));
+                         x.UserCountryMappingID == request.UserCountryMappingID));
 
                 // If no assessment found, create a new one
                 if (assessment == null)
                 {
-                    var ucm = await _context.UserCityMappings
-                        .FirstOrDefaultAsync(x => x.UserCityMappingID == request.UserCityMappingID);
+                    var ucm = await _context.UserCountryMappings
+                        .FirstOrDefaultAsync(x => x.UserCountryMappingID == request.UserCountryMappingID);
 
                     if (ucm == null)
                         return ResultResponseDto<string>.Failure(new[] { "City is not assigned" });
 
                     assessment = new Assessment
                     {
-                        UserCityMappingID = ucm.UserCityMappingID,
+                        UserCountryMappingID = ucm.UserCountryMappingID,
                         CreatedAt = now,
                         UpdatedAt = now,
                         IsActive = true,
-                        UserCityMapping = ucm,
+                        UserCountryMapping = ucm,
                         AssessmentPhase = AssessmentPhase.InProgress
                     };
                     _context.Assessments.Add(assessment);
@@ -219,7 +219,7 @@ namespace PeaceEnablers.Services
 
                 if (assessment.AssessmentPhase == AssessmentPhase.Completed)
                 {
-                    _download.InsertAnalyticalLayerResults(assessment.UserCityMapping.CityID);
+                    _download.InsertAnalyticalLayerResults(assessment.UserCountryMapping.CountryID);
                 }
 
                 return ResultResponseDto<string>.Success("", new[] { "Pillar saved successfully" }, 1);
@@ -231,7 +231,7 @@ namespace PeaceEnablers.Services
             }
         }
 
-        public async Task<PaginationResponse<GetCityAssessmentResponseDto>> GetAssessmentResult(GetAssessmentRequestDto request, UserRole role)
+        public async Task<PaginationResponse<GetCountryAssessmentResponseDto>> GetAssessmentResult(GetAssessmentRequestDto request, UserRole role)
         {
             try
             {
@@ -244,8 +244,8 @@ namespace PeaceEnablers.Services
 
                 if (role != UserRole.Admin)
                 {
-                    IQueryable<UserCityMapping> mappingQuery =
-                        _context.UserCityMappings.Where(x => !x.IsDeleted);
+                    IQueryable<UserCountryMapping> mappingQuery =
+                        _context.UserCountryMappings.Where(x => !x.IsDeleted);
 
                     mappingQuery = role switch
                     {
@@ -261,7 +261,7 @@ namespace PeaceEnablers.Services
                     };
 
                     allowedMappingIds = await mappingQuery
-                        .Select(x => x.UserCityMappingID)
+                        .Select(x => x.UserCountryMappingID)
                         .ToListAsync();
                 }
 
@@ -270,31 +270,31 @@ namespace PeaceEnablers.Services
                     where a.IsActive
                           && a.UpdatedAt >= startDate
                           && a.UpdatedAt < endDate
-                          && (!request.CityID.HasValue || a.UserCityMapping.CityID == request.CityID.Value)
-                          && (role == UserRole.Admin || allowedMappingIds.Contains(a.UserCityMappingID))
+                          && (!request.CountryID.HasValue || a.UserCountryMapping.CountryID == request.CountryID.Value)
+                          && (role == UserRole.Admin || allowedMappingIds.Contains(a.UserCountryMappingID))
 
-                    join c in _context.Cities.Where(x => !x.IsDeleted)
-                        on a.UserCityMapping.CityID equals c.CityID
+                    join c in _context.Countries.Where(x => !x.IsDeleted)
+                        on a.UserCountryMapping.CountryID equals c.CountryID
 
                     join u in _context.Users.Where(x =>
                             !x.IsDeleted &&
                             (!request.Role.HasValue || x.Role == request.Role.Value))
-                        on a.UserCityMapping.UserID equals u.UserID
+                        on a.UserCountryMapping.UserID equals u.UserID
 
                     join createdBy in _context.Users.Where(x => !x.IsDeleted)
-                        on a.UserCityMapping.AssignedByUserId equals createdBy.UserID
+                        on a.UserCountryMapping.AssignedByUserId equals createdBy.UserID
 
                     let responses = a.PillarAssessments.SelectMany(p => p.Responses)
 
-                    select new GetCityAssessmentResponseDto
+                    select new GetCountryAssessmentResponseDto
                     {
                         AssessmentID = a.AssessmentID,
-                        UserCityMappingID = a.UserCityMappingID,
+                        UserCountryMappingID = a.UserCountryMappingID,
                         CreatedAt = a.CreatedAt,
 
-                        CityID = c.CityID,
-                        CityName = c.CityName,
-                        State = c.State,
+                        CountryID = c.CountryID,
+                        CountryName = c.CountryName,
+                        Continent = c.Continent,
 
                         UserID = u.UserID,
                         UserName = u.FullName,
@@ -328,9 +328,9 @@ namespace PeaceEnablers.Services
             {
                 await _appLogger.LogAsync("Error occurred in GetAssessmentResult", ex);
 
-                return new PaginationResponse<GetCityAssessmentResponseDto>
+                return new PaginationResponse<GetCountryAssessmentResponseDto>
                 {
-                    Data = new List<GetCityAssessmentResponseDto>(),
+                    Data = new List<GetCountryAssessmentResponseDto>(),
                     PageNumber = 1,
                     PageSize = 10,
                     TotalRecords = 0
@@ -410,17 +410,17 @@ namespace PeaceEnablers.Services
 
                     // ── Read meta from first question's source row ────
                     // First question: ansRow=9, sourceRow=9+2=11
-                    int userCityMappingID = ws.Cell(11, 11).GetValue<int>();
+                    int userCountryMappingID = ws.Cell(11, 11).GetValue<int>();
                     int pillarID = ws.Cell(11, 12).GetValue<int>();
 
-                    if (userCityMappingID == 0 || pillarID == 0)
+                    if (userCountryMappingID == 0 || pillarID == 0)
                         continue; // empty or corrupt sheet — skip
 
                     // Validate that the file belongs to the uploading user
-                    if (!_context.UserCityMappings.Any(x =>
+                    if (!_context.UserCountryMappings.Any(x =>
                             !x.IsDeleted &&
                             x.UserID == userID &&
-                            x.UserCityMappingID == userCityMappingID))
+                            x.UserCountryMappingID == userCountryMappingID))
                     {
                         return ResultResponseDto<string>.Failure(new[] { "Invalid file uploaded" });
                     }
@@ -499,7 +499,7 @@ namespace PeaceEnablers.Services
                     var assessment = new AddAssessmentDto
                     {
                         AssessmentID = 0,
-                        UserCityMappingID = userCityMappingID,
+                        UserCountryMappingID = userCountryMappingID,
                         PillarID = pillarID,
                         Responses = assessmentResponses
                     };
@@ -524,50 +524,50 @@ namespace PeaceEnablers.Services
                 return ResultResponseDto<string>.Failure(new[] { "Failed to save assessment" });
             }
         }
-        public async Task<GetCityQuestionHistoryReponseDto> GetCityQuestionHistory(UserCityRequstDto userCityRequstDto)
+        public async Task<GetCountryQuestionHistoryResponseDto> GetCountryQuestionHistory(UserCountryRequestDto userCountryRequestDto)
         {
             try
             {
-                var userID = userCityRequstDto.UserID;
-                var cityID = userCityRequstDto.CityID;
+                var userID = userCountryRequestDto.UserID;
+                var countryID = userCountryRequestDto.CountryID;
 
-                var user = await _context.Users.FirstOrDefaultAsync(x => x.UserID == userID && x.Role != UserRole.CityUser);
+                var user = await _context.Users.FirstOrDefaultAsync(x => x.UserID == userID && x.Role != UserRole.CountryUser);
                 if (user == null)
                 {
-                    return new GetCityQuestionHistoryReponseDto
+                    return new GetCountryQuestionHistoryResponseDto
                     {
-                        CityID = cityID,
+                        CountryID = countryID,
                         Score = 0,
                         TotalPillar = 0,
                         TotalAnsPillar = 0,
                         TotalQuestion = 0,
                         AnsQuestion = 0,
                         TotalAssessment = 0,
-                        Pillars = new List<CityPillarQuestionHistoryReponseDto>()
+                        Pillars = new List<CountryPillarQuestionHistoryResponseDto>()
                     };
                 }
-                var cityHistory = new CityHistoryDto();
+                var cityHistory = new CountryHistoryDto();
 
-                Expression<Func<UserCityMapping, bool>> predicate = user.Role switch
+                Expression<Func<UserCountryMapping, bool>> predicate = user.Role switch
                 {
-                    UserRole.Analyst => x => !x.IsDeleted && x.CityID == cityID && (x.AssignedByUserId == userID || x.UserID == userID),
-                    UserRole.Evaluator => x => !x.IsDeleted && x.CityID == cityID && x.UserID == userID,
-                    _ => x => !x.IsDeleted && x.CityID == cityID
+                    UserRole.Analyst => x => !x.IsDeleted && x.CountryID == countryID && (x.AssignedByUserId == userID || x.UserID == userID),
+                    UserRole.Evaluator => x => !x.IsDeleted && x.CountryID == countryID && x.UserID == userID,
+                    _ => x => !x.IsDeleted && x.CountryID == countryID
                 };
 
 
-                // 1. Get all UserCityMapping IDs for the city
-                var ucmIds = await _context.UserCityMappings
+                // 1. Get all UserCountryMapping IDs for the country
+                var ucmIds = await _context.UserCountryMappings
                     .Where(predicate)
-                    .Select(x => x.UserCityMappingID)
+                    .Select(x => x.UserCountryMappingID)
                     .ToListAsync();
 
                 var pillarAssessments = _context.Assessments
-                    .Where(a => ucmIds.Contains(a.UserCityMappingID) && a.IsActive && a.UpdatedAt.Year == userCityRequstDto.UpdatedAt.Year)
+                    .Where(a => ucmIds.Contains(a.UserCountryMappingID) && a.IsActive && a.UpdatedAt.Year == userCountryRequestDto.UpdatedAt.Year)
                     .SelectMany(x => x.PillarAssessments);
 
-                // 2. Fetch city-wise pillar/question details in one go
-                var cityPillarQuery =
+                // 2. Fetch country-wise pillar/question details in one go
+                var countryPillarQuery =
                     from p in _context.Pillars
                     join pa in pillarAssessments on p.PillarID equals pa.PillarID into paGroup
                     from pa in paGroup.DefaultIfEmpty()
@@ -577,7 +577,7 @@ namespace PeaceEnablers.Services
                         p.PillarName,
                         UserID = pa != null && pa.Responses
                                 .Where(r => r.Score.HasValue && (int)r.Score.Value <= (int)ScoreValue.Four)
-                                .Count() > 0 ? pa.Assessment.UserCityMapping.UserID : 0,
+                                .Count() > 0 ? pa.Assessment.UserCountryMapping.UserID : 0,
                         Score = pa != null
                             ? pa.Responses
                                 .Where(r => r.Score.HasValue && (int)r.Score.Value <= (int)ScoreValue.Four)
@@ -588,8 +588,8 @@ namespace PeaceEnablers.Services
                         AnsQuestion = pa != null ? pa.Responses.Count() : 0,
                         HasAnswer = pa != null
                     };
-                var list = await cityPillarQuery.Distinct().ToListAsync();
-                var cityPillars = (list)
+                var list = await countryPillarQuery.Distinct().ToListAsync();
+                var countryPillars = (list)
                     .GroupBy(x => new { x.PillarID, x.PillarName })
                     .Select(g =>
                     {
@@ -600,7 +600,7 @@ namespace PeaceEnablers.Services
 
                         decimal progress = ScoreCount != 0 && ansUserCount > 0 ? totalAnsScoreOfPillar * 100 / (ScoreCount * 4m ) : 0m;
 
-                        return new CityPillarQuestionHistoryReponseDto
+                        return new CountryPillarQuestionHistoryResponseDto
                         {
                             PillarID = g.Key.PillarID,
                             PillarName = g.Key.PillarName,
@@ -615,9 +615,9 @@ namespace PeaceEnablers.Services
 
                 //// 3. Get assessment count in one query
                 //var assessmentCount = await _context.Assessments
-                //    .CountAsync(x => ucmIds.Contains(x.UserCityMappingID) && x.IsActive);
+                //    .CountAsync(x => ucmIds.Contains(x.userCountryMappingID) && x.IsActive);
 
-                //// 4. Total pillars and questions (static across city)
+                //// 4. Total pillars and questions (static across country)
                 //var pillarStats = await _context.Pillars
                 //    .Select(p => new { QuestionsCount = p.Questions.Count() })
                 //    .ToListAsync();
@@ -625,17 +625,17 @@ namespace PeaceEnablers.Services
                 //int totalQuestions = pillarStats.Sum(p => p.QuestionsCount);
 
                 // 5. Final payload
-                var payload = new GetCityQuestionHistoryReponseDto
+                var payload = new GetCountryQuestionHistoryResponseDto
                 {
-                    CityID = cityID,
+                    CountryID = countryID,
                     //TotalAssessment = assessmentCount,
-                    //Score = cityPillars.Sum(x => x.Score),
-                    ScoreProgress = cityPillars.Average(x => x.ScoreProgress),
+                    //Score = countryPillars.Sum(x => x.Score),
+                    ScoreProgress = countryPillars.Average(x => x.ScoreProgress),
                     //TotalPillar = totalPillars * ucmIds.Count,
-                    //TotalAnsPillar = cityPillars.Sum(x => x.AnsPillar),
+                    //TotalAnsPillar = countryPillars.Sum(x => x.AnsPillar),
                     //TotalQuestion = totalQuestions * ucmIds.Count,
-                    //AnsQuestion = cityPillars.Sum(x => x.AnsQuestion),
-                    Pillars = cityPillars
+                    //AnsQuestion = countryPillars.Sum(x => x.AnsQuestion),
+                    Pillars = countryPillars
                 };
 
                 return payload;
@@ -643,16 +643,16 @@ namespace PeaceEnablers.Services
             catch (Exception ex)
             {
                 await _appLogger.LogAsync("Error Occure in GetCityQuestionHistory", ex);
-                return new GetCityQuestionHistoryReponseDto
+                return new GetCountryQuestionHistoryResponseDto
                 {
-                    CityID = 0,
+                    CountryID = 0,
                     Score = 0,
                     TotalPillar = 0,
                     TotalAnsPillar = 0,
                     TotalQuestion = 0,
                     AnsQuestion = 0,
                     TotalAssessment = 0,
-                    Pillars = new List<CityPillarQuestionHistoryReponseDto>()
+                    Pillars = new List<CountryPillarQuestionHistoryResponseDto>()
                 };
             }
         }
@@ -740,7 +740,7 @@ namespace PeaceEnablers.Services
                 var currentDate = DateTime.Now;
 
                 var transferAssessment = await _context.Assessments
-                    .Include(x => x.UserCityMapping)
+                    .Include(x => x.UserCountryMapping)
                     .Include(x => x.PillarAssessments)
                         .ThenInclude(x => x.Responses)
                     .FirstOrDefaultAsync(x => x.AssessmentID == r.AssessmentID);
@@ -748,25 +748,25 @@ namespace PeaceEnablers.Services
                 if (transferAssessment == null)
                     return ResultResponseDto<string>.Failure(new[] { "Invalid assessment." });
 
-                var cityAssigned = await _context.UserCityMappings
-                    .FirstOrDefaultAsync(x => x.CityID == transferAssessment.UserCityMapping.CityID &&
+                var cityAssigned = await _context.UserCountryMappings
+                    .FirstOrDefaultAsync(x => x.CountryID == transferAssessment.UserCountryMapping.CountryID &&
                                               x.UserID == r.TransferToUserID);
 
                 if (cityAssigned == null)
-                    return ResultResponseDto<string>.Failure(new[] { "This assessment can’t be imported because the selected user hasn’t been assigned to this city yet." });
+                    return ResultResponseDto<string>.Failure(new[] { "This assessment can’t be imported because the selected user hasn’t been assigned to this country yet." });
 
-                // Load existing assessment for that user/city/year (with pillars/responses)
+                // Load existing assessment for that user/country/year (with pillars/responses)
                 var existingAssessment = await _context.Assessments
                     .Include(a => a.PillarAssessments)
                         .ThenInclude(p => p.Responses)
-                    .FirstOrDefaultAsync(a => a.UserCityMappingID == cityAssigned.UserCityMappingID &&
+                    .FirstOrDefaultAsync(a => a.UserCountryMappingID == cityAssigned.UserCountryMappingID &&
                                               a.UpdatedAt.Year == currentDate.Year);
 
                 if (existingAssessment == null)
                 {
                     existingAssessment = new Assessment
                     {
-                        UserCityMappingID = cityAssigned.UserCityMappingID,
+                        UserCountryMappingID = cityAssigned.UserCountryMappingID,
                         CreatedAt = currentDate,
                         UpdatedAt = currentDate,
                         IsActive = true,
@@ -853,7 +853,7 @@ namespace PeaceEnablers.Services
                 }
                 if (existingAssessment.AssessmentPhase == AssessmentPhase.Completed)
                 {
-                    _download.InsertAnalyticalLayerResults(transferAssessment.UserCityMapping.CityID);
+                    _download.InsertAnalyticalLayerResults(transferAssessment.UserCountryMapping.CountryID);
                 }
                 await _context.SaveChangesAsync();
 
@@ -865,45 +865,45 @@ namespace PeaceEnablers.Services
                 return ResultResponseDto<string>.Failure(new[] { "Failed to transfer assessment, please try again later." });
             }
         }
-        public async Task<ResultResponseDto<AiCityPillarDashboardResponseDto>> GetCityPillarHistory(UserCityDashBoardRequstDto request, int userId, UserRole userRole)
+        public async Task<ResultResponseDto<AiCountryPillarDashboardResponseDto>> GetCountryPillarHistory(UserCountryDashBoardRequestDto request, int userId, UserRole userRole)
         {
             try
             {
                 var year = request.UpdatedAt.Year;
                 int pillarCount = _appSettings.PillarCount;
-                // 1. Validate city access
-                var hasAccess = await _context.UserCityMappings
+                // 1. Validate country access
+                var hasAccess = await _context.UserCountryMappings
                     .AnyAsync(x =>
                         !x.IsDeleted &&
                         (userRole == UserRole.Admin ||
-                         (x.UserID == userId && x.CityID == request.CityID)));
+                         (x.UserID == userId && x.CountryID == request.CountryID)));
 
                 if (!hasAccess)
                 {
-                    return ResultResponseDto<AiCityPillarDashboardResponseDto>
-                        .Failure(new[] { "Unauthorized or invalid city access" });
+                    return ResultResponseDto<AiCountryPillarDashboardResponseDto>
+                        .Failure(new[] { "Unauthorized or invalid country access" });
                 }
 
                 // 2. Fetch required data in parallel
                 var pillarEvaluationsList = await _commonService
-                    .GetCitiesProgressAsync(userId, (int)userRole, year);
+                    .GetCountriesProgressAsync(userId, (int)userRole, year);
 
                 var pillars = await _context.Pillars
                     .AsNoTracking()
                     .OrderBy(x => x.DisplayOrder)
                     .ToListAsync();
 
-                var aiCityProgress = await _context.AICityScores
-                    .Where(x => x.CityID == request.CityID && x.Year == year)
+                var aiCityProgress = await _context.AICountryScores
+                    .Where(x => x.CountryID == request.CountryID && x.Year == year)
                     .MaxAsync(x => x.AIProgress);
 
-                var city = await _context.Cities
+                var country = await _context.Countries
                     .AsNoTracking()
-                    .Where(x => x.CityID == request.CityID)
-                    .Select(x => new { x.CityID, x.CityName })
+                    .Where(x => x.CountryID == request.CountryID)
+                    .Select(x => new { x.CountryID, x.CountryName })
                     .FirstOrDefaultAsync();
 
-                 var pillarEvaluations = pillarEvaluationsList.Where(x=>x.CityID == request.CityID);
+                 var pillarEvaluations = pillarEvaluationsList.Where(x=>x.CountryID == request.CountryID);
 
                 // 3. Map pillar results
                 var pillarResults = pillars
@@ -911,7 +911,7 @@ namespace PeaceEnablers.Services
                         pillarEvaluations,
                         p => p.PillarID,
                         e => e.PillarID,
-                        (pillar, evals) => new CityPillarDashboardPillarValueDto
+                        (pillar, evals) => new CountryPillarDashboardPillarValueDto
                         {
                             PillarID = pillar.PillarID,
                             PillarName = pillar.PillarName,
@@ -922,23 +922,23 @@ namespace PeaceEnablers.Services
                     .ToList();
 
                 // 4. Prepare response
-                var response = new AiCityPillarDashboardResponseDto
+                var response = new AiCountryPillarDashboardResponseDto
                 {
-                    CityID = request.CityID,
-                    CityName = city?.CityName ?? string.Empty,
+                    CountryID = request.CountryID,
+                    CityName = country?.CountryName ?? string.Empty,
                     AiValue = aiCityProgress ?? 0,
                     EvaluationValue = Math.Round(pillarEvaluations.Select(x => x.ScoreProgress).DefaultIfEmpty(0).Sum()/pillarCount, 2),
                     Pillars = pillarResults
                 };
 
-                return ResultResponseDto<AiCityPillarDashboardResponseDto>
+                return ResultResponseDto<AiCountryPillarDashboardResponseDto>
                     .Success(response, new[] { "Pillars fetched successfully" });
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync(nameof(GetCityPillarHistory), ex);
+                await _appLogger.LogAsync(nameof(GetCountryPillarHistory), ex);
 
-                return ResultResponseDto<AiCityPillarDashboardResponseDto>
+                return ResultResponseDto<AiCountryPillarDashboardResponseDto>
                     .Failure(new[] { "Error in getting pillar details" });
             }
         }

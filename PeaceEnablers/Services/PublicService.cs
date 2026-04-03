@@ -22,69 +22,67 @@ namespace PeaceEnablers.Services
             _appLogger = appLogger;
             _env = env;
         }
-        public async Task<ResultResponseDto<List<PartnerCityResponseDto>>> GetAllCities()
+        public async Task<ResultResponseDto<List<PartnerCountryResponseDto>>> getAllCountries()
         {
             try
             {
-                var result = await _context.Cities.Where(c => c.IsActive && !c.IsDeleted).
-                 Select(c => new PartnerCityResponseDto
+                var result = await _context.Countries.Where(c => c.IsActive && !c.IsDeleted).
+                 Select(c => new PartnerCountryResponseDto
                  {
-                     CityID = c.CityID,
-                     State = c.State,
-                     CityName = c.CityName,
-                     PostalCode = c.PostalCode,
-                     Region = c.Region,
-                     Country = c.Country
-                 }).OrderBy(x => x.CityName).ToListAsync();
+                     CountryID = c.CountryID,                     
+                     CountryName = c.CountryName,
+                     CountryCode = c.CountryCode,
+                     Continent = c.Continent,
+                     
+                 }).OrderBy(x => x.CountryName).ToListAsync();
 
-                return ResultResponseDto<List<PartnerCityResponseDto>>.Success(result, new string[] { "get All Cities successfully" });
+                return ResultResponseDto<List<PartnerCountryResponseDto>>.Success(result, new string[] { "get All Countries successfully" });
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in getAllCities", ex);
-                return ResultResponseDto<List<PartnerCityResponseDto>>.Failure(new string[] { "There is an error please try later" });
+                await _appLogger.LogAsync("Error Occure in getAllCountries", ex);
+                return ResultResponseDto<List<PartnerCountryResponseDto>>.Failure(new string[] { "There is an error please try later" });
             }
         }
-        public async Task<ResultResponseDto<PartnerCityFilterResponse>> GetPartnerCitiesFilterRecord()
+        public async Task<ResultResponseDto<PartnerCountryFilterResponse>> GetPartnerCountriesFilterRecord()
         {
             try
             {
-                // Fetch all active cities once
-                var activeCities = await _context.Cities
+                // Fetch all active Countries once
+                var activeCountries = await _context.Countries
                     .Where(x => !x.IsDeleted)
                     .ToListAsync();
 
-                var res = new PartnerCityFilterResponse
+                var res = new PartnerCountryFilterResponse
                 {
-                    Countries = activeCities
-                        .Select(x => x.Country)
+                    Countries = activeCountries.Select(x=>x.CountryName)
                         .Distinct()
                         .ToList(),
 
-                    Cities = activeCities
-                        .Select(x => new PartnerCityDto
-                        {
-                            CityID = x.CityID,
-                            CityName = x.CityName
-                        })
-                        .ToList(),
+                    //Countries = activeCountries
+                    //    .Select(x => new PartnerCountryDto
+                    //    {
+                    //        CountryID = x.CountryID,
+                    //        CountryName = x.CountryName
+                    //    })
+                    //    .ToList(),
 
-                    Regions = activeCities
+                    Regions = activeCountries
                         .Select(x => x.Region)
                         .Where(r => !string.IsNullOrEmpty(r))
                         .Distinct()
                         .ToList()
                 };
 
-                return ResultResponseDto<PartnerCityFilterResponse>.Success(
+                return ResultResponseDto<PartnerCountryFilterResponse>.Success(
                     res,
-                    new List<string> { "Get Cities history successfully" }
+                    new List<string> { "Get Countries history successfully" }
                 );
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GetPartnerCitiesFilterRecord", ex);
-                return ResultResponseDto<PartnerCityFilterResponse>.Failure(
+                await _appLogger.LogAsync("Error Occured in GetPartnerCountriesFilterRecord", ex);
+                return ResultResponseDto<PartnerCountryFilterResponse>.Failure(
                     new string[] { "Failed to get Partner City filter data" }
                 );
             }
@@ -103,7 +101,7 @@ namespace PeaceEnablers.Services
                     PillarName = x.PillarName,
                     ImagePath = x.ImagePath
                 }).ToListAsync();
-                return ResultResponseDto<List<PillarResponseDto>>.Success(res, new List<string> { "Get Cities history successfully" });
+                return ResultResponseDto<List<PillarResponseDto>>.Success(res, new List<string> { "Get Countries history successfully" });
 
             }
             catch (Exception ex)
@@ -112,7 +110,7 @@ namespace PeaceEnablers.Services
                 return ResultResponseDto<List<PillarResponseDto>>.Failure(new string[] { "Failed to get Piilar detail" });
             }
         }
-        public async Task<PaginationResponse<PartnerCityResponseDto>> GetPartnerCities(PartnerCityRequestDto request)
+        public async Task<PaginationResponse<PartnerCountryResponseDto>> GetPartnerCountries(PartnerCountryRequestDto request)
         {
             try
             {
@@ -120,10 +118,10 @@ namespace PeaceEnablers.Services
 
 
                 var cityQuery =
-                   from c in _context.Cities.Where(x => !request.CityID.HasValue || x.CityID == request.CityID)
-                   join uc in _context.UserCityMappings on c.CityID equals uc.CityID into ucg
+                   from c in _context.Countries.Where(x => !request.CountryID.HasValue || x.CountryID == request.CountryID)
+                   join uc in _context.UserCountryMappings on c.CountryID equals uc.CountryID into ucg
                    from uc in ucg.DefaultIfEmpty()
-                   join a in _context.Assessments on uc.UserCityMappingID equals a.UserCityMappingID into ag
+                   join a in _context.Assessments on uc.UserCountryMappingID equals a.UserCountryMappingID into ag
                    from a in ag.DefaultIfEmpty()
                    join pa in _context.PillarAssessments.Where(x=> !request.PillarID.HasValue || x.PillarID == request.PillarID) 
                    on a.AssessmentID equals pa.AssessmentID into pag
@@ -135,25 +133,23 @@ namespace PeaceEnablers.Services
                     (a == null || a.UpdatedAt.Year == year) 
                    group r by new
                    {
-                       c.CityID,
-                       c.Country,
-                       c.PostalCode,
+                       c.CountryID,                       
+                       c.CountryCode,
                        c.Image,
-                       c.State,
-                       c.CityName,
+                       c.Continent,
+                       c.CountryName,
                        c.Region,
-                       EvaluatorCount = _context.UserCityMappings
-                                           .Count(x => x.CityID == c.CityID && !x.IsDeleted)
+                       EvaluatorCount = _context.UserCountryMappings
+                                           .Count(x => x.CountryID == c.CountryID && !x.IsDeleted)
                    }
                    into g
-                   select new PartnerCityResponseDto
+                   select new PartnerCountryResponseDto
                    {
-                       CityID = g.Key.CityID,
-                       State = g.Key.State,
-                       CityName = g.Key.CityName,
-                       PostalCode = g.Key.PostalCode,
-                       Region = g.Key.Region,
-                       Country = g.Key.Country,
+                       CountryID = g.Key.CountryID,
+                       Continent = g.Key.Continent,
+                       CountryName = g.Key.CountryName,
+                       CountryCode = g.Key.CountryCode,
+                       Region = g.Key.Region,                       
                        Image = g.Key.Image,
                        Score = (decimal)g.Sum(x => (int?)x.Score ?? 0) / (g.Key.EvaluatorCount == 0 ? 1 : g.Key.EvaluatorCount),
                        HighScore = g.Max(x=>(int?)x.Score ?? 0),
@@ -163,7 +159,7 @@ namespace PeaceEnablers.Services
 
                 if (!string.IsNullOrWhiteSpace(request.Country))
                 {
-                    cityQuery = cityQuery.Where(c => c.Country.Contains(request.Country));
+                    cityQuery = cityQuery.Where(c => c.CountryName.Contains(request.Country));
                 }
 
                 // Only filter by Region if a value is provided
@@ -179,12 +175,12 @@ namespace PeaceEnablers.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetCitiesProgressByUserId", ex);
+                await _appLogger.LogAsync("Error Occure in GetCountriesProgressByUserId", ex);
                 return new();
             }
         }
 
-        public async Task<CountryCityResponse> GetCountriesAndCities_WithStaleSupport()
+        public async Task<CountryCityResponse> GetCountriesAndCountries_WithStaleSupport()
         {
             try
             {
@@ -207,19 +203,19 @@ namespace PeaceEnablers.Services
             }
         }
 
-        public async Task<ResultResponseDto<List<PromotedPillarsResponseDto>>> GetPromotedCities()
+        public async Task<ResultResponseDto<List<PromotedPillarsResponseDto>>> GetPromotedCountries()
         {
             try
             {
                 int currentYear = DateTime.Now.Year;
 
                 var result = await _context.AIPillarScores
-                    .Include(x => x.City)
+                    .Include(x => x.Country)
                     .Include(x => x.Pillar)
                     .Where(x =>
                         x.Year == currentYear &&
-                        x.City.IsActive &&
-                        !x.City.IsDeleted)
+                        x.Country.IsActive &&
+                        !x.Country.IsDeleted)
                     .GroupBy(x => new
                     {
                         x.PillarID,
@@ -233,18 +229,17 @@ namespace PeaceEnablers.Services
                         PillarName = g.Key.PillarName,
                         DisplayOrder = g.Key.DisplayOrder,
                         ImagePath = g.Key.ImagePath,
-                        Cities = g
+                        Countries = g
                             .OrderByDescending(x => x.AIProgress)
                             .Take(3).OrderBy(x=>x.AIProgress)
-                            .Select(c => new PromotedCityResponseDto
+                            .Select(c => new PromotedCountryResponseDto
                             {
-                                CityID = c.CityID,
-                                CityName = c.City.CityName,
-                                Country = c.City.Country,
-                                State = c.City.State,
-                                PostalCode = c.City.PostalCode,
-                                Region = c.City.Region,
-                                Image = c.City.Image,
+                                CountryID = c.CountryID,
+                                CountryName = c.Country.CountryName,
+                                CountryCode = c.Country.CountryCode,
+                                Continent = c.Country.Continent,
+                                Region = c.Country.Region,
+                                Image = c.Country.Image,
                                 ScoreProgress = c.AIProgress,
                                 Description = c.EvidenceSummary,
                             }).ToList()
@@ -252,14 +247,14 @@ namespace PeaceEnablers.Services
 
                 return ResultResponseDto<List<PromotedPillarsResponseDto>>.Success(
                     result,
-                    new List<string> { "Promoted cities fetched successfully" }
+                    new List<string> { "Promoted Countries fetched successfully" }
                 );
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occurred in GetPromotedCities", ex);
+                await _appLogger.LogAsync("Error Occurred in GetPromotedCountries", ex);
                 return ResultResponseDto<List<PromotedPillarsResponseDto>>.Failure(
-                    new[] { "Failed to get promoted cities" }
+                    new[] { "Failed to get promoted Countries" }
                 );
             }
         }
@@ -275,7 +270,7 @@ public class CountryCityResponse
 
 public class CountryData
 {
-    public string country { get; set; }
-    public List<string> cities { get; set; }
+    public string Country { get; set; }
+    public List<string> Countries { get; set; }
 }
 

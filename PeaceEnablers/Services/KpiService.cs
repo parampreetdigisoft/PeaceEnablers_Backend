@@ -8,8 +8,9 @@ using Microsoft.EntityFrameworkCore;
 using PeaceEnablers.Common.Implementation;
 using PeaceEnablers.Common.Models;
 using PeaceEnablers.Data;
-using PeaceEnablers.Dtos.CityUserDto;
+
 using PeaceEnablers.Dtos.CommonDto;
+using PeaceEnablers.Dtos.CountryUserDto;
 using PeaceEnablers.Dtos.kpiDto;
 using PeaceEnablers.Enums;
 using PeaceEnablers.IServices;
@@ -44,19 +45,19 @@ namespace PeaceEnablers.Services
                     .AsNoTracking()
                     .Include(ar => ar.AnalyticalLayer)
                         .ThenInclude(al => al.FiveLevelInterpretations)
-                    .Include(ar => ar.City)
+                    .Include(ar => ar.Country)
                     .Where(x => (x.LastUpdated >= startDate && x.LastUpdated < endDate) || (x.AiLastUpdated >= startDate && x.AiLastUpdated < endDate));
 
-                if (role == UserRole.CityUser)
+                if (role == UserRole.CountryUser )
                 {
-                    var validCities = _context.PublicUserCityMappings
+                    var validCountries = _context.PublicUserCountryMappings
                         .Where(x =>
                             x.IsActive &&
                             x.UserID == userId &&
-                            (!request.CityID.HasValue || x.CityID == request.CityID))
-                        .Select(x => x.CityID);
+                            (!request.CountryID.HasValue || x.CountryID == request.CountryID))
+                        .Select(x => x.CountryID);
 
-                    var validPillarIds = _context.CityUserPillarMappings
+                    var validPillarIds = _context.CountryUserPillarMappings
                         .Where(x => x.IsActive && x.UserID == userId)
                         .Select(x => x.PillarID);
 
@@ -69,13 +70,25 @@ namespace PeaceEnablers.Services
 
                     baseQuery = baseQuery
                         .Where(ar =>
-                            validCities.Contains(ar.CityID) &&
+                            validCountries.Contains(ar.CountryID) &&
                             validLayerIds.Contains(ar.LayerID));
+                }
+                else if (role == UserRole.Analyst || role == UserRole.Evaluator)
+                {
+                    var validCountries = _context.UserCountryMappings
+                        .Where(x =>
+                            !x.IsDeleted &&
+                            x.UserID == userId &&
+                            (!request.CountryID.HasValue || x.CountryID == request.CountryID))
+                        .Select(x => x.CountryID);
+                    baseQuery = baseQuery
+                        .Where(ar => validCountries.Contains(ar.CountryID)&&
+                        (!request.LayerID.HasValue || ar.LayerID == request.LayerID));
                 }
                 else
                 {
                     baseQuery = baseQuery.Where(ar =>
-                        (!request.CityID.HasValue || ar.CityID == request.CityID) &&
+                        (!request.CountryID.HasValue || ar.CountryID == request.CountryID) &&
                         (!request.LayerID.HasValue || ar.LayerID == request.LayerID));
                 }
                 var response = await baseQuery.Select(Projection).ApplyPaginationAsync(request);
@@ -94,7 +107,7 @@ namespace PeaceEnablers.Services
         {
             LayerResultID = ar.LayerResultID,
             LayerID = ar.LayerID,
-            CityID = ar.CityID,
+            CountryID = ar.CountryID,
             InterpretationID = ar.InterpretationID,
             NormalizeValue = ar.NormalizeValue,            
             CalValue5 = ar.CalValue5,
@@ -108,7 +121,7 @@ namespace PeaceEnablers.Services
             Purpose = ar.AnalyticalLayer.Purpose,            
             CalText5 = ar.AnalyticalLayer.CalText5,
             FiveLevelInterpretations = ar.AnalyticalLayer.FiveLevelInterpretations.OrderByDescending(f => f.MaxRange).ToList(),
-            City = ar.City
+            Country = ar.Country
         };
 
         #endregion
@@ -119,13 +132,13 @@ namespace PeaceEnablers.Services
                 IQueryable<AnalyticalLayer> query = _context.AnalyticalLayers
                     .Where(x => !x.IsDeleted);
 
-                if (role == UserRole.CityUser)
+                if (role == UserRole.CountryUser)
                 {
                     query =
                         from layer in _context.AnalyticalLayers
                         join map in _context.AnalyticalLayerPillarMappings
                             on layer.LayerID equals map.LayerID
-                        join userMap in _context.CityUserPillarMappings
+                        join userMap in _context.CountryUserPillarMappings
                             on map.PillarID equals userMap.PillarID
                         where !layer.IsDeleted
                               && userMap.IsActive
@@ -146,7 +159,7 @@ namespace PeaceEnablers.Services
                 return ResultResponseDto<List<AnalyticalLayer>>.Failure(new List<string> { "An error occurred" });
             }
         }
-        public async Task<ResultResponseDto<CompareCityResponseDto>> CompareCities(CompareCityRequestDto c, int userId, UserRole role, bool applyPagination = true)
+        public async Task<ResultResponseDto<CompareCountryResponseDto>> CompareCountries(CompareCountryRequestDto c, int userId, UserRole role, bool applyPagination = true)
         {
             try
             {
@@ -179,47 +192,47 @@ namespace PeaceEnablers.Services
                     validKpiIds = c.Kpis;
                 }
 
-                Expression<Func<City, bool>> expression = role switch
+                Expression<Func<Country, bool>> expression = role switch
                 {
-                    UserRole.Admin => x => !x.IsDeleted && c.Cities.Contains(x.CityID),
-                    UserRole.Analyst => x => !x.IsDeleted && c.Cities.Contains(x.CityID),
-                    UserRole.Evaluator => x => !x.IsDeleted && c.Cities.Contains(x.CityID),
+                    UserRole.Admin => x => !x.IsDeleted && c.Countries.Contains(x.CountryID),
+                    UserRole.Analyst => x => !x.IsDeleted && c.Countries.Contains(x.CountryID),
+                    UserRole.Evaluator => x => !x.IsDeleted && c.Countries.Contains(x.CountryID),
                     _ => x => false
                 };
 
-                // Step 2: Get all selected cities (even if no analytical data)
-                var selectedCities = await _context.Cities
+                // Step 2: Get all selected countries (even if no analytical data)
+                var selectedCountries = await _context.Countries
                     .Where(expression)
                     .Distinct()
                     .ToListAsync();
 
-                var selectedCityIds = selectedCities.Select(x => x.CityID).ToList();
+                var selectedCountryIds = selectedCountries.Select(x => x.CountryID).ToList();
 
                 if(role == UserRole.Analyst || role == UserRole.Evaluator)
                 {
-                    var validMappedCityIds = await _context.UserCityMappings
+                    var validMappedCountryIds = await _context.UserCountryMappings
                        .Where(x => x.UserID == userId && !x.IsDeleted)
-                       .Select(x => x.CityID)
+                       .Select(x => x.CountryID)
                        .ToListAsync();
 
-                    // ✅ Check if all selected cities are valid
-                    bool allValid = selectedCityIds.All(id => validMappedCityIds.Contains(id));
+                    // ✅ Check if all selected countries are valid
+                    bool allValid = selectedCountryIds.All(id => validMappedCountryIds.Contains(id));
 
                     if (!allValid)
                     {
-                        return ResultResponseDto<CompareCityResponseDto>.Failure(new List<string> { "No valid cities found." });
+                        return ResultResponseDto<CompareCountryResponseDto>.Failure(new List<string> { "No valid countries found." });
                     }
                 }
 
-                // Step 3: Fetch analytical layer results for selected cities
+                // Step 3: Fetch analytical layer results for selected countries
                 var analyticalResults = await _context.AnalyticalLayerResults
                     .Include(ar => ar.AnalyticalLayer)
-                    .Where(x => selectedCityIds.Contains(x.CityID) 
+                    .Where(x => selectedCountryIds.Contains(x.CountryID) 
                     && ((x.AiLastUpdated >= startDate && x.AiLastUpdated < endDate || x.LastUpdated >= startDate && x.LastUpdated < endDate))
                     && validKpiIds.Contains(x.LayerID))
                     .Select(ar => new
                     {
-                        ar.CityID,
+                        ar.CountryID,
                         ar.LayerID,
                         ar.AnalyticalLayer.LayerCode,
                         ar.AnalyticalLayer.LayerName,
@@ -237,28 +250,28 @@ namespace PeaceEnablers.Services
                     .ToList();
 
                 // Step 5: Prepare response DTO
-                var response = new CompareCityResponseDto
+                var response = new CompareCountryResponseDto
                 {
                     Categories = new List<string>(),
                     Series = new List<ChartSeriesDto>(),
                     TableData = new List<ChartTableRowDto>()
                 };
 
-                // Initialize chart series for each city
-                foreach (var city in selectedCities)
+                // Initialize chart series for each Country
+                foreach (var Country in selectedCountries)
                 {
                     response.Series.Add(new ChartSeriesDto
                     {
-                        Name = city.CityName,
+                        Name = Country.CountryName,
                         Data = new List<decimal>(),
                         AiData = new List<decimal>()
                     });
                 }
 
-                // Add Peer City Score series
+                // Add Peer Country Score series
                 var peerSeries = new ChartSeriesDto
                 {
-                    Name = "Peer City Score",
+                    Name = "Peer Country Score",
                     Data = new List<decimal>(),
                     AiData = new List<decimal>()
                 };
@@ -268,29 +281,29 @@ namespace PeaceEnablers.Services
                 {
                     response.Categories.Add(layer.LayerCode);
 
-                    // Map KPI values for each city (0 if missing)
+                    // Map KPI values for each Country (0 if missing)
                     var values = new Dictionary<int, List<decimal>>();
 
-                    foreach (var city in selectedCities)
+                    foreach (var Country in selectedCountries)
                     {
                         var value = analyticalResults
-                            .FirstOrDefault(r => r.CityID == city.CityID && r.LayerID == layer.LayerID);
+                            .FirstOrDefault(r => r.CountryID == Country.CountryID && r.LayerID == layer.LayerID);
 
                         var evaluatedValue = Math.Round(value?.CalValue5 ?? 0, 2);
                         var aiValue = Math.Round(value?.AiCalValue5 ?? 0, 2);
-                        values[city.CityID] = new List<decimal> { evaluatedValue, aiValue };
+                        values[Country.CountryID] = new List<decimal> { evaluatedValue, aiValue };
 
                         // Add to series
-                        var citySeries = response.Series.First(s => s.Name == city.CityName);
-                        citySeries.Data.Add(evaluatedValue);
+                        var CountrySeries = response.Series.First(s => s.Name == Country.CountryName);
+                        CountrySeries.Data.Add(evaluatedValue);
 
-                        citySeries.AiData.Add(aiValue);
+                        CountrySeries.AiData.Add(aiValue);
                     }
-                    // ✅ Calculate Peer City Score (average of all cities for this layer)
-                    var peerCityScore = values.Values.Any() ? Math.Round(values.Values.Select(x => x.First()).Average(), 2) : 0;
-                    peerSeries.Data.Add(peerCityScore);
-                    var aiPeerCityScore = values.Values.Any() ? Math.Round(values.Values.Select(x => x.Last()).Average(), 2) : 0;
-                    peerSeries.AiData.Add(aiPeerCityScore);
+                    // ✅ Calculate Peer Country Score (average of all countries for this layer)
+                    var peerCountryScore = values.Values.Any() ? Math.Round(values.Values.Select(x => x.First()).Average(), 2) : 0;
+                    peerSeries.Data.Add(peerCountryScore);
+                    var aiPeerCountryScore = values.Values.Any() ? Math.Round(values.Values.Select(x => x.Last()).Average(), 2) : 0;
+                    peerSeries.AiData.Add(aiPeerCountryScore);
 
                     // Add table data
                     response.TableData.Add(new ChartTableRowDto
@@ -299,26 +312,26 @@ namespace PeaceEnablers.Services
                         LayerCode = layer.LayerCode,
                         LayerName = layer.LayerName,
                         Purpose = layer.Purpose,
-                        CityValues = selectedCities.Select(c => new CityValueDto
+                        CountryValues = selectedCountries.Select(c => new CountryValueDto
                         {
-                            CityID = c.CityID,
-                            CityName = c.CityName,
-                            Value = values[c.CityID].First(),
-                            AiValue = values[c.CityID].Last()
+                            CountryID = c.CountryID,
+                            CountryName = c.CountryName,
+                            Value = values[c.CountryID].First(),
+                            AiValue = values[c.CountryID].Last()
                         }).ToList(),
-                        PeerCityScore = peerCityScore // You can rename property if needed
+                        PeerCountryScore = peerCountryScore // You can rename property if needed
                     });
                 }
 
-                // Append Peer City Score series
+                // Append Peer Country Score series
                 response.Series.Add(peerSeries);
 
-                return ResultResponseDto<CompareCityResponseDto>.Success(response);
+                return ResultResponseDto<CompareCountryResponseDto>.Success(response);
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error occurred in CompareCities", ex);
-                return ResultResponseDto<CompareCityResponseDto>.Failure(new List<string> { "An error occurred while comparing cities." });
+                await _appLogger.LogAsync("Error occurred in CompareCountries", ex);
+                return ResultResponseDto<CompareCountryResponseDto>.Failure(new List<string> { "An error occurred while comparing countries." });
             }
         }
 
@@ -334,22 +347,22 @@ namespace PeaceEnablers.Services
                 var startDate = new DateTime(year, 1, 1);
                 var endDate = startDate.AddYears(1);
 
-                if (role == UserRole.CityUser)
+                if (role == UserRole.CountryUser)
                 {
-                    var validCityIds = await _context.PublicUserCityMappings
+                    var validCountryIds = await _context.PublicUserCountryMappings
                         .Where(x =>
                             x.IsActive &&
                             x.UserID == userId)
-                        .Select(x => x.CityID)
+                        .Select(x => x.CountryID)
                         .ToListAsync();
 
-                    bool hasInvalidCity = request.CityIDs
-                        .Any(cityId => !validCityIds.Contains(cityId));
+                    bool hasInvalidCountry = request.CountryIDs
+						.Any(CountryId => !validCountryIds.Contains(CountryId));
 
-                    if (hasInvalidCity)
+                    if (hasInvalidCountry)
                     {
                         return ResultResponseDto<GetMutiplekpiLayerResultsDto>
-                            .Failure(new List<string> { "You are not authorized to access one or more selected cities." });
+                            .Failure(new List<string> { "You are not authorized to access one or more selected countries." });
                     }
                 }
 
@@ -357,7 +370,7 @@ namespace PeaceEnablers.Services
                 var query = _context.AnalyticalLayerResults
                     .AsNoTracking()
                     .Where(x =>
-                        request.CityIDs.Contains(x.CityID) &&
+                        request.CountryIDs.Contains(x.CountryID) &&
                         x.LayerID == request.LayerID &&
                         (
                             (x.LastUpdated >= startDate && x.LastUpdated < endDate) ||
@@ -377,9 +390,9 @@ namespace PeaceEnablers.Services
 
                         FiveLevelInterpretations = g.First().AnalyticalLayer.FiveLevelInterpretations,
 
-                        cities = g.Select(x => new MutipleCitieskpiLayerResults
+                        Countries = g.Select(x => new MutipleCountrieskpiLayerResults
                         {
-                            CityID = x.CityID,
+                            CountryID = x.CountryID,
                             InterpretationID = x.InterpretationID,
                             NormalizeValue = x.NormalizeValue,                            
                             CalValue5 = x.CalValue5,
@@ -388,7 +401,7 @@ namespace PeaceEnablers.Services
                             AiNormalizeValue = x.AiNormalizeValue,                            
                             AiCalValue5 = x.AiCalValue5,
                             AiLastUpdated = x.AiLastUpdated,
-                            City = x.City
+                            Country = x.Country
                         }).ToList()
                     })
                     .FirstOrDefaultAsync();
@@ -407,27 +420,27 @@ namespace PeaceEnablers.Services
 
 
 
-        public async Task<Tuple<string, byte[]>> ExportCompareCities(CompareCityRequestDto c, int userId, UserRole role)
+        public async Task<Tuple<string, byte[]>> ExportCompareCountries(CompareCountryRequestDto c, int userId, UserRole role)
         {
             try
             {
-                var result = await CompareCities(c, userId, role, false);
+                var result = await CompareCountries(c, userId, role, false);
                 var data = result.Result;
 
                 if (data == null || data.TableData == null || !data.TableData.Any())
                 {
-                    return new Tuple<string, byte[]>("City_Comparison.xlsx", Array.Empty<byte>());
+                    return new Tuple<string, byte[]>("Country_Comparison.xlsx", Array.Empty<byte>());
                 }
 
                 using (var workbook = new XLWorkbook())
                 {
-                    var ws = workbook.Worksheets.Add("City Comparison");
+                    var ws = workbook.Worksheets.Add("Country Comparison");
 
                     // =========================
                     // 📊 DYNAMIC HEADER SETUP
                     // =========================
-                    var cities = data.TableData.First().CityValues;
-                    int totalCols = 2 + (cities.Count * 2);
+                    var countries = data.TableData.First().CountryValues;
+                    int totalCols = 2 + (countries.Count * 2);
 
                     // =========================
                     // 🎯 REPORT HEADER (TOP)
@@ -462,12 +475,12 @@ namespace PeaceEnablers.Services
                     col++;
 
                     // Dynamic Cities
-                    foreach (var city in cities)
+                    foreach (var country in countries)
                     {
                         int startCol = col;
 
-                        // City Name (merged)
-                        ws.Range(row, startCol, row, startCol + 1).Merge().Value = city.CityName;
+                        // Country Name (merged)
+                        ws.Range(row, startCol, row, startCol + 1).Merge().Value = country.CountryName;
 
                         // Sub headers
                         ws.Cell(row + 1, startCol).Value = "Eval";
@@ -507,10 +520,10 @@ namespace PeaceEnablers.Services
                             comment.Visible = false;
                         }
 
-                        foreach (var city in kpi.CityValues)
+                        foreach (var Country in kpi.CountryValues)
                         {
-                            ws.Cell(row, col++).Value = city.Value;
-                            ws.Cell(row, col++).Value = city.AiValue;
+                            ws.Cell(row, col++).Value = Country.Value;
+                            ws.Cell(row, col++).Value = Country.AiValue;
                         }
 
                         row++;
@@ -598,13 +611,13 @@ namespace PeaceEnablers.Services
                     using (var stream = new MemoryStream())
                     {
                         workbook.SaveAs(stream);
-                        return new Tuple<string, byte[]>("City_Comparison.xlsx", stream.ToArray());
+                        return new Tuple<string, byte[]>("Country_Comparison.xlsx", stream.ToArray());
                     }
                 }
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error in ExportCompareCities", ex);
+                await _appLogger.LogAsync("Error in ExportCompareCountries", ex);
                 return new Tuple<string, byte[]>("", Array.Empty<byte>());
             }
         }

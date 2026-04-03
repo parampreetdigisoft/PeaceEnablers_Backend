@@ -1,10 +1,8 @@
 ﻿
 using DocumentFormat.OpenXml.Spreadsheet;
-
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-
-using PeaceEnablers.Dtos.CityUserDto;
+using PeaceEnablers.Dtos.CountryUserDto;
 using PeaceEnablers.Dtos.kpiDto;
 using PeaceEnablers.Enums;
 using PeaceEnablers.IServices;
@@ -61,10 +59,10 @@ namespace PeaceEnablers.Controllers
             }
 
             var tierName = GetTierFromClaims();
-            if (tierName == null && userRole == UserRole.CityUser)
+            if (tierName == null && userRole == UserRole.CountryUser)
                 return Unauthorized("You Don't have access.");
 
-            if (!Enum.TryParse<TieredAccessPlan>(tierName, true, out var userPlan) && userRole == UserRole.CityUser)
+            if (!Enum.TryParse<TieredAccessPlan>(tierName, true, out var userPlan) && userRole == UserRole.CountryUser)
             {
                 return Unauthorized("You Don't have access.");
             }
@@ -99,9 +97,9 @@ namespace PeaceEnablers.Controllers
         }
 
         [HttpPost]
-        [Route("compareCities")]
+        [Route("CompareCountries")]
         [Authorize(Policy = "StaffOnly")]
-        public async Task<IActionResult> CompareCities([FromBody] CompareCityRequestDto r)
+        public async Task<IActionResult> CompareCountries([FromBody] CompareCountryRequestDto r)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -115,12 +113,12 @@ namespace PeaceEnablers.Controllers
             {
                 return Unauthorized("You Don't have access.");
             }
-           var result = await _kpiService.CompareCities(r, userId.GetValueOrDefault(), userRole, true);
+           var result = await _kpiService.CompareCountries(r, userId.GetValueOrDefault(), userRole, true);
             return Ok(result);
         }
 
-        [HttpGet("ExportCompareCities")]
-        public async Task<IActionResult> ExportCompareCities( string cities, string? kpis, DateTime updatedAt)
+        [HttpGet("ExportCompareCountries")]
+        public async Task<IActionResult> ExportCompareCountries( string countries, string? kpis, DateTime updatedAt)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -133,7 +131,7 @@ namespace PeaceEnablers.Controllers
             if (!Enum.TryParse<UserRole>(role, true, out var userRole))
                 return Unauthorized("You Don't have access.");
 
-            var cityIds = cities.Split(',')
+            var countryIds = countries.Split(',')
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Select(int.Parse)
                 .ToList();
@@ -148,14 +146,14 @@ namespace PeaceEnablers.Controllers
                     .ToList();
             }
 
-            var request = new CompareCityRequestDto
+            var request = new CompareCountryRequestDto
             {
-                Cities = cityIds,
+                Countries = countryIds,
                 Kpis = kpiIds,
                 UpdatedAt = updatedAt
             };
 
-            var content = await _kpiService.ExportCompareCities(request, userId.Value, userRole);
+            var content = await _kpiService.ExportCompareCountries(request, userId.Value, userRole);
 
             return File(content.Item2,
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -181,10 +179,10 @@ namespace PeaceEnablers.Controllers
             }
 
             var tierName = GetTierFromClaims();
-            if (tierName == null && userRole == UserRole.CityUser)
+            if (tierName == null && userRole == UserRole.CountryUser)
                 return Unauthorized("You Don't have access.");
 
-            if (!Enum.TryParse<TieredAccessPlan>(tierName, true, out var userPlan) && userRole == UserRole.CityUser)
+            if (!Enum.TryParse<TieredAccessPlan>(tierName, true, out var userPlan) && userRole == UserRole.CountryUser)
             {
                 return Unauthorized("You Don't have access.");
             }

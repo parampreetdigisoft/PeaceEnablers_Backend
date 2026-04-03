@@ -144,9 +144,9 @@ namespace PeaceEnablers
             services.AddAuthorization(options =>
             {
                 // CityUser with Standard or higher
-                options.AddPolicy("PaidCityUserOnly", policy =>
+                options.AddPolicy("PaidCountryUserOnly", policy =>
                 {
-                    policy.RequireRole("CityUser");
+                    policy.RequireRole("CountryUser");
                     policy.RequireAssertion(context =>
                     {
                         var tier = context.User.FindFirst("Tier")?.Value;

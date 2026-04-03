@@ -23,6 +23,7 @@ using PeaceEnablers.IServices;
 using PeaceEnablers.Models;
 using PeaceEnablers.Services;
 using SkiaSharp;
+using System.Diagnostics.Metrics;
 using static PeaceEnablers.Services.AIComputationService;
 
 
@@ -62,11 +63,11 @@ namespace PeaceEnablers.Common.Implementation
         //  ENTRY POINTS
         // ════════════════════════════════════════════════════════════════════
 
-        public async Task<byte[]> GenerateCityDetailsDocx(
-            AiCitySummeryDto cityDetails,
-            List<AiCityPillarResponse> pillars,
+        public async Task<byte[]> GenerateCountryDetailsDocx(
+            AiCountrySummeryDto countryDetails,
+            List<AiCountryPillarResponse> pillars,
             List<KpiChartItem> kpis,
-            List<PeerCityHistoryReportDto> peerCities,
+            List<PeerCountryHistoryReportDto> peerCountries,
             UserRole userRole)
         {
             try
@@ -75,7 +76,7 @@ namespace PeaceEnablers.Common.Implementation
                 {
                     var body = mainPart.Document.Body!;
                     _imgId = 1;
-                    AddCityDetailsSections(body, mainPart, cityDetails, pillars, kpis, peerCities, userRole);
+                    AddCountryDetailsSections(body, mainPart, countryDetails, pillars, kpis, peerCountries, userRole);
                 });
             }
             catch (Exception ex)
@@ -85,16 +86,15 @@ namespace PeaceEnablers.Common.Implementation
             }
         }
 
-        public async Task<byte[]> GeneratePillarDetailsDocx(AiCityPillarResponse pillarData, UserRole userRole)
+        public async Task<byte[]> GeneratePillarDetailsDocx(AiCountryPillarResponse pillarData, UserRole userRole)
         {
             try
             {
-                var cityDetails = new AiCitySummeryDto
+                var countryDetails = new AiCountrySummeryDto
                 {
-                    CityID = pillarData.CityID,
-                    CityName = pillarData.CityName,
-                    State = pillarData.State,
-                    Country = pillarData.Country,
+                    CountryID = pillarData.CountryID,
+                    CountryName = pillarData.CountryName,
+                    Continent = pillarData.Continent,                   
                     Year = pillarData.AIDataYear,
                     AIProgress = pillarData.AIProgress
 
@@ -104,7 +104,7 @@ namespace PeaceEnablers.Common.Implementation
                 {
                     var body = mainPart.Document.Body!;
                     _imgId = 1;
-                    AppendCityHeader(mainPart, cityDetails, pillarData.PillarName);
+                    AppendCityHeader(mainPart, countryDetails, pillarData.PillarName);
                     AddPillarSection(body, mainPart, pillarData, userRole);
                     FinalizeLastSection(mainPart);
                 });
@@ -116,9 +116,9 @@ namespace PeaceEnablers.Common.Implementation
             }
         }
 
-        public async Task<byte[]> GenerateAllCitiesDetailsDocx(
-            List<AiCitySummeryDto> cities,
-            Dictionary<int, List<AiCityPillarResponse>> pillarsDict,
+        public async Task<byte[]> GenerateAllCountriesDetailsDocx(
+            List<AiCountrySummeryDto> countries,
+            Dictionary<int, List<AiCountryPillarResponse>> pillarsDict,
             List<KpiChartItem> kpis,
             UserRole userRole)
         {
@@ -129,25 +129,25 @@ namespace PeaceEnablers.Common.Implementation
                     var body = mainPart.Document.Body!;
                     _imgId = 1;
                     bool first = true;
-                    foreach (var city in cities)
+                    foreach (var country in countries)
                     {
-                        if (!pillarsDict.TryGetValue(city.CityID, out var pillars) || !pillars.Any())
+                        if (!pillarsDict.TryGetValue(country.CountryID, out var pillars) || !pillars.Any())
                             continue;
 
-                        var cityKpis = kpis?.Where(k => k.CityID == city.CityID).Take(109).ToList()
+                        var countryKpis = kpis?.Where(k => k.CountryID == country.CountryID).Take(109).ToList()
                                        ?? new List<KpiChartItem>();
 
                         if (!first) body.AppendChild(PageBreak());
                         first = false;
 
-                        AddCityDetailsSections(body, mainPart, city, pillars, cityKpis,
-                                               new List<PeerCityHistoryReportDto>(), userRole, isAllCities: true);
+                        AddCountryDetailsSections(body, mainPart, country, pillars, countryKpis,
+                                               new List<PeerCountryHistoryReportDto>(), userRole, isAllCountries: true);
                     }
                 });
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error in GenerateAllCitiesDetailsDocx", ex);
+                await _appLogger.LogAsync("Error in GenerateAllCountriesDetailsDocx", ex);
                 return Array.Empty<byte>();
             }
         }
@@ -181,14 +181,14 @@ namespace PeaceEnablers.Common.Implementation
         // ════════════════════════════════════════════════════════════════════
         //  CITY REPORT  –  SECTION COMPOSITION
         // ════════════════════════════════════════════════════════════════════
-        private void AddCityDetailsSections(
+        private void AddCountryDetailsSections(
             Body body, MainDocumentPart mainPart,
-            AiCitySummeryDto cityDetails,
-            List<AiCityPillarResponse> pillars,
+            AiCountrySummeryDto countryDetails,
+            List<AiCountryPillarResponse> pillars,
             List<KpiChartItem> kpis,
-            List<PeerCityHistoryReportDto> peerCities,
+            List<PeerCountryHistoryReportDto> peerCountries,
             UserRole userRole,
-            bool isAllCities = false)
+            bool isAllCountries = false)
         {
             // Reset pending header state for this document
             ResetSectionState();
@@ -202,44 +202,44 @@ namespace PeaceEnablers.Common.Implementation
                 .ToList();
 
             // ── 1. Global Dashboard ──────────────────────────────────────────────────
-            if (!isAllCities)
+            if (!isAllCountries)
             {
-                AppendCityHeader(mainPart, cityDetails, "City Performance Dashboard");
-                AddDashboardSection(body, mainPart, cityDetails, pillarChartItems, kpiChartItems);
+                AppendCityHeader(mainPart, countryDetails, "Country Performance Dashboard");
+                AddDashboardSection(body, mainPart, countryDetails, pillarChartItems, kpiChartItems);
             }
 
-            // ── 2. City Summary ──────────────────────────────────────────────────────
-            AppendCityHeader(mainPart, cityDetails, null);          
-            AddCitySummarySection(body, mainPart, cityDetails, userRole);
+            // ── 2. Country Summary ──────────────────────────────────────────────────────
+            AppendCityHeader(mainPart, countryDetails, null);          
+            AddCitySummarySection(body, mainPart, countryDetails, userRole);
 
             // ── 3. Pillar Radial Overview ────────────────────────────────────────────
             if (pillars.Any())
             {
-                AppendCityHeader(mainPart, cityDetails, "Pillar Performance Overview");
+                AppendCityHeader(mainPart, countryDetails, "Pillar Performance Overview");
                 AddPillarOverviewSection(body, mainPart, pillarChartItems);
             }
 
             // ── 4. Peer Comparison & Trends ─────────────────────────────────────────
-            if (!isAllCities && peerCities.Any())
+            if (!isAllCountries && peerCountries.Any())
             {
-                AddPeerComparisonSections(body, mainPart, peerCities, cityDetails, userRole);
-                AddPerformanceTrendSections(body, mainPart, peerCities, cityDetails, userRole);
+                AddPeerComparisonSections(body, mainPart, peerCountries, countryDetails, userRole);
+                AddPerformanceTrendSections(body, mainPart, peerCountries, countryDetails, userRole);
             }
 
             // ── 5. Per-Pillar Detail ─────────────────────────────────────────────────
             var accessiblePillars = pillars.Where(x =>
-                (x.IsAccess && userRole == UserRole.CityUser) || userRole != UserRole.CityUser).ToList();
+                (x.IsAccess && userRole == UserRole.CountryUser) || userRole != UserRole.CountryUser).ToList();
 
             foreach (var pillar in accessiblePillars)
             {
-                AppendCityHeader(mainPart, cityDetails, pillar.PillarName);
+                AppendCityHeader(mainPart, countryDetails, pillar.PillarName);
                 AddPillarSection(body, mainPart, pillar, userRole);
             }
 
             // ── 6. KPI Dashboard (LAST section) ─────────────────────────────────────
             if (kpiChartItems.Any())
             {
-                AppendCityHeader(mainPart, cityDetails, "KPI Dashboard");
+                AppendCityHeader(mainPart, countryDetails, "KPI Dashboard");
                 AddKpiDashboardSection(body, mainPart, kpiChartItems);
             }
 
@@ -252,11 +252,11 @@ namespace PeaceEnablers.Common.Implementation
 
         private void AddDashboardSection(
             Body body, MainDocumentPart mainPart,
-            AiCitySummeryDto city,
+            AiCountrySummeryDto country,
             List<PillarChartItem> pillars,
             List<KpiChartItem> kpis)
         {
-            float overall = (float)city.AIProgress.GetValueOrDefault();
+            float overall = (float)country.AIProgress.GetValueOrDefault();
             var validPillars = pillars.ToList();
             // ── Call site ────────────────────────────────────────────────────────────────
             var donutPng = RenderPng((c, s) => PaintDonut(c, s, overall), 320, 220);
@@ -557,7 +557,7 @@ namespace PeaceEnablers.Common.Implementation
         //  CITY SUMMARY SECTION
         // ════════════════════════════════════════════════════════════════════
 
-        private void AddCitySummarySection( Body body, MainDocumentPart mainPart, AiCitySummeryDto data, UserRole userRole)
+        private void AddCitySummarySection( Body body, MainDocumentPart mainPart, AiCountrySummeryDto data, UserRole userRole)
         {
             // =========================
             // PROGRESS SECTION
@@ -660,7 +660,7 @@ namespace PeaceEnablers.Common.Implementation
 
         private void AddPillarSection(
     Body body, MainDocumentPart mainPart,
-    AiCityPillarResponse data, UserRole userRole)
+    AiCountryPillarResponse data, UserRole userRole)
         {
             // =========================
             // PROGRESS SECTION
@@ -841,7 +841,7 @@ namespace PeaceEnablers.Common.Implementation
         private string? _pendingHeaderRelId = null;
 
         /// <summary>
-        /// Call once before generating any city sections to reset state.
+        /// Call once before generating any country sections to reset state.
         /// </summary>
         private void ResetSectionState() => _pendingHeaderRelId = null;
 
@@ -873,7 +873,7 @@ namespace PeaceEnablers.Common.Implementation
         /// </summary>
         private void AppendCityHeader(
             MainDocumentPart mainPart,
-            AiCitySummeryDto data,
+            AiCountrySummeryDto data,
             string? sectionTitle = null)
         {
             var body = mainPart.Document.Body!;
@@ -887,7 +887,7 @@ namespace PeaceEnablers.Common.Implementation
             var headerPart = mainPart.AddNewPart<HeaderPart>();
             var header = new Header();
 
-            string title = string.IsNullOrEmpty(sectionTitle) ? data.CityName : sectionTitle;
+            string title = string.IsNullOrEmpty(sectionTitle) ? data.CountryName : sectionTitle;
 
             string logoPath = Path.Combine(
                 Directory.GetCurrentDirectory(),
@@ -934,7 +934,7 @@ namespace PeaceEnablers.Common.Implementation
 
             leftCell.Append(
                 HeaderParagraph(title, "42", "FFFFFF", true, "40"),
-                HeaderParagraph($"{data.CityName}, {data.State}, {data.Country} | Data Year: {data.Year}", "20", "E8F3F0", false, "20"),
+                HeaderParagraph($"{data.CountryName}, {data.Continent} | Data Year: {data.Year}", "20", "E8F3F0", false, "20"),
                 HeaderParagraph($"Generated: {DateTime.Now:MMM dd, yyyy}", "16", "CFE3DD", false, "0")
             );
 
@@ -1837,49 +1837,49 @@ namespace PeaceEnablers.Common.Implementation
 
         private void AddPerformanceTrendSections(
            Body body, MainDocumentPart mainPart,
-           List<PeerCityHistoryReportDto> peerCities,
-           AiCitySummeryDto cityDetails, UserRole userRole)
+           List<PeerCountryHistoryReportDto> activeCountries,
+           AiCountrySummeryDto countryDetails, UserRole userRole)
         {
-            if (!peerCities.Any()) return;
+            if (!activeCountries.Any()) return;
 
-            var main = FindMainCity(peerCities, cityDetails);
-            var peers = peerCities.Where(p => !IsSameCity(p.CityName, cityDetails.CityName)).ToList();
-            var all = BuildAllCities(main, peers);
+            var main = FindMainCountry(activeCountries, countryDetails);
+            var peers = activeCountries.Where(p => !IsSameCountry(p.CountryName, countryDetails.CountryName)).ToList();
+            var all = BuildAllCountries(main, peers);
 
             var allYears = all
-                .SelectMany(c => c.CityHistory ?? Enumerable.Empty<PeerCityYearHistoryDto>())
+                .SelectMany(c => c.CountryHistory ?? Enumerable.Empty<PeerCountryYearHistoryDto>())
                 .Select(h => h.Year).Distinct().OrderBy(y => y).ToList();
 
             if (!allYears.Any()) return;
 
             // Historical trend
-            AppendCityHeader(mainPart, cityDetails, "Performance Trends Over Time");
+            AppendCityHeader(mainPart, countryDetails, "Performance Trends Over Time");
             var peerAvg = allYears.Select(yr =>
             {
-                var scores = peers.Select(p => p.CityHistory?.FirstOrDefault(h => h.Year == yr))
+                var scores = peers.Select(p => p.CountryHistory?.FirstOrDefault(h => h.Year == yr))
                     .Where(h => h != null).Select(h => (float)h!.ScoreProgress).ToList();
                 return (Year: yr, Avg: scores.Any() ? scores.Average() : 0f, HasData: scores.Any());
             }).ToList();
 
             var trendPng = RenderPng(
-                (c, s) => PaintMultiLineTrend(c, s, allYears, peers, main, cityDetails, peerAvg),
+                (c, s) => PaintMultiLineTrend(c, s, allYears, peers, main, countryDetails, peerAvg),
                 700, 200);
             body.AppendChild(CreateFullWidthImage(mainPart, trendPng, 200));
             body.AppendChild(Gap(100));
 
             if (main != null)
                 body.AppendChild(CreateYoYTable(allYears.TakeLast(5).ToList(),
-                    (main.CityHistory ?? new()).OrderBy(h => h.Year).ToList(),
+                    (main.CountryHistory ?? new()).OrderBy(h => h.Year).ToList(),
                     peerAvg.Select(p => (p.Year, p.Avg)).ToList()));
 
             body.AppendChild(PageBreak());
 
             // Pillar trend
-            AppendCityHeader(mainPart, cityDetails, "Pillar-Level Trend Analysis");
+            AppendCityHeader(mainPart, countryDetails, "Pillar-Level Trend Analysis");
             if (main != null)
             {
-                var pillars = (main.CityHistory ?? new())
-                    .SelectMany(h => h.Pillars ?? Enumerable.Empty<PeerCityPillarHistoryReportDto>())
+                var pillars = (main.CountryHistory ?? new())
+                    .SelectMany(h => h.Pillars ?? Enumerable.Empty<PeerCountryPillarHistoryReportDto>())
                     .GroupBy(p => p.PillarID)
                     .Select(g => g.OrderBy(p => p.DisplayOrder).First())
                     .OrderBy(p => p.DisplayOrder).Take(23).ToList();
@@ -1887,11 +1887,11 @@ namespace PeaceEnablers.Common.Implementation
                 if (pillars.Any())
                 {
                     var pillarTrendPng = RenderPng(
-                        (c, s) => PaintPillarLineChart(c, s, allYears, main.CityHistory ?? new(), pillars),
+                        (c, s) => PaintPillarLineChart(c, s, allYears, main.CountryHistory ?? new(), pillars),
                         700, 200);
                     body.AppendChild(CreateFullWidthImage(mainPart, pillarTrendPng, 200));
                     body.AppendChild(Gap(100));
-                    body.AppendChild(CreatePillarHeatmapTable(allYears, main.CityHistory ?? new(), pillars));
+                    body.AppendChild(CreatePillarHeatmapTable(allYears, main.CountryHistory ?? new(), pillars));
                 }
             }
         }
@@ -1908,17 +1908,17 @@ namespace PeaceEnablers.Common.Implementation
 
         private void AddPeerComparisonSections(
              Body body, MainDocumentPart mainPart,
-             List<PeerCityHistoryReportDto> peerCities,
-             AiCitySummeryDto cityDetails, UserRole userRole)
+             List<PeerCountryHistoryReportDto> activeCountries,
+             AiCountrySummeryDto countryDetails, UserRole userRole)
         {
-            if (!peerCities.Any()) return;
+            if (!activeCountries.Any()) return;
 
-            var main = FindMainCity(peerCities, cityDetails);
-            var peers = peerCities.Where(p => !IsSameCity(p.CityName, cityDetails.CityName)).ToList();
-            var all = BuildAllCities(main, peers);
+            var main = FindMainCountry(activeCountries, countryDetails);
+            var peers = activeCountries.Where(p => !IsSameCountry(p.CountryName, countryDetails.CountryName)).ToList();
+            var all = BuildAllCountries(main, peers);
 
             // ── 5.1  Population-Based ────────────────────────────────────────────
-            AppendCityHeader(mainPart, cityDetails, "Population-Based Peer Comparison");
+            AppendCityHeader(mainPart, countryDetails, "Population-Based Peer Comparison");
 
             var popSorted = all
                 .Where(c => c.Population.HasValue)
@@ -1928,27 +1928,27 @@ namespace PeaceEnablers.Common.Implementation
             if (popSorted.Any())
             {
                 body.AppendChild(CreateInsightBand(
-                    $"{popSorted.Count} cities compared  |  " +
-                    $"Largest: {popSorted.First().CityName} ({FormatPop(popSorted.First().Population)})  |  " +
-                    $"Smallest: {popSorted.Last().CityName} ({FormatPop(popSorted.Last().Population)})"));
+                    $"{popSorted.Count} countries compared  |  " +
+                    $"Largest: {popSorted.First().CountryName} ({FormatPop(popSorted.First().Population)})  |  " +
+                    $"Smallest: {popSorted.Last().CountryName} ({FormatPop(popSorted.Last().Population)})"));
 
                 body.AppendChild(SectionHeading("Population Size by City", DarkGreen));
                 int popH = Math.Max(popSorted.Count * 40, 80);
                 var popPng = RenderPng(
-                    (c, s) => PdfGeneratorService.DrawPopulationBarsCanvas(c, s, popSorted, cityDetails),
+                    (c, s) => PdfGeneratorService.DrawPopulationBarsCanvas(c, s, popSorted, countryDetails),
                     700, popH);
                 body.AppendChild(CreateFullWidthImage(mainPart, popPng, popH));
                 body.AppendChild(Gap(80));
-                body.AppendChild(CreateCityLegendTable(popSorted, cityDetails));
+                body.AppendChild(CreateCityLegendTable(popSorted, countryDetails));
                 body.AppendChild(Gap(120));
 
-                body.AppendChild(SectionHeading("Score vs Population  (each dot = one city)", DarkGreen));
+                body.AppendChild(SectionHeading("Score vs Population  (each dot = one country)", DarkGreen));
                 int scatterH = Math.Max(popSorted.Count * 30, 160);
                 var scatterPng = RenderPng(
                     (c, s) => PdfGeneratorService.DrawScatterPlotCanvas(
-                        c, s, popSorted, cityDetails,
-                        city => (float)(city.Population ?? 0),
-                        city => PdfGeneratorService.GetLatestScoreOrZeroForDocx(city),
+                        c, s, popSorted, countryDetails,
+                        country => (float)(country.Population ?? 0),
+                        country => PdfGeneratorService.GetLatestScoreOrZeroForDocx(country),
                         "Population", "Score"),
                     700, scatterH);
                 body.AppendChild(CreateFullWidthImage(mainPart, scatterPng, scatterH));
@@ -1956,13 +1956,13 @@ namespace PeaceEnablers.Common.Implementation
             body.AppendChild(PageBreak());
 
             // ── 5.2  Regional ────────────────────────────────────────────────────
-            AppendCityHeader(mainPart, cityDetails, "Regional Peer Group Comparison");
+            AppendCityHeader(mainPart, countryDetails, "Regional Peer Group Comparison");
             var regionPng = RenderPng((c, s) => PaintRegionalBars(c, s, all), 700, 220);
             body.AppendChild(CreateFullWidthImage(mainPart, regionPng, 220));
             body.AppendChild(PageBreak());
 
             // ── 5.3  Income-Level ────────────────────────────────────────────────
-            AppendCityHeader(mainPart, cityDetails, "Income-Level Peer Comparison");
+            AppendCityHeader(mainPart, countryDetails, "Income-Level Peer Comparison");
 
             // ══════════════════════════════════════════════════════════════════
             // IncomePeerPage — DOCX (updated with PPP section)
@@ -1972,7 +1972,7 @@ namespace PeaceEnablers.Common.Implementation
             if (withIncome.Any())
             {
                 body.AppendChild(CreateInsightBand(
-                    $"Income quartile analysis  |  {withIncome.Count} cities  |  " +
+                    $"Income quartile analysis  |  {withIncome.Count} countries  |  " +
                     $"Range: {withIncome.Min(p => p.Income):C0} – {withIncome.Max(p => p.Income):C0}"));
 
                 // ── Quartile bars ─────────────────────────────────────────────
@@ -1984,12 +1984,12 @@ namespace PeaceEnablers.Common.Implementation
                 body.AppendChild(Gap(80));
 
                 // ── Income vs Score scatter ───────────────────────────────────
-                body.AppendChild(SectionHeading("Income vs Composite Score  (each dot = one city)", DarkGreen));
+                body.AppendChild(SectionHeading("Income vs Composite Score  (each dot = one country)", DarkGreen));
                 var incScatterPng = RenderPng(
                     (c, s) => PdfGeneratorService.DrawScatterPlotCanvas(
-                        c, s, withIncome, cityDetails,
-                        city => (float)(city.Income ?? 0),
-                        city => PdfGeneratorService.GetLatestScoreOrZeroForDocx(city),
+                        c, s, withIncome, countryDetails,
+                        country => (float)(country.Income ?? 0),
+                        country => PdfGeneratorService.GetLatestScoreOrZeroForDocx(country),
                         "Income (USD)", "Score"),
                     700, 180);
                 body.AppendChild(CreateFullWidthImage(mainPart, incScatterPng, 180));
@@ -1998,61 +1998,61 @@ namespace PeaceEnablers.Common.Implementation
                 // ══════════════════════════════════════════════════════════════
                 // NEW ── PPP Analytical Section
                 // ══════════════════════════════════════════════════════════════
-                var withPpp = all.Where(p => p.PPP.HasValue && p.PPP > 0).ToList();
-                if (withPpp.Any())
-                {
-                    // Section divider heading
-                    body.AppendChild(CreateSectionDivider("Purchasing Power Parity (PPP) Analysis", DarkGreen));
+                //var withPpp = all.Where(p => p.PPP.HasValue && p.PPP > 0).ToList();
+                //if (withPpp.Any())
+                //{
+                //    // Section divider heading
+                //    body.AppendChild(CreateSectionDivider("Purchasing Power Parity (PPP) Analysis", DarkGreen));
 
-                    // Explanatory note
-                    body.AppendChild(CreateItalicNote(
-                        "PPP-adjusted income reflects real purchasing power in International Dollars, " +
-                        "correcting for local price differences. A higher PPP vs Nominal income indicates " +
-                        "a more affordable city; a lower PPP suggests high cost of living that erodes nominal " +
-                        "earnings. Use this alongside structural factors (inequality, informal markets) for a " +
-                        "complete welfare picture."));
-                    body.AppendChild(Gap(60));
+                //    // Explanatory note
+                //    body.AppendChild(CreateItalicNote(
+                //        "PPP-adjusted income reflects real purchasing power in International Dollars, " +
+                //        "correcting for local price differences. A higher PPP vs Nominal income indicates " +
+                //        "a more affordable city; a lower PPP suggests high cost of living that erodes nominal " +
+                //        "earnings. Use this alongside structural factors (inequality, informal markets) for a " +
+                //        "complete welfare picture."));
+                //    body.AppendChild(Gap(60));
 
-                    // ── Nominal vs PPP scatter ────────────────────────────────
-                    body.AppendChild(SectionHeading(
-                        "Nominal Income vs PPP-Adjusted Income  (each dot = one city)", DarkGreen));
-                    var pppScatterPng = RenderPng(
-                        (c, s) => PdfGeneratorService.DrawScatterPlotCanvas(
-                            c, s, withPpp, cityDetails,
-                            city => (float)(city.Income ?? 0),
-                            city => (float)(city.PPP ?? 0),
-                            "Nominal Income (USD)", "PPP Income (Int'l $)"),
-                        700, 180);
-                    body.AppendChild(CreateFullWidthImage(mainPart, pppScatterPng, 180));
-                    body.AppendChild(Gap(80));
+                //    // ── Nominal vs PPP scatter ────────────────────────────────
+                //    body.AppendChild(SectionHeading(
+                //        "Nominal Income vs PPP-Adjusted Income  (each dot = one city)", DarkGreen));
+                //    var pppScatterPng = RenderPng(
+                //        (c, s) => PdfGeneratorService.DrawScatterPlotCanvas(
+                //            c, s, withPpp, countryDetails,
+                //            city => (float)(city.Income ?? 0),
+                //            city => (float)(city.PPP ?? 0),
+                //            "Nominal Income (USD)", "PPP Income (Int'l $)"),
+                //        700, 180);
+                //    body.AppendChild(CreateFullWidthImage(mainPart, pppScatterPng, 180));
+                //    body.AppendChild(Gap(80));
 
-                    // ── PPP Comparison Table ──────────────────────────────────
-                    body.AppendChild(SectionHeading(
-                        "Nominal vs PPP-Adjusted Income Comparison", DarkGreen));
-                    body.AppendChild(CreatePppComparisonTable(withPpp, cityDetails));
-                    body.AppendChild(Gap(60));
+                //    // ── PPP Comparison Table ──────────────────────────────────
+                //    body.AppendChild(SectionHeading(
+                //        "Nominal vs PPP-Adjusted Income Comparison", DarkGreen));
+                //    //body.AppendChild(CreatePppComparisonTable(withPpp, countryDetails));
+                //    body.AppendChild(Gap(60));
 
-                    // ── PPP signal legend ─────────────────────────────────────
-                    body.AppendChild(CreatePppLegend());
-                    body.AppendChild(Gap(40));
+                //    // ── PPP signal legend ─────────────────────────────────────
+                //    body.AppendChild(CreatePppLegend());
+                //    body.AppendChild(Gap(40));
 
-                    // Footnote
-                    body.AppendChild(CreateFootnote(
-                        "▲ PPP adjustment moves city to a higher income category.  " +
-                        "▼ PPP adjustment moves city to a lower income category.  " +
-                        "Signal Ratio = PPP ÷ Nominal Income."));
-                    body.AppendChild(Gap(80));
-                }
+                //    // Footnote
+                //    body.AppendChild(CreateFootnote(
+                //        "▲ PPP adjustment moves city to a higher income category.  " +
+                //        "▼ PPP adjustment moves city to a lower income category.  " +
+                //        "Signal Ratio = PPP ÷ Nominal Income."));
+                //    body.AppendChild(Gap(80));
+                //}
 
                 // ── Top performers by income group (PPP column added) ─────────
                 body.AppendChild(SectionHeading("Top Performers by Income Group", DarkGreen));
-                body.AppendChild(CreateIncomeGroupTable(all, cityDetails));
+                body.AppendChild(CreateIncomeGroupTable(all, countryDetails));
             }
             body.AppendChild(PageBreak());
 
             // ── 5.5  Relative Ranking ────────────────────────────────────────────
-            AppendCityHeader(mainPart, cityDetails, "Relative Ranking Among Peer Cities");
-            AddRankingSection(body, mainPart, all, cityDetails);
+            AppendCityHeader(mainPart, countryDetails, "Relative Ranking Among Peer Countries");
+            AddRankingSection(body, mainPart, all, countryDetails);
         }
 
         // ════════════════════════════════════════════════════════════════════════
@@ -2061,24 +2061,24 @@ namespace PeaceEnablers.Common.Implementation
 
         private void AddRankingSection(
             Body body, MainDocumentPart mainPart,
-            List<PeerCityHistoryReportDto> all,
-            AiCitySummeryDto cityDetails)
+            List<PeerCountryHistoryReportDto> all,
+            AiCountrySummeryDto countryDetails)
         {
             var ranked = all
                 .Select(c => (City: c, Score: GetLatestScoreOrZero(c)))
                 .OrderByDescending(x => x.Score)
                 .ToList();
 
-            int mainRank = ranked.FindIndex(r => IsSameCity(r.City.CityName, cityDetails.CityName)) + 1;
+            int mainRank = ranked.FindIndex(r => IsSameCountry(r.City.CountryName, countryDetails.CountryName)) + 1;
             float mainScore = mainRank > 0 ? ranked[mainRank - 1].Score : 0f;
             float pctile = mainRank > 0 ? (1f - (float)mainRank / ranked.Count) * 100f : 0f;
 
             // Hero banner
-            body.AppendChild(CreateHeroBanner(cityDetails, mainRank, ranked.Count, mainScore, pctile));
+            body.AppendChild(CreateHeroBanner(countryDetails, mainRank, ranked.Count, mainScore, pctile));
             body.AppendChild(Gap(120));
 
             // Score distribution histogram
-            body.AppendChild(SectionHeading("Score Distribution Among All Cities", DarkGreen));
+            body.AppendChild(SectionHeading("Score Distribution Among All Countries", DarkGreen));
             var histPng = RenderPng(
                 (c, s) => PdfGeneratorService.DrawHistogramCanvas(
                     c, s, ranked.Select(r => r.Score).ToList(), mainScore, 10),
@@ -2091,7 +2091,7 @@ namespace PeaceEnablers.Common.Implementation
             var rows = ranked.Select((r, i) => new[]
             {
         (i + 1).ToString(),
-        r.City.CityName,
+        r.City.CountryName,
         r.City.Country    ?? "—",
         r.City.Region     ?? "—",
         FormatPop(r.City.Population),
@@ -2102,7 +2102,7 @@ namespace PeaceEnablers.Common.Implementation
                 new[] { "#", "City", "Country", "Region", "Pop.", "Score" },
                 new[] { 360, 2000, 1300, 1400, 1000, 900 },
                 rows,
-                highlightRow: i => IsSameCity(ranked[i].City.CityName, cityDetails.CityName)));
+                highlightRow: i => IsSameCountry(ranked[i].City.CountryName, countryDetails.CountryName)));
             body.AppendChild(PageBreak());
         }
 
@@ -2137,7 +2137,7 @@ namespace PeaceEnablers.Common.Implementation
         /// Dark-green hero banner: rank left, score right — mirrors the PDF RelativeRankingPage banner.
         /// </summary>
         private static Table CreateHeroBanner(
-            AiCitySummeryDto cityDetails,
+            AiCountrySummeryDto countryDetails,
             int rank, int total, float score, float pctile)
         {
             var noBorder = new EnumValue<BorderValues>(BorderValues.None);
@@ -2171,7 +2171,7 @@ namespace PeaceEnablers.Common.Implementation
                         new RunProperties(
                             new Color { Val = "A5D6C2" },
                             new FontSize { Val = "22" }, new RunFonts { Ascii = "Arial" }),
-                        new Text($"{cityDetails.CityName}  ·  {cityDetails.Country}")))));
+                        new Text($"{countryDetails.CountryName}  ·  {countryDetails.Continent}")))));
 
             // Right cell – score + percentile
             row.AppendChild(new TableCell(
@@ -2213,79 +2213,51 @@ namespace PeaceEnablers.Common.Implementation
 
         /// <summary>Income group table matching PDF IncomePeerPage top-performers table.</summary>
         private static Table CreateIncomeGroupTable(
-            List<PeerCityHistoryReportDto> all,
-            AiCitySummeryDto cityDetails)
+            List<PeerCountryHistoryReportDto> all,
+            AiCountrySummeryDto countryDetails)
         {
             string[] categoryOrder = { "Low Income", "Lower-Middle Income", "Upper-Middle Income", "High Income" };
+
             var segments = all
                 .GroupBy(x => PdfGeneratorService.GetIncomeCategory(x.Income ?? 0))
                 .ToDictionary(g => g.Key, g => g.ToList());
 
-            // Build ordered row list so highlight index works correctly
-            var orderedCities = new List<PeerCityHistoryReportDto>();
+            var orderedCountries = new List<PeerCountryHistoryReportDto>();
             foreach (var label in categoryOrder)
-                if (segments.TryGetValue(label, out var cities))
-                    orderedCities.AddRange(cities.OrderByDescending(c => GetLatestScoreOrZero(c)));
+                if (segments.TryGetValue(label, out var countries))
+                    orderedCountries.AddRange(countries.OrderByDescending(c => GetLatestScoreOrZero(c)));
 
-            var rows = orderedCities.Select(city =>
+            var rows = orderedCountries.Select(country =>
             {
-                float sc = GetLatestScoreOrZero(city);
+                float sc = GetLatestScoreOrZero(country);
 
-                // PPP display: value if available, "—" if not
-                string pppDisplay = (city.PPP.HasValue && city.PPP > 0)
-                    ? FormatPop(city.PPP)
-                    : "—";
                 return new[]
                 {
-            city.CityName,
-            city.Country ?? "—",
-            sc < 0 ? "—" : $"{sc:F1}",
-             PdfGeneratorService.GetIncomeCategory(city.Income ?? 0),
-            FormatPop(city.Income),
-            pppDisplay         
-        };
+                    country.CountryName,
+                    country.Country ?? "—",
+                    sc < 0 ? "—" : $"{sc:F1}",
+                    PdfGeneratorService.GetIncomeCategory(country.Income ?? 0),
+                    FormatPop(country.Income)         // ← NEW column
+                };
             }).ToArray();
+
             return CreateStyledTableWithCellColors(
-                headers: new[] { "City", "Country", "Score", "Income Group", "Income", "PPP (Int'l $)" },
-                widths: new[] { 1800, 1000, 700, 2000, 1200, 1300 },
+                headers: new[] { "City", "Country", "Score", "Income Group", "Income" },
+                widths: new[] { 1800, 1000, 700, 2000, 1200 },
                 rows: rows,
-                highlightRow: i => IsSameCity(orderedCities[i].CityName, cityDetails.CityName),
-                cellColor: (rowIdx, colIdx) =>
-                {
-                    // PPP column (col 5) — tint green if PPP > Income, red if less
-                    if (colIdx == 5)
-                    {
-                        var city = orderedCities[rowIdx];
-                        if (!city.PPP.HasValue || city.PPP <= 0) return null;
-                        return city.PPP > city.Income ? "E8F5E9"
-                             : city.PPP < city.Income ? "FFEBEE"
-                             : null;
-                    }
-                    return null;
-                },
-                cellFontColor: (rowIdx, colIdx) =>
-                {
-                    if (colIdx == 5)
-                    {
-                        var city = orderedCities[rowIdx];
-                        if (!city.PPP.HasValue || city.PPP <= 0) return null;
-                        return city.PPP > city.Income ? "2E7D32"
-                             : city.PPP < city.Income ? "D9534F"
-                             : null;
-                    }
-                    return null;
-                });
-        }        
+                highlightRow: i => IsSameCountry(orderedCountries[i].CountryName, countryDetails.CountryName)
+                );
+        }
 
         private static Table CreateCityLegendTable(
-            List<PeerCityHistoryReportDto> allCities, AiCitySummeryDto cityDetails)
+            List<PeerCountryHistoryReportDto> allCountries, AiCountrySummeryDto countryDetails)
         {
             string[] palette = { "F0B429", "4CAF8A", "1E88E5", "FB8C00", "7B61FF", "E05252" };
             var rows = new List<string[]>();
-            for (int i = 0; i < allCities.Count; i++)
+            for (int i = 0; i < allCountries.Count; i++)
             {
-                bool isMain = IsSameCity(allCities[i].CityName, cityDetails.CityName);
-                rows.Add(new[] { isMain ? "★" : "•", allCities[i].CityName, allCities[i].Country ?? "—" });
+                bool isMain = IsSameCountry(allCountries[i].CountryName, countryDetails.CountryName);
+                rows.Add(new[] { isMain ? "★" : "•", allCountries[i].CountryName, allCountries[i].Country ?? "—" });
             }
             return CreateStyledTable(
                 new[] { "", "City", "Country" },
@@ -2349,7 +2321,7 @@ namespace PeaceEnablers.Common.Implementation
 
         private static Table CreateYoYTable(
             List<int> years,
-            List<PeerCityYearHistoryDto> mainHistory,
+            List<PeerCountryYearHistoryDto> mainHistory,
             List<(int Year, float Avg)> peerAvg)
         {
             int yearW = (ContentDxa - 1300) / Math.Max(years.Count, 1);
@@ -2438,8 +2410,8 @@ namespace PeaceEnablers.Common.Implementation
 
         private static Table CreatePillarHeatmapTable(
             List<int> allYears,
-            List<PeerCityYearHistoryDto> history,
-            List<PeerCityPillarHistoryReportDto> pillars)
+            List<PeerCountryYearHistoryDto> history,
+            List<PeerCountryPillarHistoryReportDto> pillars)
         {
             int yearW   = Math.Max(400, (ContentDxa - 1600) / Math.Max(allYears.Count, 1));
             var table   = new Table(new TableProperties(
@@ -2628,20 +2600,20 @@ namespace PeaceEnablers.Common.Implementation
             SKCanvas c, QPDF.Size s, List<PillarChartItem> pillars) =>
             PdfGeneratorService.DrawPillarHorizontalBarsCanvas(c, s, pillars);
         private static void PaintRegionalBars(
-            SKCanvas c, QPDF.Size s, List<PeerCityHistoryReportDto> all) =>
+            SKCanvas c, QPDF.Size s, List<PeerCountryHistoryReportDto> all) =>
             PdfGeneratorService.DrawRegionalBarsCanvas(c, s, all);
 
         private static void PaintMultiLineTrend(
             SKCanvas c, QPDF.Size s,
-            List<int> years, List<PeerCityHistoryReportDto> peers,
-            PeerCityHistoryReportDto? main, AiCitySummeryDto details,
+            List<int> years, List<PeerCountryHistoryReportDto> peers,
+            PeerCountryHistoryReportDto? main, AiCountrySummeryDto details,
             List<(int Year, float Avg, bool HasData)> avg) =>
             PdfGeneratorService.DrawMultiLineTrendChartCanvas(c, s, years, peers, main, details, avg);
 
         private static void PaintPillarLineChart(
             SKCanvas c, QPDF.Size s,
-            List<int> years, List<PeerCityYearHistoryDto> history,
-            List<PeerCityPillarHistoryReportDto> pillars) =>
+            List<int> years, List<PeerCountryYearHistoryDto> history,
+            List<PeerCountryPillarHistoryReportDto> pillars) =>
             PdfGeneratorService.DrawPillarLineChartCanvas(c, s, years, history, pillars);
 
         // ════════════════════════════════════════════════════════════════════
@@ -2712,21 +2684,21 @@ namespace PeaceEnablers.Common.Implementation
             return $"#{r:X2}{g:X2}{b:X2}";
         }
 
-        private static float GetLatestScoreOrZero(PeerCityHistoryReportDto city) =>
-            city.CityHistory?.OrderByDescending(h => h.Year).FirstOrDefault() is { } last
+        private static float GetLatestScoreOrZero(PeerCountryHistoryReportDto country) =>
+            country.CountryHistory?.OrderByDescending(h => h.Year).FirstOrDefault() is { } last
                 ? (float)last.ScoreProgress : -1f;
 
-        private static PeerCityHistoryReportDto? FindMainCity(
-            List<PeerCityHistoryReportDto> all, AiCitySummeryDto city) =>
-            all.FirstOrDefault(p => IsSameCity(p.CityName, city.CityName));
+        private static PeerCountryHistoryReportDto? FindMainCountry(
+            List<PeerCountryHistoryReportDto> all, AiCountrySummeryDto country) =>
+            all.FirstOrDefault(p => IsSameCountry(p.CountryName, country.CountryName));
 
-        private static bool IsSameCity(string? a, string? b) =>
+        private static bool IsSameCountry(string? a, string? b) =>
             string.Equals(a?.Trim(), b?.Trim(), StringComparison.OrdinalIgnoreCase);
 
-        private static List<PeerCityHistoryReportDto> BuildAllCities(
-            PeerCityHistoryReportDto? main, List<PeerCityHistoryReportDto> peers)
+        private static List<PeerCountryHistoryReportDto> BuildAllCountries(
+            PeerCountryHistoryReportDto? main, List<PeerCountryHistoryReportDto> peers)
         {
-            var list = new List<PeerCityHistoryReportDto>();
+            var list = new List<PeerCountryHistoryReportDto>();
             if (main != null) list.Add(main);
             list.AddRange(peers);
             return list;
@@ -2866,113 +2838,113 @@ namespace PeaceEnablers.Common.Implementation
         // NEW HELPER — CreatePppComparisonTable
         // ══════════════════════════════════════════════════════════════════
 
-        private static Table CreatePppComparisonTable(
-            List<PeerCityHistoryReportDto> cities,
-            AiCitySummeryDto cityDetails)
-        {
-            var orderedCities = cities
-                .OrderByDescending(c => c.PPP ?? 0)
-                .ToList();
+        //private static Table CreatePppComparisonTable(
+        //    List<PeerCountryHistoryReportDto> countries,
+        //    AiCountrySummeryDto countryDetails)
+        //{
+        //    var orderedCities = countries
+        //        .OrderByDescending(c => c.PPP ?? 0)
+        //        .ToList();
 
-            var rows = orderedCities.Select(city =>
-            {
-                float score = GetLatestScoreOrZero(city);
-                decimal nominal = city.Income ?? 0;
-                decimal ppp = city.PPP ?? 0;
-                decimal diff = ppp - nominal;
-                decimal ratio = nominal > 0 ? Math.Round(ppp / nominal, 2) : 1m;
+        //    var rows = orderedCities.Select(city =>
+        //    {
+        //        float score = GetLatestScoreOrZero(city);
+        //        decimal nominal = city.Income ?? 0;
+        //        decimal ppp = city.PPP ?? 0;
+        //        decimal diff = ppp - nominal;
+        //        decimal ratio = nominal > 0 ? Math.Round(ppp / nominal, 2) : 1m;
 
-                string nomCat = PdfGeneratorService.GetIncomeCategory(nominal);
-                string pppCat = PdfGeneratorService.GetIncomeCategory(ppp);
-                bool upgraded = pppCat != nomCat && ppp > nominal;
-                bool downgraded = pppCat != nomCat && ppp < nominal;
+        //        string nomCat = PdfGeneratorService.GetIncomeCategory(nominal);
+        //        string pppCat = PdfGeneratorService.GetIncomeCategory(ppp);
+        //        bool upgraded = pppCat != nomCat && ppp > nominal;
+        //        bool downgraded = pppCat != nomCat && ppp < nominal;
 
-                string signalLabel = ratio switch
-                {
-                    >= 2.0m => "Strong PPP Advantage",
-                    >= 1.3m => "Moderate PPP Advantage",
-                    >= 0.9m => "Near-Parity",
-                    >= 0.7m => "Cost Pressure",
-                    _ => "High Cost Penalty"
-                };
+        //        string signalLabel = ratio switch
+        //        {
+        //            >= 2.0m => "Strong PPP Advantage",
+        //            >= 1.3m => "Moderate PPP Advantage",
+        //            >= 0.9m => "Near-Parity",
+        //            >= 0.7m => "Cost Pressure",
+        //            _ => "High Cost Penalty"
+        //        };
 
-                string diffStr = diff >= 0
-                    ? $"+{FormatPop(diff)}"
-                    : $"-{FormatPop(Math.Abs(diff))}";
+        //        string diffStr = diff >= 0
+        //            ? $"+{FormatPop(diff)}"
+        //            : $"-{FormatPop(Math.Abs(diff))}";
 
-                string pppDisplay = FormatPop(ppp) + (upgraded ? " ▲" : downgraded ? " ▼" : "");
+        //        string pppDisplay = FormatPop(ppp) + (upgraded ? " ▲" : downgraded ? " ▼" : "");
 
-                return new[]
-                {
-            city.CityName,
-            city.Country ?? "—",
-            score < 0 ? "—" : $"{score:F1}",
-            FormatPop(nominal),
-            pppDisplay,
-            diffStr,
-            signalLabel
-        };
-            }).ToArray();
+        //        return new[]
+        //        {
+        //    city.CityName,
+        //    city.Country ?? "—",
+        //    score < 0 ? "—" : $"{score:F1}",
+        //    FormatPop(nominal),
+        //    pppDisplay,
+        //    diffStr,
+        //    signalLabel
+        //};
+        //    }).ToArray();
 
-            // Column widths: City, Country, Score, Nominal, PPP, Diff, Signal
-            var table = CreateStyledTableWithCellColors(
-                headers: new[] { "City", "Country", "Score", "Nominal (USD)", "PPP (Int'l $)", "Δ Difference", "Signal" },
-                widths: new[] { 1800, 1000, 700, 1300, 1300, 1100, 1600 },
-                rows: rows,
-                highlightRow: i => IsSameCity(orderedCities[i].CityName, cityDetails.CityName),
-                cellColor: (rowIdx, colIdx) =>
-                {
-                    var city = orderedCities[rowIdx];
-                    decimal nominal = city.Income ?? 0;
-                    decimal ppp = city.PPP ?? 0;
-                    decimal ratio = nominal > 0 ? Math.Round(ppp / nominal, 2) : 1m;
+        //    // Column widths: City, Country, Score, Nominal, PPP, Diff, Signal
+        //    var table = CreateStyledTableWithCellColors(
+        //        headers: new[] { "City", "Country", "Score", "Nominal (USD)", "PPP (Int'l $)", "Δ Difference", "Signal" },
+        //        widths: new[] { 1800, 1000, 700, 1300, 1300, 1100, 1600 },
+        //        rows: rows,
+        //        highlightRow: i => IsSameCountry(orderedCities[i].CityName, countryDetails.CountryName),
+        //        cellColor: (rowIdx, colIdx) =>
+        //        {
+        //            var city = orderedCities[rowIdx];
+        //            decimal nominal = city.Income ?? 0;
+        //            decimal ppp = city.PPP ?? 0;
+        //            decimal ratio = nominal > 0 ? Math.Round(ppp / nominal, 2) : 1m;
 
-                    // PPP column (col 4) — green if up, red if down
-                    if (colIdx == 4)
-                        return ppp > nominal ? "E8F5E9" : ppp < nominal ? "FFEBEE" : null;
+        //            // PPP column (col 4) — green if up, red if down
+        //            if (colIdx == 4)
+        //                return ppp > nominal ? "E8F5E9" : ppp < nominal ? "FFEBEE" : null;
 
-                    // Diff column (col 5)
-                    if (colIdx == 5)
-                        return ppp >= nominal ? "E8F5E9" : "FFEBEE";
+        //            // Diff column (col 5)
+        //            if (colIdx == 5)
+        //                return ppp >= nominal ? "E8F5E9" : "FFEBEE";
 
-                    // Signal column (col 6)
-                    if (colIdx == 6)
-                        return ratio switch
-                        {
-                            >= 2.0m => "E8F5E9",  // light green
-                            >= 1.3m => "E3F2FD",  // light blue
-                            >= 0.9m => "F5F5F5",  // light grey
-                            >= 0.7m => "FFF8E1",  // light amber
-                            _ => "FFEBEE"   // light red
-                        };
+        //            // Signal column (col 6)
+        //            if (colIdx == 6)
+        //                return ratio switch
+        //                {
+        //                    >= 2.0m => "E8F5E9",  // light green
+        //                    >= 1.3m => "E3F2FD",  // light blue
+        //                    >= 0.9m => "F5F5F5",  // light grey
+        //                    >= 0.7m => "FFF8E1",  // light amber
+        //                    _ => "FFEBEE"   // light red
+        //                };
 
-                    return null;
-                },
-                cellFontColor: (rowIdx, colIdx) =>
-                {
-                    var city = orderedCities[rowIdx];
-                    decimal nominal = city.Income ?? 0;
-                    decimal ppp = city.PPP ?? 0;
-                    decimal ratio = nominal > 0 ? Math.Round(ppp / nominal, 2) : 1m;
+        //            return null;
+        //        },
+        //        cellFontColor: (rowIdx, colIdx) =>
+        //        {
+        //            var city = orderedCities[rowIdx];
+        //            decimal nominal = city.Income ?? 0;
+        //            decimal ppp = city.PPP ?? 0;
+        //            decimal ratio = nominal > 0 ? Math.Round(ppp / nominal, 2) : 1m;
 
-                    if (colIdx == 4 || colIdx == 5)
-                        return ppp >= nominal ? "2E7D32" : "D9534F";
+        //            if (colIdx == 4 || colIdx == 5)
+        //                return ppp >= nominal ? "2E7D32" : "D9534F";
 
-                    if (colIdx == 6)
-                        return ratio switch
-                        {
-                            >= 2.0m => "2E7D32",
-                            >= 1.3m => "0277BD",
-                            >= 0.9m => "555555",
-                            >= 0.7m => "E65100",
-                            _ => "D9534F"
-                        };
+        //            if (colIdx == 6)
+        //                return ratio switch
+        //                {
+        //                    >= 2.0m => "2E7D32",
+        //                    >= 1.3m => "0277BD",
+        //                    >= 0.9m => "555555",
+        //                    >= 0.7m => "E65100",
+        //                    _ => "D9534F"
+        //                };
 
-                    return null;
-                });
+        //            return null;
+        //        });
 
-            return table;
-        }
+        //    return table;
+        //}
 
 
         // ══════════════════════════════════════════════════════════════════

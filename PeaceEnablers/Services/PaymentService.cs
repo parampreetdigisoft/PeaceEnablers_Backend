@@ -32,7 +32,7 @@ namespace PeaceEnablers.Services
             try
             {
                 var user = await _context.Users.FindAsync(request.UserID);
-                if (user == null || user?.Role != UserRole.CityUser) return ResultResponseDto<CheckoutSessionResponse>.Failure(new string[] { "Invalid user" });
+                if (user == null || user?.Role != UserRole.CountryUser) return ResultResponseDto<CheckoutSessionResponse>.Failure(new string[] { "Invalid user" });
 
                 await CancelSessionIfPaymentNotCompelete(request);
                 var payment = new PaymentRecord
@@ -132,7 +132,7 @@ namespace PeaceEnablers.Services
                 // idempotent update: only change if pending
                 payment.PaymentStatus = PaymentStatus.Succeeded;
                 var user = await _context.Users.FindAsync(request.UserID);
-                if (user != null && user.Role == UserRole.CityUser)
+                if (user != null && user.Role == UserRole.CountryUser)
                 {
                     user.Tier = payment.Tier;
                     _context.Users.Update(user);

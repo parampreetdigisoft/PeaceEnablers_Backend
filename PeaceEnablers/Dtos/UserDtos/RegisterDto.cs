@@ -13,7 +13,7 @@ namespace PeaceEnablers.Dtos.UserDtos
     public class InviteUserDto : RegisterDto
     {
         public int InvitedUserID { get; set; }
-        public List<int> CityID { get; set; } = new();
+        public List<int> CountryID { get; set; } = new();
 
     }
 

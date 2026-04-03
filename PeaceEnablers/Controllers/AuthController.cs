@@ -1,8 +1,7 @@
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-
-using PeaceEnablers.Dtos.CityDto;
+using PeaceEnablers.Dtos.CountryDto;
 using PeaceEnablers.Dtos.EmailExistDto;
 using PeaceEnablers.Dtos.UserDtos;
 using PeaceEnablers.IServices;
@@ -59,10 +58,10 @@ namespace PeaceEnablers.Controllers
             return Ok(response);
         }
 
-        [HttpPost("CityUserSignUp")]
-        public async Task<IActionResult> CityUserSignUp([FromBody] CityUserSignUpDto request)
+        [HttpPost("CountryUserSignUp")]
+        public async Task<IActionResult> CountryUserSignUp([FromBody] CountryUserSignUpDto request)
         {
-            var user = await _authService.CityUserSignUp(request);
+            var user = await _authService.CountryUserSignUp(request);
             return Ok(user);
         }
 
@@ -155,7 +154,7 @@ namespace PeaceEnablers.Controllers
 
         [HttpPost("sendMailForEditAssessment")]
         [Authorize]
-        public async Task<IActionResult> SendMailForEditAssessment([FromBody] SendRequestMailToUpdateCity request)
+        public async Task<IActionResult> SendMailForEditAssessment([FromBody] SendRequestMailToUpdateCountry request)
         {
             var user = await _authService.SendMailForEditAssessment(request);
             if (user == null)

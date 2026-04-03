@@ -12,25 +12,25 @@ namespace PeaceEnablers.Backgroundjob
         }
         public string Type { get; set; } = string.Empty;
         public int? UserID { get; set; }
-        public int? CityID { get; set; }
-        public bool CityEnable { get; set; }
+        public int? CountryID { get; set; }
+        public bool CountryEnable { get; set; }
         public bool PillarEnable { get; set; }
         public bool QuestionEnable { get; set; }
-        public string InsertAnalyticalLayerResults(int cityID = 0)
+        public string InsertAnalyticalLayerResults(int countryID = 0)
         {
-            CityID = cityID;
+            CountryID = countryID;
             Type = "InsertAnalyticalLayerResults";
             channelService.Write(this);
             return "Execution has been started";
         }
 
-        public Task AiResearchByCityId(int cityID , bool cityEnable,bool pillarEnable, bool questionEnable)
+        public Task AiResearchByCountryId(int countryID , bool countryEnable,bool pillarEnable, bool questionEnable)
         {
-            this.CityID = cityID;
-            this.CityEnable = cityEnable;
+            this.CountryID = countryID;
+            this.CountryEnable = countryEnable;
             this.PillarEnable = pillarEnable;
             this.QuestionEnable = questionEnable;
-            Type = "AiResearchByCityId";
+            Type = "AiResearchByCountryId";
             channelService.Write(this);
             return Task.CompletedTask;
         }

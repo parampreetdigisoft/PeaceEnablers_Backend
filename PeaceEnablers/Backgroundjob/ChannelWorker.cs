@@ -26,7 +26,7 @@ namespace PeaceEnablers.Backgroundjob
             _actionHandlers = new Dictionary<string, Func<Download, Task>>
             {
                 { "InsertAnalyticalLayerResults", InsertAnalyticalLayerResults },
-                { "AiResearchByCityId", AiResearchByCityId },
+                { "AiResearchByCountryId", AiResearchByCountryId },
             };
         }
         #endregion
@@ -43,7 +43,7 @@ namespace PeaceEnablers.Backgroundjob
                     {
                         if (queueItem.Type == "InsertAnalyticalLayerResults")
                         {
-                            await DebounceAsync(queueItem.CityID ?? 0,
+                            await DebounceAsync(queueItem.CountryID ?? 0,
                                 () => action(queueItem));
                         }
                         else
@@ -63,9 +63,9 @@ namespace PeaceEnablers.Backgroundjob
 
         #region Debounce
 
-        private async Task DebounceAsync(int cityId, Func<Task> action)
+        private async Task DebounceAsync(int countryId, Func<Task> action)
         {
-            var cts = _debounceTokens.AddOrUpdate(cityId, _ => new CancellationTokenSource(), (_, existing) =>
+            var cts = _debounceTokens.AddOrUpdate(countryId, _ => new CancellationTokenSource(), (_, existing) =>
             {
                 existing.Cancel();
                 existing.Dispose();
@@ -76,7 +76,7 @@ namespace PeaceEnablers.Backgroundjob
             {
                 await Task.Delay(_debounceInterval, cts.Token);
 
-                var semaphore = _cityLocks.GetOrAdd(cityId, _ => new SemaphoreSlim(1, 1));
+                var semaphore = _cityLocks.GetOrAdd(countryId, _ => new SemaphoreSlim(1, 1));
                 await semaphore.WaitAsync(cts.Token);
 
                 try
@@ -94,7 +94,7 @@ namespace PeaceEnablers.Backgroundjob
             }
             finally
             {
-                _debounceTokens.TryRemove(cityId, out _);
+                _debounceTokens.TryRemove(countryId, out _);
             }
         }
 
@@ -108,14 +108,14 @@ namespace PeaceEnablers.Backgroundjob
             var _appLogger = scope.ServiceProvider.GetRequiredService<IAppLogger>();
             var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-            var cityIdParam = new SqlParameter("@CityID", channel.CityID ?? 0);
+            var countryIdParam = new SqlParameter("@CountryID", channel.CountryID ?? 0);
 
             try
             {
                 await ExecuteWithRetry(
                     async () =>
                     {
-                        await dbContext.Database.ExecuteSqlRawAsync("EXEC sp_InsertAnalyticalLayerResults @CityID", cityIdParam);
+                        await dbContext.Database.ExecuteSqlRawAsync("EXEC sp_InsertAnalyticalLayerResults @CountryID", countryIdParam);
                     },
                     onFinalFailure: ex =>
                     {
@@ -126,7 +126,7 @@ namespace PeaceEnablers.Backgroundjob
                 await ExecuteWithRetry(
                     async () =>
                     {
-                        await dbContext.Database.ExecuteSqlRawAsync("EXEC sp_AiRecalculateCityScore @CityID", cityIdParam);
+                        await dbContext.Database.ExecuteSqlRawAsync("EXEC sp_AiRecalculateCountryScore @CountryID", countryIdParam);
                     },
                     onFinalFailure: ex =>
                     {
@@ -137,7 +137,7 @@ namespace PeaceEnablers.Backgroundjob
                 await ExecuteWithRetry(
                     async () =>
                     {
-                        await dbContext.Database.ExecuteSqlRawAsync("EXEC sp_AiInsertAnalyticalLayerResults @CityID", cityIdParam);
+                        await dbContext.Database.ExecuteSqlRawAsync("EXEC sp_AiInsertAnalyticalLayerResults @CountryID", countryIdParam);
                     },
                     onFinalFailure: ex =>
                     {
@@ -177,25 +177,25 @@ namespace PeaceEnablers.Backgroundjob
 
 
         #endregion
-        
-        #region AiResearchByCityId
 
-        private async Task AiResearchByCityId(Download channel)
+        #region AiResearchByCountryId
+
+        private async Task AiResearchByCountryId(Download channel)
         {
             try
             {
                 using var scope = _serviceProvider.CreateScope();
                 var aiService = scope.ServiceProvider.GetRequiredService<IAIAnalyzeService>();
-                if(channel.CityID > 0)
+                if(channel.CountryID > 0)
                 {
                     if (channel.QuestionEnable)
-                        await aiService.AnalyzeQuestionsOfCity(channel.CityID.Value);
+                        await aiService.AnalyzeQuestionsOfCountry(channel.CountryID.Value);
 
                     if (channel.PillarEnable)
-                        await aiService.AnalyzeCityPillars(channel.CityID.Value);
+                        await aiService.AnalyzeCountryPillars(channel.CountryID.Value);
 
-                    if (channel.CityEnable)
-                        await aiService.AnalyzeSingleCity(channel.CityID.Value);
+                    if (channel.CountryEnable)
+                        await aiService.AnalyzeSingleCountry(channel.CountryID.Value);
                 }
 
                 
@@ -204,7 +204,7 @@ namespace PeaceEnablers.Backgroundjob
             {
                 using var scope = _serviceProvider.CreateScope();
                 var _appLogger = scope.ServiceProvider.GetRequiredService<IAppLogger>();
-                await _appLogger.LogAsync("AiResearchByCityId", ex);
+                await _appLogger.LogAsync("AiResearchByCountryId", ex);
             }
         }
         #endregion

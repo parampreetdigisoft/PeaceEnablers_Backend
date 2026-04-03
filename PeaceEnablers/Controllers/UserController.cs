@@ -32,14 +32,14 @@ namespace PeaceEnablers.Controllers
             return null;
         }
         [HttpGet]
-        [Route("GetUserByRoleWithAssignedCity")]
-        public async Task<IActionResult> GetUserByRoleWithAssignedCity([FromQuery] GetUserByRoleRequestDto request)
+        [Route("GetUserByRoleWithAssignedCountry")]
+        public async Task<IActionResult> GetUserByRoleWithAssignedCountry([FromQuery] GetUserByRoleRequestDto request)
         {
             var claimUserId = GetUserIdFromClaims();
             if (claimUserId == null || claimUserId != request.UserID)
                 return Unauthorized("User ID not found.");
 
-            return Ok(await _userService.GetUserByRoleWithAssignedCity(request));
+            return Ok(await _userService.GetUserByRoleWithAssignedCountry(request));
         }
 
         [HttpGet]
@@ -67,8 +67,8 @@ namespace PeaceEnablers.Controllers
 
         [HttpGet]
         [Authorize(Policy = "AdminOnly")]
-        [Route("getUsersAssignedToCity/{cityID}")]
-        public async Task<IActionResult> GetUsersAssignedToCity(int cityID) => Ok(await _userService.GetUsersAssignedToCity(cityID));
+        [Route("getUsersAssignedToCountry/{countryID}")]
+        public async Task<IActionResult> GetUsersAssignedToCountry(int countryID) => Ok(await _userService.GetUsersAssignedToCountry(countryID));
     }
 
     public class RegisterRequest

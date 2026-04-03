@@ -2,13 +2,13 @@
 {
     public interface IAIAnalyzeService
     {
-        Task AnalyzeAllCitiesFull();
-        Task AnalyzeSingleCityFull(int cityId);
-        Task AnalyzeSingleCity(int cityId);
-        Task AnalyzeCityPillars(int cityId);
-        Task AnalyzeSinglePillar(int cityId, int pillarId);
-        Task AnalyzeQuestionsOfCity(int cityId);
-        Task AnalyzeQuestionsOfCityPillar(int cityId, int pillarId);
+        Task AnalyzeAllCountriesFull();
+        Task AnalyzeSingleCountryFull(int countryId);
+        Task AnalyzeSingleCountry(int countryId);
+        Task AnalyzeCountryPillars(int countryId);
+        Task AnalyzeSinglePillar(int countryId, int pillarId);
+        Task AnalyzeQuestionsOfCountry(int countryId);
+        Task AnalyzeQuestionsOfCountryPillar(int countryId, int pillarId);
 
         Task RunEvery2HoursJob();
         Task RunMonthlyJob();

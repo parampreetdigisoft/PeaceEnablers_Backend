@@ -44,8 +44,8 @@ namespace PeaceEnablers.Controllers
         {
             return Ok(await _aIComputationService.GetAITrustLevels());
         }
-        [HttpGet("getAICities")]
-        public async Task<IActionResult> GetAICities([FromQuery] AiCitySummeryRequestDto request)
+        [HttpGet("getAICountries")]
+        public async Task<IActionResult> GetAICountries([FromQuery] AiCountrySummeryRequestDto request)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -60,11 +60,11 @@ namespace PeaceEnablers.Controllers
                 return Unauthorized("You Don't have access.");
             }
 
-            return Ok(await _aIComputationService.GetAICities(request, userId.Value, userRole));
+            return Ok(await _aIComputationService.GetAICountries(request, userId.Value, userRole));
         }
 
-        [HttpGet("getAICityPillars")]
-        public async Task<IActionResult> GetAICityPillars([FromQuery] AiCityPillarRequestDto request)
+        [HttpGet("getAICountryPillars")]
+        public async Task<IActionResult> GetAICountryPillars([FromQuery] AiCountryPillarRequestDto request)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -79,11 +79,11 @@ namespace PeaceEnablers.Controllers
                 return Unauthorized("You Don't have access.");
             }
 
-            return Ok(await _aIComputationService.GetAICityPillars(request.CityID, userId.Value, userRole, request.Year));
+            return Ok(await _aIComputationService.GetAICountryPillars(request.CountryID, userId.Value, userRole, request.Year));
         }
 
         [HttpGet("getAIPillarQuestions")]
-        public async Task<IActionResult> GetAIPillarQuestions([FromQuery] AiCityPillarSummeryRequestDto r)
+        public async Task<IActionResult> GetAIPillarQuestions([FromQuery] AiCountryPillarSummeryRequestDto r)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -101,8 +101,8 @@ namespace PeaceEnablers.Controllers
             return Ok(await _aIComputationService.GetAIPillarsQuestion(r, userId.Value, userRole));
         }
 
-        [HttpGet("aiCityDetailsReport")]
-        public async Task<IActionResult> DownloadCityReport([FromQuery] AiCitySummeryRequestPdfDto request)
+        [HttpGet("aiCountryDetailsReport")]
+        public async Task<IActionResult> DownloadCountryReport([FromQuery] AiCountrySummeryRequestPdfDto request)
         {
             try
             {
@@ -119,7 +119,7 @@ namespace PeaceEnablers.Controllers
                     return Unauthorized("You Don't have access.");
                 }
 
-                var cityDetails = await _aIComputationService.GetCityAiSummeryDetail(userId ?? 0, userRole, request.CityID,request.Year);
+                var countryDetails = await _aIComputationService.GetCountryAiSummeryDetail(userId ?? 0, userRole, request.CountryID,request.Year);
 
                 // Generate PDF               
 
@@ -127,17 +127,17 @@ namespace PeaceEnablers.Controllers
                 byte[] fileBytes;
                 string contentType;
 
-                fileBytes = await _aIComputationService.GenerateCityDetailsReport(cityDetails, userRole, userId ?? 0, request.Format, request.ReportType);
+                fileBytes = await _aIComputationService.GenerateCountryDetailsReport(countryDetails, userRole, userId ?? 0, request.Format, request.ReportType);
 
                 if (request.Format == IServices.DocumentFormat.Docx)
                 {
                     contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-                    fileName = $"{cityDetails.CityName}_Details_{DateTime.Now:yyyyMMdd}.docx";
+                    fileName = $"{countryDetails.CountryName}_Details_{DateTime.Now:yyyyMMdd}.docx";
                 }
                 else
                 {
                     contentType = "application/pdf";
-                    fileName = $"{cityDetails.CityName}_Details_{DateTime.Now:yyyyMMdd}.pdf";
+                    fileName = $"{countryDetails.CountryName}_Details_{DateTime.Now:yyyyMMdd}.pdf";
                 }
 
                 return File(fileBytes, contentType, fileName);
@@ -153,7 +153,7 @@ namespace PeaceEnablers.Controllers
             }
         }
         [HttpGet("aiPillarDetailsReport")]
-        public async Task<IActionResult> DownloadPillarReport([FromQuery] AiCitySummeryRequestPdfDto request)
+        public async Task<IActionResult> DownloadPillarReport([FromQuery] AiCountrySummeryRequestPdfDto request)
         {
             try
             {
@@ -169,11 +169,11 @@ namespace PeaceEnablers.Controllers
                 {
                     return Unauthorized("You Don't have access.");
                 }
-                if (userRole != UserRole.Admin && userRole != UserRole.CityUser)
+                if (userRole != UserRole.Admin && userRole != UserRole.CountryUser)
                     return Unauthorized("You Don't have access.");
 
 
-                var pillars = await _aIComputationService.GetAICityPillars(request.CityID, userId.Value, userRole, request.Year);
+                var pillars = await _aIComputationService.GetAICountryPillars(request.CountryID, userId.Value, userRole, request.Year);
 
                 var pillarDetails = pillars.Result.Pillars.FirstOrDefault(x => x.PillarID == request.PillarID);
                 if (pillarDetails != null)
@@ -214,8 +214,8 @@ namespace PeaceEnablers.Controllers
             }
         }
 
-        [HttpPost("getAICrossCityPillars")]
-        public async Task<IActionResult> GetAICrossCityPillars([FromBody] AiCityIdsDto aiCityIdsDto)
+        [HttpPost("getAICrossCountryPillars")]
+        public async Task<IActionResult> GetAICrossCountryPillars([FromBody] AiCountryIdsDto aiCountryIdsDto)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -230,12 +230,12 @@ namespace PeaceEnablers.Controllers
                 return Unauthorized("You Don't have access.");
             }
 
-            return Ok(await _aIComputationService.GetAICrossCityPillars(aiCityIdsDto, userId.Value, userRole));
+            return Ok(await _aIComputationService.GetAICrossCountryPillars(aiCountryIdsDto, userId.Value, userRole));
         }
 
-        [HttpPost("changedAiCityEvaluationStatus")]
+        [HttpPost("changedAiCountryEvaluationStatus")]
         [Authorize(Policy = "StaffOnly")]
-        public async Task<IActionResult> ChangedAiCityEvaluationStatus([FromBody] ChangedAiCityEvaluationStatusDto aiCityIdsDto)
+        public async Task<IActionResult> ChangedAiCountryEvaluationStatus([FromBody] ChangedAiCountryEvaluationStatusDto aiCountryIdsDto)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -250,12 +250,12 @@ namespace PeaceEnablers.Controllers
                 return Unauthorized("You Don't have access.");
             }
 
-            return Ok(await _aIComputationService.ChangedAiCityEvaluationStatus(aiCityIdsDto, userId.Value, userRole));
+            return Ok(await _aIComputationService.ChangedAiCountryEvaluationStatus(aiCountryIdsDto, userId.Value, userRole));
         }
 
         [HttpPost("regenerateAiSearch")]
         [Authorize(Policy = "StaffOnly")]
-        public async Task<IActionResult> RegenerateAiSearch([FromBody] RegenerateAiSearchDto aiCityIdsDto)
+        public async Task<IActionResult> RegenerateAiSearch([FromBody] RegenerateAiSearchDto aiCountryIdsDto)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -270,12 +270,12 @@ namespace PeaceEnablers.Controllers
                 return Unauthorized("You Don't have access.");
             }
 
-            return Ok(await _aIComputationService.RegenerateAiSearch(aiCityIdsDto, userId.Value, userRole));
+            return Ok(await _aIComputationService.RegenerateAiSearch(aiCountryIdsDto, userId.Value, userRole));
         }
 
         [HttpPost("addComment")]
         [Authorize(Policy = "StaffOnly")]
-        public async Task<IActionResult> AddComment([FromBody] AddCommentDto aiCityIdsDto)
+        public async Task<IActionResult> AddComment([FromBody] AddCommentDto aiCountryIdsDto)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -290,11 +290,11 @@ namespace PeaceEnablers.Controllers
                 return Unauthorized("You Don't have access.");
             }
 
-            return Ok(await _aIComputationService.AddComment(aiCityIdsDto, userId.Value, userRole));
+            return Ok(await _aIComputationService.AddComment(aiCountryIdsDto, userId.Value, userRole));
         }
         [HttpPost("regeneratePillarAiSearch")]
         [Authorize(Policy = "StaffOnly")]
-        public async Task<IActionResult> RegeneratePillarAiSearch([FromBody] RegeneratePillarAiSearchDto aiCityIdsDto)
+        public async Task<IActionResult> RegeneratePillarAiSearch([FromBody] RegeneratePillarAiSearchDto aiCountryIdsDto)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -309,10 +309,10 @@ namespace PeaceEnablers.Controllers
                 return Unauthorized("You Don't have access.");
             }
 
-            return Ok(await _aIComputationService.RegeneratePillarAiSearch(aiCityIdsDto, userId.Value, userRole));
+            return Ok(await _aIComputationService.RegeneratePillarAiSearch(aiCountryIdsDto, userId.Value, userRole));
         }
-        [HttpGet("aiAllCityDetailsReport")]
-        public async Task<IActionResult> DownloadAllCityPdf([FromQuery] DownloadReportDto request)
+        [HttpGet("aiAllCountryDetailsReport")]
+        public async Task<IActionResult> DownloadAllCountryPdf([FromQuery] DownloadReportDto request)
         {
             try
             {
@@ -329,29 +329,29 @@ namespace PeaceEnablers.Controllers
                     return Unauthorized("You Don't have access.");
                 }
                 var year = DateTime.Now.Year;
-                var cityDetails = await _aIComputationService.GetAllCityAiSummeryDetail(userId ?? 0, userRole, year);
+                var countryDetails = await _aIComputationService.GetAllCountryAiSummeryDetail(userId ?? 0, userRole, year);
                 
-                if (cityDetails.Count > 0)
+                if (countryDetails.Count > 0)
                 {
                     string fileName;
                     string contentType;
-                    var pdfBytes = await _aIComputationService.GenerateAllCityDetailsReport(cityDetails, userRole, userId.GetValueOrDefault(), year, request.Format);
+                    var pdfBytes = await _aIComputationService.GenerateAllCountryDetailsReport(countryDetails, userRole, userId.GetValueOrDefault(), year, request.Format);
 
                     if (request.Format == IServices.DocumentFormat.Docx)
                     {
                         contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-                        fileName = $"Cities_Details_{DateTime.Now:yyyyMMdd}.docx";
+                        fileName = $"Countries_Details_{DateTime.Now:yyyyMMdd}.docx";
                     }
                     else
                     {
                         contentType = "application/pdf";
-                        fileName = $"Cities_Details_{DateTime.Now:yyyyMMdd}.pdf";
+                        fileName = $"Countries_Details_{DateTime.Now:yyyyMMdd}.pdf";
                     }
 
                     return File(pdfBytes, contentType, fileName);
                 }
 
-                return NotFound("No City Found.");
+                return NotFound("No Country Found.");
 
             }
             catch (Exception ex)
@@ -366,7 +366,7 @@ namespace PeaceEnablers.Controllers
         }
         [HttpPost("aiResultTransfer")]
         [Authorize(Policy = "StaffOnly")]
-        public async Task<IActionResult> AiResultTransfer([FromBody] AITransferAssessmentRequestDto aiCityIdsDto)
+        public async Task<IActionResult> AiResultTransfer([FromBody] AITransferAssessmentRequestDto aiCountryIdsDto)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -381,7 +381,7 @@ namespace PeaceEnablers.Controllers
                 return Unauthorized("You Don't have access.");
             }
 
-            return Ok(await _aIComputationService.AITransferAssessment(aiCityIdsDto, userId.Value, userRole));
+            return Ok(await _aIComputationService.AITransferAssessment(aiCountryIdsDto, userId.Value, userRole));
         }
 
         [HttpGet("reCalculateKpis")]

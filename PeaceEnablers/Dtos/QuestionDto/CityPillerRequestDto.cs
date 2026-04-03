@@ -1,8 +1,0 @@
-﻿namespace PeaceEnablers.Dtos.QuestionDto
-{
-    public class CityPillerRequestDto
-    {
-        public int UserCityMappingID { get; set; }
-        public int? PillarID { get; set; }
-    }
-}

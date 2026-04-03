@@ -15,7 +15,7 @@ namespace PeaceEnablers.IServices
         Task<Pillar> AddAsync(Pillar pillar);
         Task<Pillar> UpdateAsync(int id, UpdatePillarDto pillar);
         Task<bool> DeleteAsync(int id);
-        Task<Tuple<string, byte[]>> ExportPillarsHistoryByUserId(GetCityPillarHistoryRequestDto requestDto);
+        Task<Tuple<string, byte[]>> ExportPillarsHistoryByUserId(GetCountryPillarHistoryRequestDto requestDto);
         Task<PaginationResponse<PillarsHistroyResponseDto>> GetResponsesByUserId(GetPillarResponseHistoryRequestNewDto request, UserRole userRole);
 
     }

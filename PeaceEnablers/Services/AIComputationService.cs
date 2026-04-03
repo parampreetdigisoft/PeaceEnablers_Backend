@@ -9,7 +9,7 @@ using PeaceEnablers.Common.Models;
 using PeaceEnablers.Common.Models.settings;
 using PeaceEnablers.Data;
 using PeaceEnablers.Dtos.AiDto;
-using PeaceEnablers.Dtos.CityDto;
+using PeaceEnablers.Dtos.CountryDto;
 using PeaceEnablers.Dtos.CommonDto;
 using PeaceEnablers.IServices;
 using PeaceEnablers.Models;
@@ -55,21 +55,21 @@ namespace PeaceEnablers.Services
             return ResultResponseDto<List<AITrustLevel>>.Success(r, new[] { "Pillar get successfully" });
 
         }
-        public async Task<PaginationResponse<AiCitySummeryDto>> GetAICities(AiCitySummeryRequestDto request, int userID, UserRole userRole)
+        public async Task<PaginationResponse<AiCountrySummeryDto>> GetAICountries(AiCountrySummeryRequestDto request, int userID, UserRole userRole)
         {
             try
             {
-                IQueryable<AiCitySummeryDto> query = await GetCityAiSummeryDetails(userID, userRole, request.CityID, request.Year);
+                IQueryable<AiCountrySummeryDto> query = await GetCountryAiSummeryDetails(userID, userRole, request.CountryID, request.Year);
 
                 var result = await query.ApplyPaginationAsync(request);
                 int pillarCount = _appSettings.PillarCount;
 
-                if (userRole != UserRole.CityUser)
+                if (userRole != UserRole.CountryUser)
                 {
-                    var progress = await _commonService.GetCitiesProgressAsync(userID, (int)userRole, DateTime.Now.Year);
+                    var progress = await _commonService.GetCountriesProgressAsync(userID, (int)userRole, DateTime.Now.Year);
 
-                    var ids = result.Data.Select(x => x.CityID);
-                    var cities = progress.Where(x => ids.Contains(x.CityID));
+                    var ids = result.Data.Select(x => x.CountryID);
+                    var countries = progress.Where(x => ids.Contains(x.CountryID));
 
 
                     var counts = await _context.Pillars
@@ -78,11 +78,11 @@ namespace PeaceEnablers.Services
                     var totalQuestions = counts.Sum();
 
                     var answeredQuestions = await _context.AIEstimatedQuestionScores
-                        .Where(x => x.Year == request.Year && ids.Contains(x.CityID))
-                        .GroupBy(x => x.CityID)
+                        .Where(x => x.Year == request.Year && ids.Contains(x.CountryID))
+                        .GroupBy(x => x.CountryID)
                         .Select(g => new
                         {
-                            CityID = g.Key,
+                            CountryID = g.Key,
                             CompletionRate = totalQuestions == 0
                                 ? 0
                                 : g.Count() * 100.0M / totalQuestions
@@ -91,11 +91,11 @@ namespace PeaceEnablers.Services
 
                     foreach (var c in result.Data)
                     {
-                        var pillars = cities.Where(x => x.CityID == c.CityID);
-                        var cityScore = Math.Round(pillars.Sum(x => x.ScoreProgress) / pillarCount, 2);
-                        c.EvaluatorScore = cityScore;
-                        c.Discrepancy = Math.Abs(cityScore - (c.AIProgress ?? 0));
-                        c.AICompletionRate = answeredQuestions.FirstOrDefault(x=>x.CityID== c.CityID)?.CompletionRate;
+                        var pillars = countries.Where(x => x.CountryID == c.CountryID);
+                        var countryScore = Math.Round(pillars.Sum(x => x.ScoreProgress) / pillarCount, 2);
+                        c.EvaluatorScore = countryScore;
+                        c.Discrepancy = Math.Abs(countryScore - (c.AIProgress ?? 0));
+                        c.AICompletionRate = answeredQuestions.FirstOrDefault(x=>x.CountryID== c.CountryID)?.CompletionRate;
                     }
                 }
 
@@ -103,60 +103,60 @@ namespace PeaceEnablers.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GetCitiesAsync", ex);
-                return new PaginationResponse<AiCitySummeryDto>();
+                await _appLogger.LogAsync("Error Occured in GetCountriesAsync", ex);
+                return new PaginationResponse<AiCountrySummeryDto>();
             }
         }
-        public async Task<IQueryable<AiCitySummeryDto>> GetCityAiSummeryDetails(int userID, UserRole userRole, int? cityID, int currentYear=0)
+        public async Task<IQueryable<AiCountrySummeryDto>> GetCountryAiSummeryDetails(int userID, UserRole userRole, int? countryID, int currentYear=0)
         {
             currentYear = currentYear ==0 ? DateTime.Now.Year : currentYear;
             var firstDate = new DateTime(currentYear, 1, 1); 
             var endDate = new DateTime(currentYear+1, 1, 1); 
-            IQueryable<AICityScore> baseQuery = _context.AICityScores.Where(x=> x.UpdatedAt >= firstDate && x.UpdatedAt < endDate && x.Year== currentYear);
+            IQueryable<AICountryScore> baseQuery = _context.AICountryScores.Where(x=> x.UpdatedAt >= firstDate && x.UpdatedAt < endDate && x.Year== currentYear);
 
-            List<int> allowedCityIds = new();
+            List<int> allowedCountryIds = new();
             if (userRole == UserRole.Analyst)
             {
-                // Allowed city IDs
-                 allowedCityIds = await _context.UserCityMappings
-                            .Where(x => !x.IsDeleted && x.UserID == userID && (!cityID.HasValue || x.CityID == cityID.Value))
-                            .Select(x => x.CityID)
+                // Allowed country IDs
+                allowedCountryIds = await _context.UserCountryMappings
+                            .Where(x => !x.IsDeleted && x.UserID == userID && (!countryID.HasValue || x.CountryID == countryID.Value))
+                            .Select(x => x.CountryID)
                             .Distinct()
                             .ToListAsync();
 
-                baseQuery = baseQuery.Where(x => allowedCityIds.Contains(x.CityID));
+                baseQuery = baseQuery.Where(x => allowedCountryIds.Contains(x.CountryID));
             }
             else if (userRole == UserRole.Evaluator)
             {
-                // Allowed city IDs
-                 allowedCityIds = await _context.AIUserCityMappings
-                            .Where(x => x.IsActive && x.UserID == userID && (!cityID.HasValue || x.CityID == cityID.Value))
-                            .Select(x => x.CityID)
+                // Allowed country IDs
+                allowedCountryIds = await _context.AIUserCountryMappings
+                            .Where(x => x.IsActive && x.UserID == userID && (!countryID.HasValue || x.CountryID == countryID.Value))
+                            .Select(x => x.CountryID)
                             .Distinct()
                             .ToListAsync();
 
-                baseQuery = baseQuery.Where(x => allowedCityIds.Contains(x.CityID));
+                baseQuery = baseQuery.Where(x => allowedCountryIds.Contains(x.CountryID));
             }
-            else if (userRole == UserRole.CityUser)
+            else if (userRole == UserRole.CountryUser)
             {
-                 allowedCityIds = await _context.PublicUserCityMappings
-                            .Where(x => x.IsActive && x.UserID == userID && (!cityID.HasValue || x.CityID == cityID.Value))
-                            .Select(x => x.CityID)
+                allowedCountryIds = await _context.PublicUserCountryMappings
+                            .Where(x => x.IsActive && x.UserID == userID && (!countryID.HasValue || x.CountryID == countryID.Value))
+                            .Select(x => x.CountryID)
                             .Distinct()
                             .ToListAsync();
 
-                baseQuery = baseQuery.Where(x => allowedCityIds.Contains(x.CityID) && x.IsVerified);
+                baseQuery = baseQuery.Where(x => allowedCountryIds.Contains(x.CountryID) && x.IsVerified);
             }
             else
             {
                 // Admin
-                if (cityID.HasValue)
+                if (countryID.HasValue)
                 {
-                    baseQuery = baseQuery.Where(x => x.CityID == cityID.Value);
-                    allowedCityIds = new() { cityID.Value };
+                    baseQuery = baseQuery.Where(x => x.CountryID == countryID.Value);
+                    allowedCountryIds = new() { countryID.Value };
                 }
             }
-            var commentQuery = _context.AIUserCityMappings
+            var commentQuery = _context.AIUserCountryMappings
                 .Where(x =>
                     (
                         userRole == UserRole.Admin ||
@@ -164,10 +164,10 @@ namespace PeaceEnablers.Services
                         (userRole == UserRole.Evaluator && x.UserID == userID)
                     )
                 )
-                .GroupBy(x => x.CityID)
+                .GroupBy(x => x.CountryID)
                 .Select(g => new
                 {
-                    CityID = g.Key,
+                    CountryID = g.Key,
                     Comment = g
                         .OrderByDescending(x => x.UpdatedAt >= firstDate && x.UpdatedAt < endDate)
                         .Select(x => x.Comment)
@@ -175,24 +175,24 @@ namespace PeaceEnablers.Services
                 });
 
             var query =
-                from c in _context.Cities
-                where !c.IsDeleted && ( allowedCityIds.Contains(c.CityID) || (userRole == UserRole.Admin && !cityID.HasValue))
+                from c in _context.Countries
+                where !c.IsDeleted && (allowedCountryIds.Contains(c.CountryID) || (userRole == UserRole.Admin && !countryID.HasValue))
                 join score in baseQuery
-                    on c.CityID equals score.CityID
+                    on c.CountryID equals score.CountryID
                     into scoreJoin
                 from score in scoreJoin.DefaultIfEmpty()   // LEFT JOIN score
 
                 join cmt in commentQuery
-                    on c.CityID equals cmt.CityID
+                    on c.CountryID equals cmt.CountryID
                     into cmtJoin
                 from cmt in cmtJoin.DefaultIfEmpty()       // LEFT JOIN comment
 
-                select new AiCitySummeryDto
+                select new AiCountrySummeryDto
                 {
-                    CityID = c.CityID,
-                    State = c.State ?? string.Empty,
-                    CityName = c.CityName ?? string.Empty,
-                    Country = c.Country ?? string.Empty,
+                    CountryID = c.CountryID,
+                    Continent = c.Continent ?? string.Empty,
+                    CountryName = c.CountryName ?? string.Empty,
+                    //Country = c.Country ?? string.Empty,
                     Image = c.Image ?? string.Empty,
 
                     Year = score != null ? score.Year : currentYear,
@@ -239,7 +239,7 @@ namespace PeaceEnablers.Services
             return query;
         }
     
-        public async Task<ResultResponseDto<AiCityPillarReponseDto>> GetAICityPillars(int cityID, int userID, UserRole userRole, int currentYear = 0)
+        public async Task<ResultResponseDto<AiCountryPillarResponseDto>> GetAICountryPillars(int CountryID, int userID, UserRole userRole, int currentYear = 0)
         {
             try
             {
@@ -247,15 +247,15 @@ namespace PeaceEnablers.Services
                 var firstDate = new DateTime(currentYear, 1, 1);
                 int pillarCount = _appSettings.PillarCount;
                 var res = await _context.AIPillarScores
-                    .Where(x => x.CityID == cityID && x.UpdatedAt >= firstDate && x.Year == currentYear)
-                    .Include(x=>x.City)
+                    .Where(x => x.CountryID == CountryID && x.UpdatedAt >= firstDate && x.Year == currentYear)
+                    .Include(x=>x.Country)
                     .Include(x => x.DataSourceCitations)
                     .ToListAsync();
 
                 List<int> pillarIds = new();
-                if (userRole == UserRole.CityUser)
+                if (userRole == UserRole.CountryUser)
                 {
-                    pillarIds = await _context.CityUserPillarMappings
+                    pillarIds = await _context.CountryUserPillarMappings
                                 .Where(x => x.IsActive && x.UserID == userID)
                                 .Select(x => x.PillarID)
                                 .Distinct()
@@ -281,13 +281,12 @@ namespace PeaceEnablers.Services
                 {
                     var isAccess = pillarIds.Count == 0 || pillarIds.Contains(x.pillar.PillarID);
 
-                    var r = new AiCityPillarResponse
+                    var r = new AiCountryPillarResponse
                     {
                         PillarScoreID = x.score?.PillarScoreID ?? 0,
-                        CityID = x.score?.CityID ?? cityID,
-                        CityName = x.score?.City?.CityName ?? "",
-                        State = x.score?.City?.State ?? "",
-                        Country = x.score?.City?.Country ?? "",
+                        CountryID = x.score?.CountryID ?? CountryID,
+                        CountryName = x.score?.Country?.CountryName ?? "",
+                        Continent = x.score?.Country?.Continent ?? "",                        
                         PillarID = x.pillar.PillarID,
                         PillarName = x.pillar.PillarName,
                         DisplayOrder = x.pillar.DisplayOrder,
@@ -333,12 +332,12 @@ namespace PeaceEnablers.Services
                 .ToList();
 
 
-                var progress = await _commonService.GetCitiesProgressAsync(userID, (int)userRole, currentYear);
+                var progress = await _commonService.GetCountriesProgressAsync(userID, (int)userRole, currentYear);
 
-                var cities = progress.Where(x => x.CityID== cityID);
+                var countries = progress.Where(x => x.CountryID== CountryID);
 
                 var answeredQuestions = await _context.AIEstimatedQuestionScores
-               .Where(x => x.Year == currentYear && x.CityID == cityID)
+               .Where(x => x.Year == currentYear && x.CountryID == CountryID)
                .GroupBy(x => x.PillarID)
                .Select(g => new
                {
@@ -351,7 +350,7 @@ namespace PeaceEnablers.Services
                 {
                     var totalQuestions = pillars.FirstOrDefault(x => x.PillarID == c.PillarID)?.TotalQuestions ?? 0;
                     var answeredQuestion = answeredQuestions.FirstOrDefault(x => x.PillarID == c.PillarID)?.AnsweredQuestions ?? 0;
-                    var pillarScore = cities
+                    var pillarScore = countries
                         .Where(x => x.PillarID == c.PillarID)
                         .Select(x => x.ScoreProgress)
                         .DefaultIfEmpty(0)
@@ -361,35 +360,35 @@ namespace PeaceEnablers.Services
                     c.AICompletionRate = answeredQuestion * 100.0M / totalQuestions;
                 }
 
-                var finalResutl = new AiCityPillarReponseDto
+                var finalResutl = new AiCountryPillarResponseDto
                 {
 
                     Pillars = result
                 };
 
-                var resposne = ResultResponseDto<AiCityPillarReponseDto>.Success(finalResutl, new[] { "Pillar get successfully", });
+                var resposne = ResultResponseDto<AiCountryPillarResponseDto>.Success(finalResutl, new[] { "Pillar get successfully", });
 
                 return resposne;
             }
             catch (Exception ex)
             {
                 await _appLogger.LogAsync("Error Occured in GetAICityPillars", ex);
-                return ResultResponseDto<AiCityPillarReponseDto>.Failure(new[] { "Error in getting pillar details", });
+                return ResultResponseDto<AiCountryPillarResponseDto>.Failure(new[] { "Error in getting pillar details", });
             }
         }
-        public async Task<PaginationResponse<AIEstimatedQuestionScoreDto>> GetAIPillarsQuestion(AiCityPillarSummeryRequestDto request, int userID, UserRole userRole)
+        public async Task<PaginationResponse<AIEstimatedQuestionScoreDto>> GetAIPillarsQuestion(AiCountryPillarSummeryRequestDto request, int userID, UserRole userRole)
         {
             try
             {
-                if (userRole == UserRole.CityUser && request.CityID != null && request.PillarID != null)
+                if (userRole == UserRole.CountryUser && request.CountryID != null && request.PillarID != null)
                 {
-                    var isPillarAccess = _context.CityUserPillarMappings
+                    var isPillarAccess = _context.CountryUserPillarMappings
                                 .Where(x => x.IsActive && x.UserID == userID)
                                 .Select(x => x.PillarID).Contains(request.PillarID.Value);
 
-                    var isCityAccess = _context.PublicUserCityMappings
+                    var isCityAccess = _context.PublicUserCountryMappings
                                .Where(x => x.IsActive && x.UserID == userID)
-                               .Select(x => x.CityID).Contains(request.CityID.Value);
+                               .Select(x => x.CountryID).Contains(request.CountryID.Value);
                     if (!(isCityAccess && isPillarAccess))
                     {
                         return new PaginationResponse<AIEstimatedQuestionScoreDto>();
@@ -402,14 +401,14 @@ namespace PeaceEnablers.Services
                     from q in _context.Questions.Where(x=>x.PillarID== request.PillarID)
                     join s in _context.AIEstimatedQuestionScores
                         .Where(x =>
-                            x.CityID == request.CityID &&
+                            x.CountryID == request.CountryID &&
                             x.PillarID == request.PillarID &&
                             x.UpdatedAt >= firstDate && x.Year == currentYear)
                     on q.QuestionID equals s.QuestionID into qs
                     from x in qs.DefaultIfEmpty() // LEFT JOIN
                     select new AIEstimatedQuestionScoreDto
                     {
-                        CityID = x == null ? request.CityID ?? 0 : x.CityID,
+                        CountryID = x == null ? request.CountryID ?? 0 : x.CountryID,
                         PillarID = x == null ? request.PillarID ?? 0 : x.PillarID,
                         QuestionID = q.QuestionID,
                         Year = x == null ? currentYear : x.Year,
@@ -458,57 +457,56 @@ namespace PeaceEnablers.Services
                 return new PaginationResponse<AIEstimatedQuestionScoreDto>();
             }
         }        
-        private async Task<List<PeerCityHistoryReportDto>> GetPeerCities(int userID, UserRole role, int cityID, int year, bool isAiScore = true)
+        private async Task<List<PeerCountryHistoryReportDto>> GetPeerCountries(int userID, UserRole role, int CountryID, int year, bool isAiScore = true)
         {
-            var peerCities = new List<PeerCityHistoryReportDto>();
+            var peerCountries = new List<PeerCountryHistoryReportDto>();
             int pillarCount = _appSettings.PillarCount;
-            var peersCityIds = await _context.Cities
-                   .Where(x => x.CityID == cityID && x.IsActive && !x.IsDeleted)
-                   .SelectMany(x => x.CityPeers)
+            var peersCountryIDs = await _context.Countries
+                   .Where(x => x.CountryID == CountryID && x.IsActive && !x.IsDeleted)
+                   .SelectMany(x => x.CountryPeers)
                    .Where(x => x.IsActive && !x.IsDeleted)
-                   .Select(x => x.PeerCityID)
+                   .Select(x => x.PeerCountryID)
                    .ToListAsync();
-            if (peersCityIds.Count > 0)
+            if (peersCountryIDs.Count > 0)
             {
-                peersCityIds.Add(cityID);
+                peersCountryIDs.Add(CountryID);
             }
 
             var startYear = year - 5;
 
-            peerCities = await _context.Cities
-                .Where(c => peersCityIds.Contains(c.CityID))
-                .Select(c => new PeerCityHistoryReportDto
+            peerCountries = await _context.Countries
+                .Where(c => peersCountryIDs.Contains(c.CountryID))
+                .Select(c => new PeerCountryHistoryReportDto
                 {
-                    CityID = c.CityID,
-                    CityName = c.CityName,
-                    State = c.State,
-                    Country = c.Country,
+                    CountryID = c.CountryID,
+                    CountryName = c.CountryName,
+                    Continent = c.Continent,
+                    Country = c.CountryName,
                     Region = c.Region,
-                    PostalCode = c.PostalCode,
+                    CountryCode = c.CountryCode,
                     UpdatedDate = c.UpdatedDate,
                     Image = c.Image,
                     Latitude = c.Latitude,
                     Longitude = c.Longitude,
                     Population = c.Population,
-                    Income = c.Income,
-                    PPP = c.PPP
+                    Income = c.Income                  
 
                 }).ToListAsync();
 
             if (isAiScore)
             {
-                foreach (var c in peerCities)
+                foreach (var c in peerCountries)
                 {
-                    c.CityHistory = _context.AIPillarScores
+                    c.CountryHistory = _context.AIPillarScores
                     .Include(x => x.Pillar)
                     .Where(x =>
-                        x.CityID == c.CityID &&
+                        x.CountryID == c.CountryID &&
                         x.Year >= startYear &&
                         x.Year <= year)
                     .GroupBy(x => x.Year)
-                    .Select(yearGroup => new PeerCityYearHistoryDto
+                    .Select(yearGroup => new PeerCountryYearHistoryDto
                     {
-                        CityID = c.CityID,
+                        CountryID = c.CountryID,
                         Year = yearGroup.Key,
 
                         ScoreProgress = yearGroup.Average(x => x.AIProgress ?? 0),
@@ -520,7 +518,7 @@ namespace PeaceEnablers.Services
                                 p.Pillar.PillarName,
                                 p.Pillar.DisplayOrder
                             })
-                            .Select(pillarGroup => new PeerCityPillarHistoryReportDto
+                            .Select(pillarGroup => new PeerCountryPillarHistoryReportDto
                             {
                                 PillarID = pillarGroup.Key.PillarID,
                                 PillarName = pillarGroup.Key.PillarName,
@@ -543,25 +541,25 @@ namespace PeaceEnablers.Services
                     x.DisplayOrder
                 }).ToListAsync();
 
-                var cityProgress = await _commonService
-                    .GetCitiesProgressHistoryAsync(userID, (int)role, year - 5, year);
+                var countryProgress = await _commonService
+                    .GetCountriesProgressHistoryAsync(userID, (int)role, year - 5, year);
 
-                var filterCites = cityProgress
-                    .Where(x => peersCityIds.Contains(x.CityID))
+                var filterCountries = countryProgress
+                    .Where(x => peersCountryIDs.Contains(x.CountryID))
                     .ToList();
 
-                foreach (var city in peerCities)
+                foreach (var country in peerCountries)
                 {
-                    var progress = filterCites
-                        .Where(x => x.CityID == city.CityID)
+                    var progress = filterCountries
+                        .Where(x => x.CountryID == country.CountryID)
                         .ToList();
 
                     // ✅ Build Year-wise history first
-                    city.CityHistory = progress
+                    country.CountryHistory = progress
                         .GroupBy(x => x.Year)
-                        .Select(yearGroup => new PeerCityYearHistoryDto
+                        .Select(yearGroup => new PeerCountryYearHistoryDto
                         {
-                            CityID = city.CityID,
+                            CountryID = country.CountryID,
                             Year = yearGroup.Key,
 
                             // City level score
@@ -572,7 +570,7 @@ namespace PeaceEnablers.Services
 
                             // Pillar level score
                             Pillars = pillars
-                                .Select(p => new PeerCityPillarHistoryReportDto
+                                .Select(p => new PeerCountryPillarHistoryReportDto
                                 {
                                     PillarID = p.PillarID,
                                     PillarName = p.PillarName,
@@ -593,27 +591,27 @@ namespace PeaceEnablers.Services
                 }
             }
 
-            return peerCities;
+            return peerCountries;
         }
 
         // ─────────────────────────────────────────────────────────────────────────────
-        //  ENTRY POINTS  (GenerateCityDetailsPdf / GeneratePillarDetailsPdf)
+        //  ENTRY POINTS  (GeneratecountryDetailsPdf / GeneratePillarDetailsPdf)
         // ─────────────────────────────────────────────────────────────────────────────
 
-        public async Task<byte[]> GenerateCityDetailsReport(AiCitySummeryDto cityDetails, UserRole userRole, int userID,
+        public async Task<byte[]> GenerateCountryDetailsReport(AiCountrySummeryDto countryDetails, UserRole userRole, int userID,
            IServices.DocumentFormat format = IServices.DocumentFormat.Pdf, string reportType = "ai")
         {
             try
             {
                 var isManual = reportType != "ai" && userRole == UserRole.Admin ? true : false;
 
-                var pillars = await GetAICityPillars(cityDetails.CityID, userID, userRole, cityDetails.Year);
+                var pillars = await GetAICountryPillars(countryDetails.CountryID, userID, userRole, countryDetails.Year);
 
-                var kpis = await GetAccessKpis(userID, userRole, cityDetails.CityID, cityDetails.Year, !isManual);
+                var kpis = await GetAccessKpis(userID, userRole, countryDetails.CountryID, countryDetails.Year, !isManual);
 
                 if (isManual)
                 {
-                    cityDetails.AIProgress = cityDetails.EvaluatorScore;
+                    countryDetails.AIProgress = countryDetails.EvaluatorScore;
 
                     foreach (var pillar in pillars.Result.Pillars)
                     {
@@ -621,20 +619,20 @@ namespace PeaceEnablers.Services
                     }
                 }
 
-                var peerCities = await GetPeerCities(userID, userRole, cityDetails.CityID, cityDetails.Year, !isManual);
+                var peerCountries = await GetPeerCountries(userID, userRole, countryDetails.CountryID, countryDetails.Year, !isManual);
 
 
-                var document = await _documentGeneratorService.GenerateCityDetails(cityDetails, pillars.Result.Pillars, kpis, peerCities, userRole, format);
+                var document = await _documentGeneratorService.GenerateCountryDetails(countryDetails, pillars.Result.Pillars, kpis, peerCountries, userRole, format);
 
                 return document;
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GenerateCityDetailsReport", ex);
+                await _appLogger.LogAsync("Error Occured in GeneratecountryDetailsReport", ex);
                 return Array.Empty<byte>();
             }
         }
-        public async Task<byte[]> GeneratePillarDetailsReport(AiCityPillarResponse pillarData, UserRole userRole, IServices.DocumentFormat format = IServices.DocumentFormat.Pdf)
+        public async Task<byte[]> GeneratePillarDetailsReport(AiCountryPillarResponse pillarData, UserRole userRole, IServices.DocumentFormat format = IServices.DocumentFormat.Pdf)
         {
             try
             {
@@ -691,7 +689,7 @@ namespace PeaceEnablers.Services
                     });
 
 
-                    col.Item().PaddingTop(5).AlignCenter().Text("AI Power City Assessment Platform")
+                    col.Item().PaddingTop(5).AlignCenter().Text("AI Power Country Assessment Platform")
                         .FontSize(8)
                         .FontColor("#9E9E9E");
                 });
@@ -723,28 +721,28 @@ namespace PeaceEnablers.Services
             if (string.IsNullOrEmpty(text) || text.Length <= maxLength) return text;
             return text.Substring(0, maxLength) + "...";
         }
-        public async Task<ResultResponseDto<AiCrossCityResponseDto>> GetAICrossCityPillars(AiCityIdsDto cityIds, int userID, UserRole userRole)
+        public async Task<ResultResponseDto<AiCrossCountryResponseDto>> GetAICrossCountryPillars(AiCountryIdsDto CountryIDs, int userID, UserRole userRole)
         {
             try
             {
                 var currentYear = DateTime.Now.Year;
-                var response = new AiCrossCityResponseDto();
+                var response = new AiCrossCountryResponseDto();
 
                 var firstDate = new DateTime(currentYear, 1, 1);
 
                 var aiPillarScores = await _context.AIPillarScores
-                    .Where(x => cityIds.CityIDs.Contains(x.CityID) && x.UpdatedAt >= firstDate)
+                    .Where(x => CountryIDs.CountryIDs.Contains(x.CountryID) && x.UpdatedAt >= firstDate)
                     .ToListAsync();
 
-                var cities = await _context.Cities
-                    .Where(x => cityIds.CityIDs.Contains(x.CityID))
+                var countries = await _context.Countries
+                    .Where(x => CountryIDs.CountryIDs.Contains(x.CountryID))
                     .ToListAsync();
 
                 // Pillar access based on role
                 List<int> pillarIds = new();
-                if (userRole == UserRole.CityUser)
+                if (userRole == UserRole.CountryUser)
                 {
-                    pillarIds = await _context.CityUserPillarMappings
+                    pillarIds = await _context.CountryUserPillarMappings
                         .Where(x => x.IsActive && x.UserID == userID)
                         .Select(x => x.PillarID)
                         .Distinct()
@@ -760,25 +758,25 @@ namespace PeaceEnablers.Services
                         .OrderBy(x=>x.DisplayOrder)
                         .Select(x => x.PillarName)
                 );
-                // Per city processing
+                // Per country processing
 
-                var aiCities = await _context.AICityScores
-                    .Where(x => cityIds.CityIDs.Contains(x.CityID) &&
-                                x.Year == currentYear && ((userRole == UserRole.CityUser && x.IsVerified) || userRole != UserRole.CityUser))
-                    .GroupBy(x => x.CityID)
+                var aiCountries = await _context.AICountryScores
+                    .Where(x => CountryIDs.CountryIDs.Contains(x.CountryID) &&
+                                x.Year == currentYear && ((userRole == UserRole.CountryUser && x.IsVerified) || userRole != UserRole.CountryUser))
+                    .GroupBy(x => x.CountryID)
                     .Select(g => new
                     {
-                        CityID = g.Key,
+                        CountryID = g.Key,
                         AIProgress = g.Max(x => x.AIProgress)
                     })
-                    .ToDictionaryAsync(x => x.CityID, x => x.AIProgress);
+                    .ToDictionaryAsync(x => x.CountryID, x => x.AIProgress);
 
 
-                foreach (var city in cities)
+                foreach (var country in countries)
                 {
                     var pillarResults = pillars
                     .GroupJoin(
-                        aiPillarScores.Where(x => x.CityID == city.CityID),
+                        aiPillarScores.Where(x => x.CountryID == country.CountryID),
                         p => p.PillarID,
                         s => s.PillarID,
                         (pillar, scores) => new
@@ -790,7 +788,7 @@ namespace PeaceEnablers.Services
                     {
                         var isAccess = pillarIds.Count == 0 || pillarIds.Contains(x.Pillar.PillarID);
 
-                        return new CrossCityPillarValueDto
+                        return new CrossCountryPillarValueDto
                         {
                             PillarID = x.Pillar.PillarID,
                             PillarName = x.Pillar.PillarName,
@@ -802,21 +800,21 @@ namespace PeaceEnablers.Services
                     .OrderBy(x => !x.IsAccess)
                     .ThenBy(x => x.DisplayOrder)
                     .ToList();
-                    var chartRow = new CrossCityChartTableRowDto
+                    var chartRow = new CrossCountryChartTableRowDto
                     {
-                        CityID = city.CityID,
-                        CityName = city.CityName,
+                        CountryID = country.CountryID,
+                        CountryName = country.CountryName,
                         PillarValues = pillarResults.ToList()
                     };
-                    if (aiCities?.TryGetValue(city.CityID,out var aiCityValue) ?? false)
+                    if (aiCountries?.TryGetValue(country.CountryID,out var aiCountryValue) ?? false)
                     {
-                        chartRow.Value = aiCityValue ?? 0;
+                        chartRow.Value = aiCountryValue ?? 0;
                     }
                     response.TableData.Add(chartRow);
 
-                    var series = new CrossCityChartSeriesDto
+                    var series = new CrossCountryChartSeriesDto
                     {
-                        Name = city.CityName,
+                        Name = country.CountryName,
                         Data = pillarResults
                             .Where(x => x.IsAccess)
                             .Select(x => x.Value).ToList()
@@ -824,24 +822,24 @@ namespace PeaceEnablers.Services
                     response.Series.Add(series);
                 }
 
-                return ResultResponseDto<AiCrossCityResponseDto>.Success(response,new[] { "Pillars fetched successfully" });
+                return ResultResponseDto<AiCrossCountryResponseDto>.Success(response,new[] { "Pillars fetched successfully" });
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error occurred in GetAICrossCityPillars", ex);
-                return ResultResponseDto<AiCrossCityResponseDto>.Failure(new[] { "Error in getting pillar details" });
+                await _appLogger.LogAsync("Error occurred in GetAICrossCountryPillars", ex);
+                return ResultResponseDto<AiCrossCountryResponseDto>.Failure(new[] { "Error in getting pillar details" });
             }
         }
 
-        public async Task<ResultResponseDto<bool>> ChangedAiCityEvaluationStatus(ChangedAiCityEvaluationStatusDto dto, int userID, UserRole userRole)
+        public async Task<ResultResponseDto<bool>> ChangedAiCountryEvaluationStatus(ChangedAiCountryEvaluationStatusDto dto, int userID, UserRole userRole)
         {
             try
             {
-                var v = _context.UserCityMappings.Any(x => x.UserID == userID && x.CityID == dto.CityID);
+                var v = _context.UserCountryMappings.Any(x => x.UserID == userID && x.CountryID == dto.CountryID);
                 if ((v && userRole == UserRole.Analyst) || userRole == UserRole.Admin)
                 {
 
-                    var aiResponse = await _context.AICityScores.Where(x => x.CityID == dto.CityID && x.Year == DateTime.UtcNow.Year).FirstOrDefaultAsync();
+                    var aiResponse = await _context.AICountryScores.Where(x => x.CountryID == dto.CountryID && x.Year == DateTime.UtcNow.Year).FirstOrDefaultAsync();
                     if (aiResponse != null)
                     {
                         aiResponse.IsVerified = dto.IsVerified;
@@ -849,11 +847,11 @@ namespace PeaceEnablers.Services
                         
                         await _context.SaveChangesAsync();
 
-                        _download.InsertAnalyticalLayerResults(dto.CityID);
+                        _download.InsertAnalyticalLayerResults(dto.CountryID);
                         return ResultResponseDto<bool>.Success(true, new[] { dto.IsVerified ? "Finalize and lock the AI-generated score successfully" : "Reject the current AI-generated score Successfully" });
                     }
                 }
-                return ResultResponseDto<bool>.Failure(new[] { "Invalid city, please try again" });
+                return ResultResponseDto<bool>.Failure(new[] { "Invalid country, please try again" });
             }
             catch (Exception ex)
             {
@@ -870,7 +868,7 @@ namespace PeaceEnablers.Services
                     var currentYear = DateTime.Now.Year;
 
                     var aiQuestionList = await _context.AIEstimatedQuestionScores
-                        .Where(x => x.CityID == dto.CityID && x.Year == currentYear)
+                        .Where(x => x.CountryID == dto.CountryID && x.Year == currentYear)
                         .ToListAsync();
 
                     if (aiQuestionList.Count > 0)
@@ -881,24 +879,24 @@ namespace PeaceEnablers.Services
                 }
 
 
-                await _download.AiResearchByCityId(dto.CityID, dto.CityEnable, dto.PillarEnable, dto.QuestionEnable);
-                var aiResponse = await _context.AICityScores.FirstOrDefaultAsync(x => x.CityID == dto.CityID);
+                await _download.AiResearchByCountryId(dto.CountryID, dto.CountryEnable, dto.PillarEnable, dto.QuestionEnable);
+                var aiResponse = await _context.AICountryScores.FirstOrDefaultAsync(x => x.CountryID == dto.CountryID);
                 if(aiResponse != null)
                 {
                     aiResponse.IsVerified = false;
                 }
                 // Assign viewers (optional)
 
-                var aIUserCityMappingsList = await _context.AIUserCityMappings.Where(x => x.CityID == dto.CityID).ToListAsync();
+                var aIUserCountryMappingsList = await _context.AIUserCountryMappings.Where(x => x.CountryID == dto.CountryID).ToListAsync();
 
-                var um = _context.UserCityMappings.Where(x => !x.IsDeleted && x.CityID == dto.CityID && dto.ViewerUserIDs.Contains(x.UserID));
+                var um = _context.UserCountryMappings.Where(x => !x.IsDeleted && x.CountryID == dto.CountryID && dto.ViewerUserIDs.Contains(x.UserID));
                 var valid = um.All(x => dto.ViewerUserIDs.Contains(x.UserID));
 
-                string msg = "Evaluator not have access of this city please try again";
+                string msg = "Evaluator not have access of this county please try again";
 
                 if (dto.ViewerUserIDs != null && dto.ViewerUserIDs.Any() && valid)
                 {
-                    var existingMappings = aIUserCityMappingsList.Where(x => dto.ViewerUserIDs.Contains(x.UserID));
+                    var existingMappings = aIUserCountryMappingsList.Where(x => dto.ViewerUserIDs.Contains(x.UserID));
 
 
                     var existingUserIds = existingMappings.Select(x => x.UserID).ToHashSet();
@@ -915,21 +913,21 @@ namespace PeaceEnablers.Services
                     // Insert new mappings
                     var newMappings = dto.ViewerUserIDs
                         .Where(userId => !existingUserIds.Contains(userId))
-                        .Select(userId => new AIUserCityMapping
+                        .Select(userId => new AIUserCountryMapping
                         {
                             UserID = userId,
-                            CityID = dto.CityID,
+                            CountryID = dto.CountryID,
                             AssignBy = userID,
                             UpdatedAt = DateTime.UtcNow,
                             IsActive = true
                         });
 
-                    await _context.AIUserCityMappings.AddRangeAsync(newMappings);
-                    msg = "Evaluator have access to view the city";
+                    await _context.AIUserCountryMappings.AddRangeAsync(newMappings);
+                    msg = "Evaluator have access to view the country";
                 }
-                else if(aIUserCityMappingsList.Count > 0)
+                else if(aIUserCountryMappingsList.Count > 0)
                 {
-                    foreach (var mapping in aIUserCityMappingsList)
+                    foreach (var mapping in aIUserCountryMappingsList)
                     {
                         mapping.IsActive = false;
                         mapping.UpdatedAt = DateTime.UtcNow;
@@ -961,7 +959,7 @@ namespace PeaceEnablers.Services
         {
             try
             {
-                var aIUserCityMappings = await _context.AIUserCityMappings.FirstOrDefaultAsync(x => x.UserID == userID && x.IsActive && x.CityID == dto.CityID);
+                var aIUserCityMappings = await _context.AIUserCountryMappings.FirstOrDefaultAsync(x => x.UserID == userID && x.IsActive && x.CountryID == dto.CountryID);
                 if (aIUserCityMappings !=null && userRole == UserRole.Evaluator)
                 {
                     aIUserCityMappings.Comment = dto.Comment;
@@ -973,12 +971,12 @@ namespace PeaceEnablers.Services
                     return ResultResponseDto<bool>.Success(true, new[] {"Comment Added Successfully"});
 
                 }
-                return ResultResponseDto<bool>.Failure(new[] { "Invalid city, please try again" });
+                return ResultResponseDto<bool>.Failure(new[] { "Invalid country, please try again" });
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error in ChangedAiCityEvaluationStatus", ex);
-                return ResultResponseDto<bool>.Failure(new[] { "Error in Changed AiCity Evaluation Status" });
+                await _appLogger.LogAsync("Error in ChangedAiCountryEvaluationStatus", ex);
+                return ResultResponseDto<bool>.Failure(new[] { "Error in Changed AiCountry Evaluation Status" });
             }
         }
         public async Task<ResultResponseDto<bool>> RegeneratePillarAiSearch(RegeneratePillarAiSearchDto channel, int userID, UserRole userRole)
@@ -988,18 +986,18 @@ namespace PeaceEnablers.Services
                 if (channel.QuestionEnable)
                 {
                     var currentYear = DateTime.Now.Year;
-                    var aiQuestionList = await _context.AIEstimatedQuestionScores.Where(x => x.CityID == channel.CityID && x.PillarID== channel.PillarID && x.Year == currentYear).ToListAsync();
+                    var aiQuestionList = await _context.AIEstimatedQuestionScores.Where(x => x.CountryID == channel.CountryID && x.PillarID== channel.PillarID && x.Year == currentYear).ToListAsync();
                     if (aiQuestionList.Count > 0)
                     {
                         _context.AIEstimatedQuestionScores.RemoveRange(aiQuestionList);
                         await _context.SaveChangesAsync();
                     }
 
-                    await _iAIAnalayzeService.AnalyzeQuestionsOfCityPillar(channel.CityID, channel.PillarID);
+                    await _iAIAnalayzeService.AnalyzeQuestionsOfCountryPillar(channel.CountryID, channel.PillarID);
                 }
 
                 if (channel.PillarEnable)
-                    await _iAIAnalayzeService.AnalyzeSinglePillar(channel.CityID,channel.PillarID);
+                    await _iAIAnalayzeService.AnalyzeSinglePillar(channel.CountryID,channel.PillarID);
 
 
                 var msglist = new List<string>
@@ -1018,32 +1016,32 @@ namespace PeaceEnablers.Services
             }
         }
 
-        public async Task<AiCitySummeryDto> GetCityAiSummeryDetail(int userID, UserRole userRole, int? cityID, int year)
+        public async Task<AiCountrySummeryDto> GetCountryAiSummeryDetail(int userID, UserRole userRole, int? CountryID, int year)
         {
-            var query = await GetCityAiSummeryDetails(userID, userRole, cityID, year);
-            var cityDetails = await query.FirstAsync();
+            var query = await GetCountryAiSummeryDetails(userID, userRole, CountryID, year);
+            var countryDetails = await query.FirstAsync();
             int pillarCount = _appSettings.PillarCount;
-            if (userRole != UserRole.CityUser)
+            if (userRole != UserRole.CountryUser)
             {
-                var progress = await _commonService.GetCitiesProgressAsync(userID, (int)userRole, DateTime.Now.Year);
+                var progress = await _commonService.GetCountriesProgressAsync(userID, (int)userRole, DateTime.Now.Year);
 
-                var cities = progress.Where(x => x.CityID == cityID);
+                var countries = progress.Where(x => x.CountryID == CountryID);
 
-               if(cities != null)
+               if(countries != null)
                 {
-                    var cityScore = cities
+                    var countryScore = countries
                         .Select(x => x.ScoreProgress)
                         .DefaultIfEmpty(0)
                         .Sum();
-                    cityScore = Math.Round(cityScore / pillarCount, 2);
+                    countryScore = Math.Round(countryScore / pillarCount, 2);
 
-                    cityDetails.EvaluatorScore = Math.Round(cityScore,2);
-                    cityDetails.Discrepancy = Math.Abs(cityScore - (cityDetails.AIProgress ?? 0));
+                    countryDetails.EvaluatorScore = Math.Round(countryScore,2);
+                    countryDetails.Discrepancy = Math.Abs(countryScore - (countryDetails.AIProgress ?? 0));
                }
             }
-            return cityDetails;
+            return countryDetails;
         }
-        private async Task<List<KpiChartItem>> GetAccessKpis(int userID, UserRole role, int? cityID, int year = 0, bool isAiScore = true)
+        private async Task<List<KpiChartItem>> GetAccessKpis(int userID, UserRole role, int? CountryID, int year = 0, bool isAiScore = true)
         {
             var startDate = new DateTime(year, 1, 1);
             var endDate = new DateTime(year + 1, 1, 1);
@@ -1052,16 +1050,16 @@ namespace PeaceEnablers.Services
                 .AsNoTracking()
                 .Include(ar => ar.AnalyticalLayer)
                     .ThenInclude(al => al.FiveLevelInterpretations)
-                .Include(ar => ar.City)
+                .Include(ar => ar.Country)
                 .Where(x => x.AiLastUpdated >= startDate && x.AiLastUpdated < endDate);
 
-            if (role == UserRole.CityUser)
+            if (role == UserRole.CountryUser)
             {
-                var validCities = _context.PublicUserCityMappings
+                var validCities = _context.PublicUserCountryMappings
                     .Where(x => x.IsActive && x.UserID == userID)
-                    .Select(x => x.CityID);
+                    .Select(x => x.CountryID);
 
-                var validPillarIds = _context.CityUserPillarMappings
+                var validPillarIds = _context.CountryUserPillarMappings
                     .Where(x => x.IsActive && x.UserID == userID)
                     .Select(x => x.PillarID);
 
@@ -1072,17 +1070,17 @@ namespace PeaceEnablers.Services
 
                 baseQuery = baseQuery
                     .Where(ar =>
-                        validCities.Contains(ar.CityID) &&
+                        validCities.Contains(ar.CountryID) &&
                         validLayerIds.Contains(ar.LayerID));
             }
 
             var kpiRaw = baseQuery
-            .Where(x => !cityID.HasValue || x.CityID == cityID)
+            .Where(x => !CountryID.HasValue || x.CountryID == CountryID)
             .Select(x => new
             {
                 KpiShortName = x.AnalyticalLayer.LayerCode,
                 KpiName = x.AnalyticalLayer.LayerName,
-                CityID = x.CityID,
+                CountryID = x.CountryID,
                 AiCalValue5 = x.AiCalValue5,
                 CalValue5 = x.CalValue5,
                 Definition = StripHtml(x.AnalyticalLayer.Purpose),
@@ -1092,7 +1090,7 @@ namespace PeaceEnablers.Services
             {
                 x.KpiShortName,
                 x.KpiName,
-                x.CityID,
+                x.CountryID,
                 x.AiCalValue5,
                 x.CalValue5,
                 LayerID = x.AnalyticalLayer.LayerID,
@@ -1110,53 +1108,53 @@ namespace PeaceEnablers.Services
             }).OrderBy(x => x.LayerID);
 
             var kpis = await kpiRaw
-                .Select(k => new KpiChartItem(k.KpiShortName, k.KpiName, isAiScore && role == UserRole.Admin ? k.AiCalValue5 : k.CalValue5, k.Definition, k.CityID, k.Interpretation))
+                .Select(k => new KpiChartItem(k.KpiShortName, k.KpiName, isAiScore && role == UserRole.Admin ? k.AiCalValue5 : k.CalValue5, k.Definition, k.CountryID, k.Interpretation))
                 .ToListAsync();
 
             return kpis ?? new List<KpiChartItem>();
         }
-        public async Task<List<AiCitySummeryDto>> GetAllCityAiSummeryDetail(int userID, UserRole userRole, int year)
+        public async Task<List<AiCountrySummeryDto>> GetAllCountryAiSummeryDetail(int userID, UserRole userRole, int year)
         {
-            var query = await GetCityAiSummeryDetails(userID, userRole, null, year);
-            var citiesDetails = await query.ToListAsync();
+            var query = await GetCountryAiSummeryDetails(userID, userRole, null, year);
+            var countriesDetails = await query.ToListAsync();
             int pillarCount = _appSettings.PillarCount;
-            if (userRole != UserRole.CityUser)
+            if (userRole != UserRole.CountryUser)
             {
-                foreach (var cityDetails in citiesDetails)
+                foreach (var countryDetails in countriesDetails)
                 {
-                    var progress = await _commonService.GetCitiesProgressAsync(userID, (int)userRole, DateTime.Now.Year);
+                    var progress = await _commonService.GetCountriesProgressAsync(userID, (int)userRole, DateTime.Now.Year);
 
-                    var cities = progress.Where(x => x.CityID == cityDetails.CityID);
+                    var countries = progress.Where(x => x.CountryID == countryDetails.CountryID);
 
-                    if (cities != null)
+                    if (countries != null)
                     {
-                        var cityScore = cities
+                        var countryScore = countries
                             .Select(x => x.ScoreProgress)
                             .DefaultIfEmpty(0)
                             .Sum();
-                        cityScore = Math.Round(cityScore / pillarCount, 2);
+                        countryScore = Math.Round(countryScore / pillarCount, 2);
 
-                        cityDetails.EvaluatorScore = Math.Round(cityScore, 2);
-                        cityDetails.Discrepancy = Math.Abs(cityScore - (cityDetails.AIProgress ?? 0));
+                        countryDetails.EvaluatorScore = Math.Round(countryScore, 2);
+                        countryDetails.Discrepancy = Math.Abs(countryScore - (countryDetails.AIProgress ?? 0));
                     }
                 }
 
             }
-            return citiesDetails;
+            return countriesDetails;
         }        
 
-        public async Task<byte[]> GenerateAllCityDetailsReport(List<AiCitySummeryDto> citiesDetails, UserRole userRole, int userID, int year, IServices.DocumentFormat format = IServices.DocumentFormat.Pdf)
+        public async Task<byte[]> GenerateAllCountryDetailsReport(List<AiCountrySummeryDto> countriesDetails, UserRole userRole, int userID, int year, IServices.DocumentFormat format = IServices.DocumentFormat.Pdf)
         {
             try
             {
-                var pillars = await GetAllCitiesAIPillars(userID, userRole, year);
+                var pillars = await GetAllCountriesAIPillars(userID, userRole, year);
 
                 var kpis = new List<KpiChartItem>();
 
-                var recordAvailable = pillars.Result.Any(x => citiesDetails.Select(x => x.CityID).Contains(x.Key));
+                var recordAvailable = pillars.Result.Any(x => countriesDetails.Select(x => x.CountryID).Contains(x.Key));
                 if (recordAvailable)
                 {
-                    var document = await _documentGeneratorService.GenerateAllCitiesDetails(citiesDetails, pillars.Result, kpis, userRole, format);
+                    var document = await _documentGeneratorService.GenerateAllCountriesDetails(countriesDetails, pillars.Result, kpis, userRole, format);
 
                     return document;
                 }
@@ -1167,11 +1165,11 @@ namespace PeaceEnablers.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GenerateCityDetailsReport", ex);
+                await _appLogger.LogAsync("Error Occured in GeneratecountryDetailsReport", ex);
                 return Array.Empty<byte>();
             }
         }
-        public async Task<ResultResponseDto<Dictionary<int, List<AiCityPillarResponse>>>> GetAllCitiesAIPillars(
+        public async Task<ResultResponseDto<Dictionary<int, List<AiCountryPillarResponse>>>> GetAllCountriesAIPillars(
          int userID, UserRole userRole, int currentYear = 0)
         {
             try
@@ -1182,14 +1180,14 @@ namespace PeaceEnablers.Services
 
                 var scores = await _context.AIPillarScores
                     .Where(x => x.UpdatedAt >= firstDate && x.Year == currentYear)
-                    .Include(x => x.City)
+                    .Include(x => x.Country)
                     .Include(x => x.DataSourceCitations)
                     .ToListAsync();
 
                 List<int> pillarIds = new();
-                if (userRole == UserRole.CityUser)
+                if (userRole == UserRole.CountryUser)
                 {
-                    pillarIds = await _context.CityUserPillarMappings
+                    pillarIds = await _context.CountryUserPillarMappings
                         .Where(x => x.IsActive && x.UserID == userID)
                         .Select(x => x.PillarID)
                         .Distinct()
@@ -1205,17 +1203,17 @@ namespace PeaceEnablers.Services
                     TotalQuestions = x.Questions.Count()
                 }).ToListAsync();
 
-                var cityIds = scores.Select(x => x.CityID).Distinct().ToList();
+                var CountryIDs = scores.Select(x => x.CountryID).Distinct().ToList();
 
-                var result = new Dictionary<int, List<AiCityPillarResponse>>();
+                var result = new Dictionary<int, List<AiCountryPillarResponse>>();
 
-                foreach (var cityId in cityIds)
+                foreach (var CountryID in CountryIDs)
                 {
-                    var cityScores = scores.Where(x => x.CityID == cityId).ToList();
+                    var countryScores = scores.Where(x => x.CountryID == CountryID).ToList();
 
                     var pillarResults = pillars
                         .GroupJoin(
-                            cityScores,
+                            countryScores,
                             p => p.PillarID,
                             s => s.PillarID,
                             (pillar, score) => new { pillar, score = score.FirstOrDefault() }
@@ -1224,13 +1222,12 @@ namespace PeaceEnablers.Services
                         {
                             var isAccess = pillarIds.Count == 0 || pillarIds.Contains(x.pillar.PillarID);
 
-                            var r = new AiCityPillarResponse
+                            var r = new AiCountryPillarResponse
                             {
                                 PillarScoreID = x.score?.PillarScoreID ?? 0,
-                                CityID = x.score?.CityID ?? cityId,
-                                CityName = x.score?.City?.CityName ?? "",
-                                State = x.score?.City?.State ?? "",
-                                Country = x.score?.City?.Country ?? "",
+                                CountryID = x.score?.CountryID ?? CountryID,
+                                CountryName = x.score?.Country?.CountryName ?? "",
+                                Continent = x.score?.Country?.Continent ?? "",                                
                                 PillarID = x.pillar.PillarID,
                                 PillarName = x.pillar.PillarName,
                                 DisplayOrder = x.pillar.DisplayOrder,
@@ -1276,59 +1273,59 @@ namespace PeaceEnablers.Services
                         .ThenBy(x => x.DisplayOrder)
                         .ToList();
 
-                    result.Add(cityId, pillarResults);
+                    result.Add(CountryID, pillarResults);
                 }
 
-                var progress = await _commonService.GetCitiesProgressAsync(userID, (int)userRole, currentYear);
+                var progress = await _commonService.GetCountriesProgressAsync(userID, (int)userRole, currentYear);
 
                 var answeredQuestions = await _context.AIEstimatedQuestionScores
                     .Where(x => x.Year == currentYear)
-                    .GroupBy(x => new { x.CityID, x.PillarID })
+                    .GroupBy(x => new { x.CountryID, x.PillarID })
                     .Select(g => new
                     {
-                        g.Key.CityID,
+                        g.Key.CountryID,
                         g.Key.PillarID,
                         AnsweredQuestions = g.Count()
                     })
                     .ToListAsync();
 
-                foreach (var city in result)
+                foreach (var country in result)
                 {
-                    foreach (var c in city.Value)
+                    foreach (var c in country.Value)
                     {
                         var totalQuestions = pillars.FirstOrDefault(x => x.PillarID == c.PillarID)?.TotalQuestions ?? 1;
 
                         var answeredQuestion = answeredQuestions
-                            .FirstOrDefault(x => x.CityID == city.Key && x.PillarID == c.PillarID)?.AnsweredQuestions ?? 0;
+                            .FirstOrDefault(x => x.CountryID == country.Key && x.PillarID == c.PillarID)?.AnsweredQuestions ?? 0;
 
-                        var cityScore = progress
-                            .Where(x => x.CityID == city.Key && x.PillarID == c.PillarID)
+                        var countryScore = progress
+                            .Where(x => x.CountryID == country.Key && x.PillarID == c.PillarID)
                             .Select(x => x.ScoreProgress)
                             .DefaultIfEmpty(0)
                             .Sum();
 
-                        cityScore = Math.Round(cityScore / pillarCount, 2);
+                        countryScore = Math.Round(countryScore / pillarCount, 2);
 
-                        c.EvaluatorScore = cityScore;
-                        c.Discrepancy = Math.Abs(cityScore - (c.AIProgress ?? 0));
+                        c.EvaluatorScore = countryScore;
+                        c.Discrepancy = Math.Abs(countryScore - (c.AIProgress ?? 0));
                         c.AICompletionRate = answeredQuestion * 100.0M / totalQuestions;
                     }
                 }
 
-                var response = ResultResponseDto<Dictionary<int, List<AiCityPillarResponse>>>
-                    .Success(result, new[] { "All cities pillars fetched successfully" });
+                var response = ResultResponseDto<Dictionary<int, List<AiCountryPillarResponse>>>
+                    .Success(result, new[] { "All countries pillars fetched successfully" });
 
                 return response;
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GetAllCitiesAIPillars", ex);
+                await _appLogger.LogAsync("Error Occured in getAllCountriesAIPillars", ex);
 
-                return ResultResponseDto<Dictionary<int, List<AiCityPillarResponse>>>
-                    .Failure(new[] { "Error in getting cities pillar details" });
+                return ResultResponseDto<Dictionary<int, List<AiCountryPillarResponse>>>
+                    .Failure(new[] { "Error in getting countries pillar details" });
             }
         }
-        public record KpiChartItem(string ShortName, string Name, decimal? Value, string? Definition, int? CityID, List<FiveLevelInterpretationsDto> InterPretation);
+        public record KpiChartItem(string ShortName, string Name, decimal? Value, string? Definition, int? CountryID, List<FiveLevelInterpretationsDto> InterPretation);
 
         public record FiveLevelInterpretationsDto(
         int InterpretationID,
@@ -1347,7 +1344,7 @@ namespace PeaceEnablers.Services
                 var currentDate = DateTime.Now;
                 var year = currentDate.Year;
 
-                if (userRole == UserRole.CityUser || userRole == UserRole.Evaluator)
+                if (userRole == UserRole.CountryUser || userRole == UserRole.Evaluator)
                 {
                     return ResultResponseDto<string>.Failure(new[] { "Failed to transfer assessment, You don't have access." });
                 }
@@ -1356,16 +1353,16 @@ namespace PeaceEnablers.Services
                 {
                     r.TransferToUserID = userID;
 
-                    var validCity = _context.UserCityMappings.Any(x => !x.IsDeleted && x.CityID == r.CityID && x.UserID == userID);
+                    var validCity = _context.UserCountryMappings.Any(x => !x.IsDeleted && x.CountryID == r.CountryID && x.UserID == userID);
 
                     if (!validCity)
                     {
-                        return ResultResponseDto<string>.Failure(new[] { "This assessment can’t be imported because the selected user hasn’t been assigned to this city yet." });
+                        return ResultResponseDto<string>.Failure(new[] { "This assessment can’t be imported because the selected user hasn’t been assigned to this country yet." });
                     }
                 }
 
                 var aiAssessmentData = await _context.AIEstimatedQuestionScores
-                                    .Where(x => x.CityID == r.CityID && x.Year == year)
+                                    .Where(x => x.CountryID == r.CountryID && x.Year == year)
                                     .ToListAsync();
 
                 var aiAssessmentQuestions = aiAssessmentData
@@ -1373,27 +1370,27 @@ namespace PeaceEnablers.Services
                     .ToDictionary(g => g.Key, g => g.ToList());
 
                 if (aiAssessmentQuestions == null || aiAssessmentQuestions.Count==0)
-                    return ResultResponseDto<string>.Failure(new[] { "There is no ai assessment is available for this city" });
+                    return ResultResponseDto<string>.Failure(new[] { "There is no ai assessment is available for this country" });
 
 
-                var userCityMapping = await _context.UserCityMappings.FirstOrDefaultAsync(x => !x.IsDeleted && x.CityID == r.CityID && x.UserID == r.TransferToUserID);
+                var userCityMapping = await _context.UserCountryMappings.FirstOrDefaultAsync(x => !x.IsDeleted && x.CountryID == r.CountryID && x.UserID == r.TransferToUserID);
 
                 if (userCityMapping == null)
-                    return ResultResponseDto<string>.Failure(new[] { "This assessment can’t be imported because the selected user hasn’t been assigned to this city yet." });
+                    return ResultResponseDto<string>.Failure(new[] { "This assessment can’t be imported because the selected user hasn’t been assigned to this country yet." });
 
 
-                // Load existing assessment for that user/city/year (with pillars/responses)
+                // Load existing assessment for that user/country/year (with pillars/responses)
                 var existingAssessment = await _context.Assessments
                     .Include(a => a.PillarAssessments)
                         .ThenInclude(p => p.Responses)
-                    .FirstOrDefaultAsync(a => a.UserCityMappingID == userCityMapping.UserCityMappingID &&
+                    .FirstOrDefaultAsync(a => a.UserCountryMappingID == userCityMapping.UserCountryMappingID &&
                                               a.UpdatedAt.Year == year);
 
                 if (existingAssessment == null)
                 {
                     existingAssessment = new Assessment
                     {
-                        UserCityMappingID = userCityMapping.UserCityMappingID,
+                        UserCountryMappingID = userCityMapping.UserCountryMappingID,
                         CreatedAt = currentDate,
                         UpdatedAt = currentDate,
                         IsActive = true,
@@ -1490,7 +1487,7 @@ namespace PeaceEnablers.Services
                 }
                 if (existingAssessment.AssessmentPhase == AssessmentPhase.Completed)
                 {
-                    _download.InsertAnalyticalLayerResults(r.CityID);
+                    _download.InsertAnalyticalLayerResults(r.CountryID);
                 }                
                 await _context.SaveChangesAsync();
 
@@ -1512,7 +1509,7 @@ namespace PeaceEnablers.Services
                     return ResultResponseDto<string>.Failure(new[] { "Failed to recalculate KPIs, You don't have access." });
                 }
 
-                await _context.Database.ExecuteSqlRawAsync("EXEC sp_AiRecalculateCityScore");
+                await _context.Database.ExecuteSqlRawAsync("EXEC sp_AiRecalculateCountryScore");
 
                 await _context.Database.ExecuteSqlRawAsync("EXEC sp_InsertAnalyticalLayerResults");
 

@@ -39,4 +39,8 @@
     <Folder Include="wwwroot\uploads\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="Dtos\CountryDto\SendRequestMailToUpdateCountry.cs" />
+  </ItemGroup>
+
 </Project>

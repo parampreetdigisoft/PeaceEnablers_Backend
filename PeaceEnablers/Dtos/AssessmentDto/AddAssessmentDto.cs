@@ -5,7 +5,7 @@ namespace PeaceEnablers.Dtos.AssessmentDto
     public class AddAssessmentDto
     {
         public int AssessmentID { get; set; }
-        public int UserCityMappingID { get; set; }
+        public int UserCountryMappingID { get; set; }
         public int PillarID { get; set; }
         public List<AddAssesmentResponseDto> Responses { get; set; }
         public bool IsAutoSave { get; set; } = false;

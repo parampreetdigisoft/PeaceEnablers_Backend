@@ -26,10 +26,10 @@ namespace PeaceEnablers.Common.DI
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IPillarService, PillarService>();
             services.AddScoped<IAssessmentResponseService, AssessmentResponseService>();
-            services.AddScoped<ICityService, CityService>();
+            services.AddScoped<ICountryService, CountryService>();
             services.AddScoped<IEmailService, EmailService>();
             services.AddScoped<IAuthService, AuthService>();
-            services.AddScoped<ICityUserService, CityUserService>();
+            services.AddScoped<ICountryUserService, CountryUserService>();
             services.AddScoped<IPaymentService, PaymentService>();
             services.AddScoped<IPublicService, PublicService>();
             services.AddScoped<IKpiService, KpiService>();

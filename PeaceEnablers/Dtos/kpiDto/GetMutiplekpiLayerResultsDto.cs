@@ -13,13 +13,13 @@ namespace PeaceEnablers.Dtos.kpiDto
         public string? CalText3 { get; set; }
         public string? CalText4 { get; set; }
         public string? CalText5 { get; set; }
-        public List<MutipleCitieskpiLayerResults> cities { get; set; } = new();
+        public List<MutipleCountrieskpiLayerResults> Countries { get; set; } = new();
         public ICollection<FiveLevelInterpretation> FiveLevelInterpretations { get; set; } = new List<FiveLevelInterpretation>();
     }
-    public class MutipleCitieskpiLayerResults
+    public class MutipleCountrieskpiLayerResults
     {
         public int LayerResultID { get; set; }
-        public int CityID { get; set; }
+        public int CountryID { get; set; }
         public int? InterpretationID { get; set; }
         public decimal? NormalizeValue { get; set; }       
         public decimal? CalValue5 { get; set; }
@@ -28,6 +28,6 @@ namespace PeaceEnablers.Dtos.kpiDto
         public decimal? AiNormalizeValue { get; set; }       
         public decimal? AiCalValue5 { get; set; }
         public DateTime? AiLastUpdated { get; set; }
-        public City? City { get; set; }
+        public Country? Country { get; set; }
     }
 }

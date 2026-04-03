@@ -13,20 +13,20 @@ namespace PeaceEnablers.Common.Interface
     /// </summary>
     public interface IDocxGeneratorService
     {
-        Task<byte[]> GenerateCityDetailsDocx(
-            AiCitySummeryDto city,
-            List<AiCityPillarResponse> pillars,
+        Task<byte[]> GenerateCountryDetailsDocx(
+            AiCountrySummeryDto country,
+            List<AiCountryPillarResponse> pillars,
             List<KpiChartItem> kpis,
-            List<PeerCityHistoryReportDto> peerCities,
+            List<PeerCountryHistoryReportDto> peerCountries,
             UserRole userRole);
 
         Task<byte[]> GeneratePillarDetailsDocx(
-            AiCityPillarResponse pillarData,
+            AiCountryPillarResponse pillarData,
             UserRole userRole);
 
-        Task<byte[]> GenerateAllCitiesDetailsDocx(
-            List<AiCitySummeryDto> cities,
-            Dictionary<int, List<AiCityPillarResponse>> pillarsDict,
+        Task<byte[]> GenerateAllCountriesDetailsDocx(
+            List<AiCountrySummeryDto> countries,
+            Dictionary<int, List<AiCountryPillarResponse>> pillarsDict,
             List<KpiChartItem> kpis,
             UserRole userRole);
     }

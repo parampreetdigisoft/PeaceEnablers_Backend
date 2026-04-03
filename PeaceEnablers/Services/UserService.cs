@@ -2,7 +2,7 @@ using PeaceEnablers.Common.Implementation;
 using PeaceEnablers.Common.Models;
 using PeaceEnablers.Data;
 using PeaceEnablers.Dtos.AssessmentDto;
-using PeaceEnablers.Dtos.CityDto;
+using PeaceEnablers.Dtos.CountryDto;
 using PeaceEnablers.Dtos.CommonDto;
 using PeaceEnablers.Dtos.UserDtos;
 using PeaceEnablers.IServices;
@@ -27,20 +27,20 @@ namespace PeaceEnablers.Services
         {
             return _context.Users.FirstOrDefault(u => u.Email == email);
         }
-        public async Task<PaginationResponse<GetUserByRoleResponse>> GetUserByRoleWithAssignedCity(GetUserByRoleRequestDto request)
+        public async Task<PaginationResponse<GetUserByRoleResponse>> GetUserByRoleWithAssignedCountry(GetUserByRoleRequestDto request)
         {
             try
             {
                 var currentUser = _context.Users.First(u => u.UserID == request.UserID);
 
                 var filteredMappings =
-                    _context.UserCityMappings
+                    _context.UserCountryMappings
                         .Where(x => !x.IsDeleted &&
                                (x.AssignedByUserId == request.UserID || currentUser.Role == UserRole.Admin));
 
                 Expression<Func<User, bool>> predicate = currentUser.Role switch
                 {
-                    UserRole.Admin => x => !x.IsDeleted && request.GetUserRole.HasValue ? x.Role == request.GetUserRole : (x.Role == UserRole.Evaluator || x.Role == UserRole.CityUser),
+                    UserRole.Admin => x => !x.IsDeleted && request.GetUserRole.HasValue ? x.Role == request.GetUserRole : (x.Role == UserRole.Evaluator || x.Role == UserRole.CountryUser),
                     _ => x => !x.IsDeleted && x.Role == UserRole.Evaluator
                 };
 
@@ -76,34 +76,34 @@ namespace PeaceEnablers.Services
                          x.Email.Contains(request.SearchText) ||
                          x.FullName.Contains(request.SearchText));
 
-                // Get all cities for fetched users in one query
+                // Get all countries for fetched users in one query
                 var userIds = response.Data.Select(x => x.UserID).Distinct().ToList();
-                var cityMap = await _context.UserCityMappings
+                var countryMap = await _context.UserCountryMappings
                 .Where(x => !x.IsDeleted && userIds.Contains(x.UserID) && (x.AssignedByUserId == request.UserID || currentUser.Role == UserRole.Admin))
-                .Join(_context.Cities,
-                      cm => cm.CityID,
-                      c => c.CityID,
+                .Join(_context.Countries,
+                      cm => cm.CountryID,
+                      c => c.CountryID,
                       (cm, c) => new
                       {
                           cm.UserID,
-                          City = new AddUpdateCityDto
+                          Country = new AddUpdateCountryDto
                           {
-                              CityID = c.CityID,
-                              CityName = c.CityName,
+                              CountryID = c.CountryID,
+                              CountryName = c.CountryName,
                               Region = c.Region,
-                              State = c.State
+                              Continent = c.Continent
                           }
                       }).Distinct()
                 .ToListAsync();
 
-                var result = cityMap
+                var result = countryMap
                     .GroupBy(x => x.UserID)
-                    .ToDictionary(g => g.Key, g => g.Select(x => x.City).ToList());
+                    .ToDictionary(g => g.Key, g => g.Select(x => x.Country).ToList());
 
                 foreach (var item in response.Data)
                 {
-                    result.TryGetValue(item.UserID, out var cities);
-                    item.cities = cities ?? new List<AddUpdateCityDto>();
+                    result.TryGetValue(item.UserID, out var countries);
+                    item.Countries = countries ?? new List<AddUpdateCountryDto>();
                 }
 
                 return response;
@@ -119,11 +119,11 @@ namespace PeaceEnablers.Services
             try
             {
                 var query =
-                    from uc in _context.UserCityMappings
+                    from uc in _context.UserCountryMappings
                     where !uc.IsDeleted
                           && uc.AssignedByUserId == request.UserID
                           && (!request.SearchedUserID.HasValue || uc.UserID == request.SearchedUserID.Value)
-                          && (!request.CityID.HasValue || uc.CityID == request.CityID.Value)
+                          && (!request.CountryID.HasValue || uc.CountryID == request.CountryID.Value)
                     join u in _context.Users
                         .Where(x => !x.IsDeleted)
                         on uc.UserID equals u.UserID
@@ -156,7 +156,7 @@ namespace PeaceEnablers.Services
             }
         }
 
-        public async Task<ResultResponseDto<List<GetAssessmentResponseDto>>> GetUsersAssignedToCity(int cityId)
+        public async Task<ResultResponseDto<List<GetAssessmentResponseDto>>> GetUsersAssignedToCountry(int countryId)
         {
             try
             {
@@ -164,11 +164,11 @@ namespace PeaceEnablers.Services
                 var query =
                 from u in _context.Users
                 where !u.IsDeleted
-                join uc in _context.UserCityMappings
-                        .Where(x => !x.IsDeleted && x.CityID == cityId)
+                join uc in _context.UserCountryMappings
+                        .Where(x => !x.IsDeleted && x.CountryID == countryId)
                     on u.UserID equals uc.UserID
-                join c in _context.Cities.Where(x => !x.IsDeleted)
-                    on uc.CityID equals c.CityID
+                join c in _context.Countries.Where(x => !x.IsDeleted)
+                    on uc.CountryID equals c.CountryID
                 join createdBy in _context.Users.Where(x => !x.IsDeleted)
                     on uc.AssignedByUserId equals createdBy.UserID into createdByUser
                 from createdBy in createdByUser.DefaultIfEmpty()
@@ -177,17 +177,17 @@ namespace PeaceEnablers.Services
                 join a in _context.Assessments
                         .Include(q => q.PillarAssessments)
                             .ThenInclude(q => q.Responses).Where(x=>x.IsActive && x.CreatedAt.Year == year)
-                    on uc.UserCityMappingID equals a.UserCityMappingID into userAssessment
+                    on uc.UserCountryMappingID equals a.UserCountryMappingID into userAssessment
                 from a in userAssessment.DefaultIfEmpty()
 
                 select new GetAssessmentResponseDto
                 {
                     AssessmentID = a != null ? a.AssessmentID : 0,
-                    UserCityMappingID = uc.UserCityMappingID,
+                    UserCountryMappingID = uc.UserCountryMappingID,
                     CreatedAt = a != null ? a.CreatedAt : null,
-                    CityID = c.CityID,
-                    CityName = c.CityName,
-                    State = c.State,
+                    CountryID = c.CountryID,
+                    CountryName = c.CountryName,
+                    Continent = c.Continent,
                     UserID = u.UserID,
                     UserName = u.FullName,
                     Score = a != null

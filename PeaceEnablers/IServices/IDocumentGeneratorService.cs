@@ -22,25 +22,25 @@ namespace PeaceEnablers.IServices
     /// </summary>
     public interface IDocumentGeneratorService
     {
-        /// <summary>Full city report: dashboard, summary, pillars, peer comparison, trends, KPI dashboard.</summary>
-        Task<byte[]> GenerateCityDetails(
-            AiCitySummeryDto city,
-            List<AiCityPillarResponse> pillars,
+        /// <summary>Full country report: dashboard, summary, pillars, peer comparison, trends, KPI dashboard.</summary>
+        Task<byte[]> GenerateCountryDetails(
+            AiCountrySummeryDto country,
+            List<AiCountryPillarResponse> pillars,
             List<KpiChartItem> kpis,
-            List<PeerCityHistoryReportDto> peerCity,
+            List<PeerCountryHistoryReportDto> peerCountry,
             UserRole userRole,
             DocumentFormat format = DocumentFormat.Pdf);
 
         /// <summary>Single pillar detail report.</summary>
         Task<byte[]> GeneratePillarDetails(
-            AiCityPillarResponse pillarData,
+            AiCountryPillarResponse pillarData,
             UserRole userRole,
             DocumentFormat format = DocumentFormat.Pdf);
 
-        /// <summary>Combined report covering every city in the list.</summary>
-        Task<byte[]> GenerateAllCitiesDetails(
-            List<AiCitySummeryDto> cities,
-            Dictionary<int, List<AiCityPillarResponse>> pillarsDict,
+        /// <summary>Combined report covering every country in the list.</summary>
+        Task<byte[]> GenerateAllCountriesDetails(
+            List<AiCountrySummeryDto> countries,
+            Dictionary<int, List<AiCountryPillarResponse>> pillarsDict,
             List<KpiChartItem> kpis,
             UserRole userRole,
             DocumentFormat format = DocumentFormat.Pdf);

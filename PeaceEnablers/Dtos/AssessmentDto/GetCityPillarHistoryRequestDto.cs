@@ -7,27 +7,27 @@ namespace PeaceEnablers.Dtos.AssessmentDto
 
     public class GetPillarResponseHistoryRequestNewDto : PaginationRequest
     {
-        public int CityID { get; set; }
+        public int CountryID { get; set; }
         public int? PillarID { get; set; }
         public DateTime UpdatedAt { get; set; } = new DateTime(DateTime.Now.Year, 1, 1);
     }
-    public class GetCityPillarHistoryRequestDto
+    public class GetCountryPillarHistoryRequestDto
     {
         public int UserID { get; set; }
-        public int CityID { get; set; }
+        public int CountryID { get; set; }
         public int? PillarID { get; set; }
         public DateTime UpdatedAt { get; set; } = new DateTime(DateTime.Now.Year, 1, 1);
 
         public ExportType ExportType { get; set; }
     }
-    public class UserCityRequstDto : UserCityDashBoardRequstDto
+    public class UserCountryRequestDto : UserCountryDashBoardRequestDto
     {
         public int UserID { get; set; }
         public TieredAccessPlan Tiered { get; set; } = TieredAccessPlan.Pending;
     }
-    public class UserCityDashBoardRequstDto
+    public class UserCountryDashBoardRequestDto
     {
-        public int CityID { get; set; }
+        public int CountryID { get; set; }
         public DateTime UpdatedAt { get; set; } = new DateTime(DateTime.Now.Year, 1, 1);
     }
 

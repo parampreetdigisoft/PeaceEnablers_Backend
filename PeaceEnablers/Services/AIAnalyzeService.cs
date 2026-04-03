@@ -24,10 +24,10 @@ namespace PeaceEnablers.Services
         }
         public async Task RunMonthlyJob()
         {
-            var newCitiesIds = _context.Cities.Where(x => x.IsActive && !x.IsDeleted ).Select(x => x.CityID).ToList();
-            foreach (var id in newCitiesIds)
+            var newCountriesIds = _context.Countries.Where(x => x.IsActive && !x.IsDeleted ).Select(x => x.CountryID).ToList();
+            foreach (var id in newCountriesIds)
             {
-                await AnalyzeSingleCityFull(id);
+                await AnalyzeSingleCountryFull(id);
             }
         }
 
@@ -48,13 +48,13 @@ namespace PeaceEnablers.Services
         {
             // if new city added
             var totalPillar = await _context.Pillars.CountAsync();
-            var allCitiesIds = _context.Cities.Where(x=>x.IsActive && !x.IsDeleted).Select(x=>x.CityID).ToList();
-            var importedCitiesIds = _context.AICityScores.Select(x => x.CityID);
+            var allCountriesIds = _context.Countries.Where(x=>x.IsActive && !x.IsDeleted).Select(x=>x.CountryID).ToList();
+            var importedCountriesIds = _context.AICountryScores.Select(x => x.CountryID);
 
-            var newCitiesIds = allCitiesIds.Where(x=> !importedCitiesIds.Contains(x)).ToList();
-            foreach (var id in newCitiesIds)
+            var newCountriesIds = allCountriesIds.Where(x=> !importedCountriesIds.Contains(x)).ToList();
+            foreach (var id in newCountriesIds)
             {
-                await AnalyzeSingleCityFull(id);
+                await AnalyzeSingleCountryFull(id);
             }
 
             var now = DateTime.UtcNow;
@@ -63,64 +63,64 @@ namespace PeaceEnablers.Services
             var date = new DateTime(now.Year, now.Month, 1, 1, 0, 0, DateTimeKind.Utc)
                             .AddMonths(-1);
 
-            var importPillarsCityIds = _context.AIPillarScores
-                .GroupBy(x => x.CityID)
+            var importPillarscountryIds = _context.AIPillarScores
+                .GroupBy(x => x.CountryID)
                 .Where(g => g.Max(x => x.UpdatedAt) < date || g.Count() < totalPillar)
                 .Select(g => g.Key)
                 .ToList();
 
 
-            foreach (var id in importPillarsCityIds)
+            foreach (var id in importPillarscountryIds)
             {
-                await AnalyzeCityPillars(id);
+                await AnalyzeCountryPillars(id);
             }
 
 
-            var needtoImportCityIds = _context.AICityScores.Where(x => x.UpdatedAt < date).Select(x=>x.CityID);
-            foreach (var id in needtoImportCityIds)
+            var needtoImportcountryIds = _context.AICountryScores.Where(x => x.UpdatedAt < date).Select(x=>x.CountryID);
+            foreach (var id in needtoImportcountryIds)
             {
-                await AnalyzeSingleCity(id);
+                await AnalyzeSingleCountry(id);
             }
         }
 
-        public async Task AnalyzeAllCitiesFull()
+        public async Task AnalyzeAllCountriesFull()
         {
-            var url = aiUrl + AiEndpoints.AnalyzeAllCitiesFull;
+            var url = aiUrl + AiEndpoints.AnalyzeAllCountriesFull;
             await _httpService.SendAsync<dynamic>(HttpMethod.Post, url, null, headers);
         }
 
-        public async Task AnalyzeSingleCityFull(int cityId)
+        public async Task AnalyzeSingleCountryFull(int countryId)
         {
-            var url = aiUrl + AiEndpoints.AnalyzeSingleCityFull(cityId);
+            var url = aiUrl + AiEndpoints.AnalyzeSingleCountryFull(countryId);
             await _httpService.SendAsync<dynamic>(HttpMethod.Post, url, null, headers);
         }
 
-        public async Task AnalyzeSingleCity(int cityId)
+        public async Task AnalyzeSingleCountry(int countryId)
         {
-            var url = aiUrl + AiEndpoints.AnalyzeSingleCity(cityId);
+            var url = aiUrl + AiEndpoints.AnalyzeSingleCountry(countryId);
             await _httpService.SendAsync<dynamic>(HttpMethod.Post, url, null, headers);
         }
 
-        public async Task AnalyzeCityPillars(int cityId)
+        public async Task AnalyzeCountryPillars(int countryId)
         {
-            var url = aiUrl + AiEndpoints.AnalyzeCityPillars(cityId);
+            var url = aiUrl + AiEndpoints.AnalyzeCountryPillars(countryId);
             await _httpService.SendAsync<dynamic>(HttpMethod.Post, url, null, headers);
         }
-        public async Task AnalyzeSinglePillar(int cityId, int pillarId)
+        public async Task AnalyzeSinglePillar(int countryId, int pillarId)
         {
-            var url = aiUrl + AiEndpoints.AnalyzeSinglePillar(cityId, pillarId);
-            await _httpService.SendAsync<dynamic>(HttpMethod.Post, url, null, headers);
-        }
-
-        public async Task AnalyzeQuestionsOfCity(int cityId)
-        {
-            var url = aiUrl + AiEndpoints.AnalyzeCityQuestions(cityId);
+            var url = aiUrl + AiEndpoints.AnalyzeSinglePillar(countryId, pillarId);
             await _httpService.SendAsync<dynamic>(HttpMethod.Post, url, null, headers);
         }
 
-        public async Task AnalyzeQuestionsOfCityPillar(int cityId, int pillarId)
+        public async Task AnalyzeQuestionsOfCountry(int countryId)
         {
-            var url = aiUrl + AiEndpoints.AnalyzeCityPillarQuestions(cityId, pillarId);
+            var url = aiUrl + AiEndpoints.AnalyzeCountryQuestions(countryId);
+            await _httpService.SendAsync<dynamic>(HttpMethod.Post, url, null, headers);
+        }
+
+        public async Task AnalyzeQuestionsOfCountryPillar(int countryId, int pillarId)
+        {
+            var url = aiUrl + AiEndpoints.AnalyzeCountryPillarQuestions(countryId, pillarId);
             await _httpService.SendAsync<dynamic>(HttpMethod.Post, url, null, headers);
         }
 
@@ -133,25 +133,25 @@ namespace PeaceEnablers.Services
     {
         private const string BasePath = "/api/cities-score-analysis";
 
-        public static string AnalyzeAllCitiesFull =>
+        public static string AnalyzeAllCountriesFull =>
             $"{BasePath}/analyze/full";
 
-        public static string AnalyzeSingleCityFull(int cityId) =>
-            $"{BasePath}/analyze/{cityId}/full";
+        public static string AnalyzeSingleCountryFull(int countryId) =>
+            $"{BasePath}/analyze/{countryId}/full";
 
-        public static string AnalyzeSingleCity(int cityId) =>
-            $"{BasePath}/analyze/{cityId}";
+        public static string AnalyzeSingleCountry(int countryId) =>
+            $"{BasePath}/analyze/{countryId}";
 
-        public static string AnalyzeCityPillars(int cityId) =>
-            $"{BasePath}/analyze/{cityId}/pillars";
-        public static string AnalyzeSinglePillar(int cityId, int pillarId) =>
-            $"{BasePath}/analyze/{cityId}/single-pillar/{pillarId}";
+        public static string AnalyzeCountryPillars(int countryId) =>
+            $"{BasePath}/analyze/{countryId}/pillars";
+        public static string AnalyzeSinglePillar(int countryId, int pillarId) =>
+            $"{BasePath}/analyze/{countryId}/single-pillar/{pillarId}";
 
-        public static string AnalyzeCityQuestions(int cityId) =>
-            $"{BasePath}/analyze/{cityId}/questions";
+        public static string AnalyzeCountryQuestions(int countryId) =>
+            $"{BasePath}/analyze/{countryId}/questions";
 
-        public static string AnalyzeCityPillarQuestions(int cityId, int pillarId) =>
-            $"{BasePath}/analyze/{cityId}/pillars/{pillarId}/questions";
+        public static string AnalyzeCountryPillarQuestions(int countryId, int pillarId) =>
+            $"{BasePath}/analyze/{countryId}/pillars/{pillarId}/questions";
     }
 
     #endregion

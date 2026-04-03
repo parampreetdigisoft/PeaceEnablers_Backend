@@ -8,8 +8,8 @@ namespace PeaceEnablers.Common.Interface
 {
     public interface IPdfGeneratorService
     {
-        Task<byte[]> GenerateCityDetailsPdf(AiCitySummeryDto city, List<AiCityPillarResponse> pillars, List<KpiChartItem> kpis, List<PeerCityHistoryReportDto> peerCity, UserRole userRole);
-        Task<byte[]> GeneratePillarDetailsPdf(AiCityPillarResponse cityDetails, UserRole userRole);
-        Task<byte[]> GenerateAllCitiesDetailsPdf(List<AiCitySummeryDto> cities, Dictionary<int, List<AiCityPillarResponse>> pillars, List<KpiChartItem> kpis, UserRole userRole);
+        Task<byte[]> GenerateCountryDetailsPdf(AiCountrySummeryDto country, List<AiCountryPillarResponse> pillars, List<KpiChartItem> kpis, List<PeerCountryHistoryReportDto> peercountry, UserRole userRole);
+        Task<byte[]> GeneratePillarDetailsPdf(AiCountryPillarResponse countryDetails, UserRole userRole);
+        Task<byte[]> GenerateAllCountriesDetailsPdf(List<AiCountrySummeryDto> countries, Dictionary<int, List<AiCountryPillarResponse>> pillars, List<KpiChartItem> kpis, UserRole userRole);
     }
 }

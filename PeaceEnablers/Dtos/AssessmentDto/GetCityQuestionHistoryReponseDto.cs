@@ -1,12 +1,12 @@
 ﻿namespace PeaceEnablers.Dtos.AssessmentDto
 {
-    public class GetCityQuestionHistoryReponseDto : GetCitySubmitionHistoryReponseDto
+    public class GetCountryQuestionHistoryResponseDto : GetCountrySubmitionHistoryResponseDto
     {
-        public List<CityPillarQuestionHistoryReponseDto> Pillars { get; set; } = new();
+        public List<CountryPillarQuestionHistoryResponseDto> Pillars { get; set; } = new();
     }
-    public class GetCitySubmitionHistoryReponseDto
+    public class GetCountrySubmitionHistoryResponseDto
     {
-        public int CityID { get; set; }
+        public int CountryID { get; set; }
         public int TotalAssessment { get; set; } = 0;
         public decimal Score { get; set; } = 0;
         public decimal ScoreProgress { get; set; } = 0;
@@ -16,12 +16,12 @@
         public int TotalQuestion { get; set; } = 0;
         public int AnsQuestion { get; set; } = 0;
     }
-    public class GetCitiesSubmitionHistoryReponseDto : GetCitySubmitionHistoryReponseDto
+    public class GetCountriesSubmitionHistoryResponseDto : GetCountrySubmitionHistoryResponseDto
     {
-        public string CityName { get; set; }
+        public string CountryName { get; set; }
     }
 
-    public class CityPillarQuestionHistoryReponseDto
+    public class CountryPillarQuestionHistoryResponseDto
     {
         public int PillarID { get; set; }
         public string PillarName { get; set; }
@@ -44,7 +44,7 @@
         public double CurrentProgress { get; set; }
     }
 
-    public class CityPillarUserHistoryReponseDto : CityPillarQuestionHistoryReponseDto
+    public class CityPillarUserHistoryResponseDto : CountryPillarQuestionHistoryResponseDto
     {
         public int UserID { get; set; }
         public string FullName { get; set; }

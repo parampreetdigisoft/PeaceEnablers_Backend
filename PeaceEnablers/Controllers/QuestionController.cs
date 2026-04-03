@@ -81,25 +81,25 @@ namespace PeaceEnablers.Controllers
             return Ok();
         }
 
-        [HttpGet("getQuestionsByCityMappingId")]
+        [HttpGet("getQuestionsByCountryMappingId")]
         [Authorize]
-        public async Task<IActionResult> GetQuestionsByCityIdAsync([FromQuery] CityPillerRequestDto requestDto)
+        public async Task<IActionResult> GetQuestionsByCountryIdAsync([FromQuery] CountryPillerRequestDto requestDto)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
                 return Unauthorized("User ID not found in token.");
 
-            var result = await _questionService.GetQuestionsByCityIdAsync(requestDto, userId.GetValueOrDefault());
+            var result = await _questionService.GetQuestionsByCountryIdAsync(requestDto, userId.GetValueOrDefault());
             if (result == null) return NotFound();
 
             return Ok(result);
         }
         
-        [HttpGet("ExportAssessment/{userCityMappingID}")]
+        [HttpGet("ExportAssessment/{userCountryMappingID}")]
         [Authorize]
-        public async Task<IActionResult> ExportAssessment(int userCityMappingID)
+        public async Task<IActionResult> ExportAssessment(int userCountryMappingID)
         {
-            var content = await _questionService.ExportAssessment(userCityMappingID);
+            var content = await _questionService.ExportAssessment(userCountryMappingID);
 
             return File(content.Item2 ?? new byte[1],
                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -108,21 +108,21 @@ namespace PeaceEnablers.Controllers
 
         [HttpGet("getQuestionsHistoryByPillar")]
         [Authorize]
-        public async Task<IActionResult> GetQuestionsHistoryByPillar([FromQuery] GetCityPillarHistoryRequestDto requestDto)
+        public async Task<IActionResult> GetQuestionsHistoryByPillar([FromQuery] GetCountryPillarHistoryRequestDto requestDto)
         {
             var content = await _questionService.GetQuestionsHistoryByPillar(requestDto);
 
             return Ok(content);
         }
-        [HttpGet("getQuestionsByCityMappingIdForAnalyst")]
+        [HttpGet("getQuestionsByCountryMappingIdForAnalyst")]
         [Authorize]
-        public async Task<IActionResult> GetQuestionsByCityMappingIdForAnalyst([FromQuery] CityPillerRequestDto requestDto)
+        public async Task<IActionResult> GetQuestionsByCountryMappingIdForAnalyst([FromQuery] CountryPillerRequestDto requestDto)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
                 return Unauthorized("User ID not found in token.");
 
-            var result = await _questionService.GetQuestionsByCityMappingIdForAnalyst(requestDto, userId.GetValueOrDefault());
+            var result = await _questionService.GetQuestionsByCountryMappingIdForAnalyst(requestDto, userId.GetValueOrDefault());
             if (result == null) return NotFound();
 
             return Ok(result);

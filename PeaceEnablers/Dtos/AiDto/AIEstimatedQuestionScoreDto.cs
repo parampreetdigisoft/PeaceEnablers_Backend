@@ -4,7 +4,7 @@ namespace PeaceEnablers.Dtos.AiDto
 {
     public class AIEstimatedQuestionScoreDto
     {
-        public int CityID { get; set; }
+        public int CountryID { get; set; }
         public int PillarID { get; set; }
         public int QuestionID { get; set; }
         public string? QuestionText { get; set; }

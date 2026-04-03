@@ -29,37 +29,37 @@ namespace PeaceEnablers.Services
             _docx = docx;
         }
 
-        public Task<byte[]> GenerateCityDetails(
-            AiCitySummeryDto city,
-            List<AiCityPillarResponse> pillars,
+        public Task<byte[]> GenerateCountryDetails(
+            AiCountrySummeryDto country,
+            List<AiCountryPillarResponse> pillars,
             List<KpiChartItem> kpis,
-            List<PeerCityHistoryReportDto> peerCity,
+            List<PeerCountryHistoryReportDto> peercountry,
             UserRole userRole,
         PeaceEnablers.IServices.DocumentFormat format = PeaceEnablers.IServices.DocumentFormat.Pdf)
         {
              var result = format == PeaceEnablers.IServices.DocumentFormat.Docx
-                ? _docx.GenerateCityDetailsDocx(city, pillars, kpis, peerCity, userRole)
-                : _pdf.GenerateCityDetailsPdf(city, pillars, kpis, peerCity, userRole);
+                ? _docx.GenerateCountryDetailsDocx(country, pillars, kpis, peercountry, userRole)
+                : _pdf.GenerateCountryDetailsPdf(country, pillars, kpis, peercountry, userRole);
 
             return result;
         }
 
         public Task<byte[]> GeneratePillarDetails(
-            AiCityPillarResponse pillarData,
+            AiCountryPillarResponse pillarData,
             UserRole userRole,
             PeaceEnablers.IServices.DocumentFormat format = PeaceEnablers.IServices.DocumentFormat.Pdf)
             => format == PeaceEnablers.IServices.DocumentFormat.Docx
                 ? _docx.GeneratePillarDetailsDocx(pillarData, userRole)
                 : _pdf.GeneratePillarDetailsPdf(pillarData, userRole);
 
-        public Task<byte[]> GenerateAllCitiesDetails(
-            List<AiCitySummeryDto> cities,
-            Dictionary<int, List<AiCityPillarResponse>> pillarsDict,
+        public Task<byte[]> GenerateAllCountriesDetails(
+            List<AiCountrySummeryDto> countries,
+            Dictionary<int, List<AiCountryPillarResponse>> pillarsDict,
             List<KpiChartItem> kpis,
             UserRole userRole,
             PeaceEnablers.IServices.DocumentFormat format = PeaceEnablers.IServices.DocumentFormat.Pdf)
             => format == PeaceEnablers.IServices.DocumentFormat.Docx
-                ? _docx.GenerateAllCitiesDetailsDocx(cities, pillarsDict, kpis, userRole)
-                : _pdf.GenerateAllCitiesDetailsPdf(cities, pillarsDict, kpis, userRole);
+                ? _docx.GenerateAllCountriesDetailsDocx(countries, pillarsDict, kpis, userRole)
+                : _pdf.GenerateAllCountriesDetailsPdf(countries, pillarsDict, kpis, userRole);
     }
 }

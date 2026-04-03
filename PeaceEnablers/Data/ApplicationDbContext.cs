@@ -2,7 +2,7 @@ using AssessmentPlatform.Models;
 
 using Microsoft.EntityFrameworkCore;
 
-using PeaceEnablers.Dtos.CityDto;
+using PeaceEnablers.Dtos.CountryDto;
 using PeaceEnablers.Models;
 
 namespace PeaceEnablers.Data
@@ -18,26 +18,26 @@ namespace PeaceEnablers.Data
         public DbSet<AssessmentResponse> AssessmentResponses { get; set; } = default!;
         public DbSet<Assessment> Assessments { get; set; } = default!;
         public DbSet<PillarAssessment> PillarAssessments { get; set; } = default!;
-        public DbSet<City> Cities { get; set; } = default!;
-        public DbSet<UserCityMapping> UserCityMappings { get; set; } = default!;
+        public DbSet<Country> Countries { get; set; } = default!;
+        public DbSet<UserCountryMapping> UserCountryMappings { get; set; } = default!;
         public DbSet<AppLogs> AppLogs { get; set; } = default!;
         public DbSet<PaymentRecord> PaymentRecords { get; set; } = default!;
-        public DbSet<PublicUserCityMapping> PublicUserCityMappings { get; set; } = default!;
+        public DbSet<PublicUserCountryMapping> PublicUserCountryMappings { get; set; } = default!;
         public DbSet<AnalyticalLayer> AnalyticalLayers { get; set; } = default!;
         public DbSet<FiveLevelInterpretation> FiveLevelInterpretations { get; set; } = default!;
         public DbSet<AnalyticalLayerResult> AnalyticalLayerResults { get; set; } = default!;
-        public DbSet<CityUserPillarMapping> CityUserPillarMappings { get; set; } = default!;
+        public DbSet<CountryUserPillarMapping> CountryUserPillarMappings { get; set; } = default!;
         public DbSet<AIDataSourceCitation> AIDataSourceCitations { get; set; } = default!;
-        public DbSet<AICityScore> AICityScores { get; set; } = default!;
+        public DbSet<AICountryScore> AICountryScores { get; set; } = default!;
         public DbSet<AIEstimatedQuestionScore> AIEstimatedQuestionScores { get; set; } = default!;
         public DbSet<AIPillarScore> AIPillarScores { get; set; } = default!;
         public DbSet<AITrustLevel> AITrustLevels { get; set; } = default!;
         public DbSet<AnalyticalLayerPillarMapping> AnalyticalLayerPillarMappings { get; set; } = default!;
-        public DbSet<EvaluationCityProgressResultDto> CityProgressResults { get; set; }
-        public DbSet<GetCitiesProgressAdminDto> GetCitiesProgressAdminDto { get; set; }
-        public DbSet<AIUserCityMapping> AIUserCityMappings { get; set; }
-        public DbSet<CityPeer> CityPeers { get; set; } = default!;
-        public DbSet<EvaluationCityProgressHistoryResultDto> CityProgressHistoryResults { get; set; }
+        public DbSet<EvaluationCountryProgressResultDto> CountryProgressResults { get; set; }
+        public DbSet<GetCountriesProgressAdminDto> GetCountriesProgressAdminDto { get; set; }
+        public DbSet<AIUserCountryMapping> AIUserCountryMappings { get; set; }
+        public DbSet<CountryPeer> CountryPeers { get; set; } = default!;
+        public DbSet<EvaluationCountryProgressHistoryResultDto> CountryProgressHistoryResults { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -77,7 +77,7 @@ namespace PeaceEnablers.Data
             .HasForeignKey(r => r.PillarAssessmentID)
             .OnDelete(DeleteBehavior.Cascade);
 
-            modelBuilder.Entity<City>().HasKey(uc => uc.CityID);
+            modelBuilder.Entity<Country>().HasKey(uc => uc.CountryID);
             modelBuilder.Entity<PaymentRecord>(entity =>
             {
                 entity.HasKey(p => p.PaymentRecordID);
@@ -88,8 +88,8 @@ namespace PeaceEnablers.Data
                       .HasConversion<byte>();
             });
 
-            modelBuilder.Entity<UserCityMapping>().HasKey(uc => uc.UserCityMappingID);
-            modelBuilder.Entity<PublicUserCityMapping>().HasKey(uc => uc.PublicUserCityMappingID);
+            modelBuilder.Entity<UserCountryMapping>().HasKey(uc => uc.UserCountryMappingID);
+            modelBuilder.Entity<PublicUserCountryMapping>().HasKey(uc => uc.PublicUserCountryMappingID);
 
             modelBuilder.Entity<AnalyticalLayer>(entity =>
             {
@@ -111,22 +111,22 @@ namespace PeaceEnablers.Data
             {
                 entity.HasKey(al => al.InterpretationID);
             });
-            modelBuilder.Entity<CityUserPillarMapping>().HasKey(ur => ur.CityUserPillarMappingID);
+            modelBuilder.Entity<CountryUserPillarMapping>().HasKey(ur => ur.CountryUserPillarMappingID);
 
             modelBuilder.Entity<AIDataSourceCitation>().HasKey(ur => ur.CitationID);
-            modelBuilder.Entity<AICityScore>().HasKey(ur => ur.CityScoreID);
+            modelBuilder.Entity<AICountryScore>().HasKey(ur => ur.CountryScoreID);
             modelBuilder.Entity<AIEstimatedQuestionScore>().HasKey(ur => ur.QuestionScoreID);
             modelBuilder.Entity<AIPillarScore>().HasKey(ur => ur.PillarScoreID);
             modelBuilder.Entity<AITrustLevel>().HasKey(ur => ur.TrustID);
             modelBuilder.Entity<AnalyticalLayerPillarMapping>().HasKey(ur => ur.AnalyticalLayerPillarMappingID);
-            modelBuilder.Entity<AIUserCityMapping>().HasKey(ur => ur.AIUserCityMappingID);
-            modelBuilder.Entity<EvaluationCityProgressResultDto>().HasNoKey().ToView(null); 
-            modelBuilder.Entity<GetCitiesProgressAdminDto>().HasNoKey().ToView(null);
-            modelBuilder.Entity<EvaluationCityProgressHistoryResultDto>().HasNoKey().ToView(null);
-            modelBuilder.Entity<CityPeer>(entity =>
+            modelBuilder.Entity<AIUserCountryMapping>().HasKey(ur => ur.AIUserCountryMappingID);
+            modelBuilder.Entity<EvaluationCountryProgressResultDto>().HasNoKey().ToView(null); 
+            modelBuilder.Entity<GetCountriesProgressAdminDto>().HasNoKey().ToView(null);
+            modelBuilder.Entity<EvaluationCountryProgressHistoryResultDto>().HasNoKey().ToView(null);
+            modelBuilder.Entity<CountryPeer>(entity =>
             {
-                entity.HasKey(e => e.CityPeerID);
-                entity.ToTable("CityPeer");
+                entity.HasKey(e => e.CountryPeerID);
+                entity.ToTable("CountryPeer");
             });
 
             base.OnModelCreating(modelBuilder);

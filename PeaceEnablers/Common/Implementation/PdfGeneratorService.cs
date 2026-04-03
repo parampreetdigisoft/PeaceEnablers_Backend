@@ -24,25 +24,25 @@ namespace PeaceEnablers.Common.Implementation
         #endregion
 
 
-        #region pdf pillars and city report
+        #region pdf pillars and country report
 
-        public async Task<byte[]> GenerateAllCitiesDetailsPdf(List<AiCitySummeryDto> cities, Dictionary<int, List<AiCityPillarResponse>> pillarsDict, List<KpiChartItem> kpis, UserRole userRole)
+        public async Task<byte[]> GenerateAllCountriesDetailsPdf(List<AiCountrySummeryDto> countries, Dictionary<int, List<AiCountryPillarResponse>> pillarsDict, List<KpiChartItem> kpis, UserRole userRole)
         {
             try
             {
                 QuestPDF.Settings.EnableDebugging = true;
                 var document = Document.Create(container =>
                 {
-                    foreach(var cityDetails in cities)
+                    foreach(var countryDetails in countries)
                     {
-                        if(pillarsDict.TryGetValue(cityDetails.CityID, out var pillars) && pillars.Count > 0)
+                        if(pillarsDict.TryGetValue(countryDetails.CountryID, out var pillars) && pillars.Count > 0)
                         {
                             var kpiChartItems = kpis?
-                            .Where(x => x.CityID == cityDetails.CityID)
+                            .Where(x => x.CountryID == countryDetails.CountryID)
                             .Take(109)
                             .ToList() ?? new List<KpiChartItem>();
 
-                            AddCityDetailsPdf(container, cityDetails, pillars, kpiChartItems,new(), userRole, true);
+                            AddCountryDetailsPdf(container, countryDetails, pillars, kpiChartItems,new(), userRole, true);
                         }
                     }
                 });
@@ -56,7 +56,7 @@ namespace PeaceEnablers.Common.Implementation
             }
         }
 
-        public async Task<byte[]> GenerateCityDetailsPdf(AiCitySummeryDto cityDetails, List<AiCityPillarResponse> pillars, List<KpiChartItem> kpis, List<PeerCityHistoryReportDto> peerCity, UserRole userRole)
+        public async Task<byte[]> GenerateCountryDetailsPdf(AiCountrySummeryDto countryDetails, List<AiCountryPillarResponse> pillars, List<KpiChartItem> kpis, List<PeerCountryHistoryReportDto> peerCountry, UserRole userRole)
         {
             try
             {
@@ -64,19 +64,19 @@ namespace PeaceEnablers.Common.Implementation
                 QuestPDF.Settings.EnableDebugging = true;
                 var document = Document.Create(container =>
                 {
-                    AddCityDetailsPdf(container, cityDetails, pillars, kpis, peerCity, userRole);
+                    AddCountryDetailsPdf(container, countryDetails, pillars, kpis, peerCountry, userRole);
                 });
 
                 return document.GeneratePdf();
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GenerateCityDetailsPdf", ex);
+                await _appLogger.LogAsync("Error Occured in GenerateCountryDetailsPdf", ex);
                 return Array.Empty<byte>();
             }
         }
 
-        public async Task<byte[]> GeneratePillarDetailsPdf(AiCityPillarResponse pillarData, UserRole userRole)
+        public async Task<byte[]> GeneratePillarDetailsPdf(AiCountryPillarResponse pillarData, UserRole userRole)
         {
             try
             {
@@ -106,8 +106,8 @@ namespace PeaceEnablers.Common.Implementation
             }
         }
 
-        public void AddCityDetailsPdf(IDocumentContainer container, AiCitySummeryDto cityDetails, List<AiCityPillarResponse> pillars, List<KpiChartItem> kpis,
-            List<PeerCityHistoryReportDto> peerCities, UserRole userRole, bool isAllCities = false)
+        public void AddCountryDetailsPdf(IDocumentContainer container, AiCountrySummeryDto countryDetails, List<AiCountryPillarResponse> pillars, List<KpiChartItem> kpis,
+            List<PeerCountryHistoryReportDto> peerCountries, UserRole userRole, bool isAllCountries = false)
         {
             var kpiChartItems = kpis.Take(109).ToList();
 
@@ -116,23 +116,23 @@ namespace PeaceEnablers.Common.Implementation
                   : SanitizeText(p.PillarName) ?? "-",  SanitizeText(p.PillarName) ?? "-", p.AIProgress)).ToList();
 
             // ── Section 1 : Global Dashboard ─────────────────────────────────
-            if (!isAllCities)
-                AddGlobalDashboardPage(container, cityDetails, pillarChartItems, kpis, userRole);
+            if (!isAllCountries)
+                AddGlobalDashboardPage(container, countryDetails, pillarChartItems, kpis, userRole);
 
 
-            // ── Section 2 : City Summary ─────────────────────────────────────
+            // ── Section 2 : Country Summary ─────────────────────────────────────
             container.Page(page =>
             {
                 ApplyPageDefaults(page);
                 page.Header().Element(x =>
-                    CityComposeHeader(x, cityDetails, userRole, null));
+                    CountryComposeHeader(x, countryDetails, userRole, null));
                 page.Content().Element(content =>
                 {
                     content.Column(column =>
                     {
                         column.Spacing(10);
                         column.Item().Element(x =>
-                            CitySummeryComposeContent(x, cityDetails, userRole));
+                            CitySummeryComposeContent(x, countryDetails, userRole));
                     });
                 });
                 PageFooter(page);
@@ -146,7 +146,7 @@ namespace PeaceEnablers.Common.Implementation
                 {
                     ApplyPageDefaults(page);
                     page.Header().Element(x =>
-                        CityComposeHeader(x, cityDetails, userRole, "Pillar Performance Overview"));
+                        CountryComposeHeader(x, countryDetails, userRole, "Pillar Performance Overview"));
                     page.Content().Element(content =>
                         PillarLineChartPage(content, pillarChartItems));
                     PageFooter(page);
@@ -154,21 +154,21 @@ namespace PeaceEnablers.Common.Implementation
             }
 
             // ── Section 1 : Global Dashboard ─────────────────────────────────
-            if (!isAllCities)
+            if (!isAllCountries)
             {
-                AddPeerCityComparisonSection(container, peerCities, cityDetails, userRole);
-                AddPerformanceTrendsSection(container, peerCities, cityDetails, userRole);
+                AddPeerCityComparisonSection(container, peerCountries, countryDetails, userRole);
+                AddPerformanceTrendsSection(container, peerCountries, countryDetails, userRole);
             }
 
             // ── Section 4+ : Per-Pillar Detail ──────────────────────────────
-            var accessiblePillars = pillars.Where(x => x.IsAccess && UserRole.CityUser == userRole || UserRole.CityUser != userRole).ToList();
+            var accessiblePillars = pillars.Where(x => x.IsAccess && UserRole.CountryUser == userRole || UserRole.CountryUser != userRole).ToList();
             foreach (var p in accessiblePillars)
             {
                 container.Page(page =>
                 {
                     ApplyPageDefaults(page);
                     page.Header().Element(x =>
-                        CityComposeHeader(x, cityDetails, userRole, SanitizeText(p.PillarName)));
+                        CountryComposeHeader(x, countryDetails, userRole, SanitizeText(p.PillarName)));
                     page.Content().Element(content =>
                     {
                         content.Column(column =>
@@ -184,13 +184,13 @@ namespace PeaceEnablers.Common.Implementation
 
 
             // ── Section 5 : KPI Dashboard ────────────────────────────────────
-            if (kpiChartItems.Any() || !isAllCities)
+            if (kpiChartItems.Any() || !isAllCountries)
             {
                 container.Page(page =>
                 {
                     ApplyPageDefaults(page);
                     page.Header().Element(x =>
-                        CityComposeHeader(x, cityDetails, userRole, "KPI Dashboard"));
+                        CountryComposeHeader(x, countryDetails, userRole, "KPI Dashboard"));
                     page.Content().Element(content =>
                         KpiDashboardPage(content, kpiChartItems));
                     PageFooter(page);
@@ -211,7 +211,7 @@ namespace PeaceEnablers.Common.Implementation
             page.DefaultTextStyle(x => x.FontSize(10).FontFamily("Arial"));
         }
 
-        /// <summary>Standard numeric footer for city pages.</summary>
+        /// <summary>Standard numeric footer for country pages.</summary>
         static void PageFooter(PageDescriptor page)
         {
             page.Footer().AlignCenter().Text(x =>
@@ -221,7 +221,7 @@ namespace PeaceEnablers.Common.Implementation
         }        
         void AddGlobalDashboardPage(
             IDocumentContainer doc,
-            AiCitySummeryDto city,
+            AiCountrySummeryDto country,
             List<PillarChartItem> pillars,   // already filtered to max 14
             List<KpiChartItem> kpis,      // already filtered to max 107
             UserRole userRole)
@@ -233,9 +233,9 @@ namespace PeaceEnablers.Common.Implementation
             {
                 ApplyPageDefaults(page);
                 page.Header().Element(x =>
-                    CityComposeHeader(x, city, userRole, "City Performance Dashboard"));
+                    CountryComposeHeader(x, country, userRole, "Country Performance Dashboard"));
                 page.Content().Element(x =>
-                    RenderDashboardContent(x, vPillars, vKpis, city));
+                    RenderDashboardContent(x, vPillars, vKpis, country));
                 PageFooter(page);
             });
         }
@@ -244,11 +244,11 @@ namespace PeaceEnablers.Common.Implementation
             IContainer container,
             List<PillarChartItem> pillars,
             List<KpiChartItem> kpis,
-            AiCitySummeryDto city)
+            AiCountrySummeryDto country)
         {
             //var vKpis = kpis.Where(k => k.Value.HasValue).ToList();
 
-            float overall = (float)city.AIProgress.GetValueOrDefault();
+            float overall = (float)country.AIProgress.GetValueOrDefault();
             int kpiGreen = kpis.Count(k => k.Value >= 70);
             int kpiAmber = kpis.Count(k => k.Value >= 40 && k.Value < 70);
             int kpiRed = kpis.Count(k => k.Value == null || k.Value < 40);
@@ -314,7 +314,7 @@ namespace PeaceEnablers.Common.Implementation
                     col.Spacing(0);
 
                     col.Item().AlignCenter()
-                        .Text("Overall City Score")
+                        .Text("Overall Country Score")
                         .FontSize(10).Bold().FontColor("#12352f");
 
                     // Donut chart
@@ -431,7 +431,7 @@ namespace PeaceEnablers.Common.Implementation
                 IsAntialias = true,
                 TextAlign = SKTextAlign.Center
             };
-            canvas.DrawText("city progress", cx, cy + 21, subTxt);
+            canvas.DrawText("country progress", cx, cy + 21, subTxt);
         }
 
         // ─────────────────────────────────────────────────────────────────────────────
@@ -1512,9 +1512,9 @@ namespace PeaceEnablers.Common.Implementation
         // ─────────────────────────────────────────────────────────────────────────────
         //  HEADERS / FOOTERS
         // ─────────────────────────────────────────────────────────────────────────────
-        void CityComposeHeader(
+        void CountryComposeHeader(
             IContainer container,
-            AiCitySummeryDto data,
+            AiCountrySummeryDto data,
             UserRole userRole,
             string? pillarName)
         {
@@ -1531,14 +1531,14 @@ namespace PeaceEnablers.Common.Implementation
                     {
                         col.Spacing(2);
 
-                        string? title = string.IsNullOrEmpty(pillarName) ? data.CityName : pillarName!;
+                        string? title = string.IsNullOrEmpty(pillarName) ? data.CountryName : pillarName!;
 
                         col.Item().Text(title)
                             .FontSize(21)
                             .Bold()
                             .FontColor(Colors.White);
 
-                        col.Item().Text($"{data.CityName}, {data.State}, {data.Country} | Data Year: {data.Year}")
+                        col.Item().Text($"{data.CountryName}, {data.Continent} | Data Year: {data.Year}")
                             .FontSize(10)
                             .FontColor("#E8F3F0");
 
@@ -1562,7 +1562,7 @@ namespace PeaceEnablers.Common.Implementation
             });
         }        
 
-        void PillarComposeHeader(IContainer container, AiCityPillarResponse data)
+        void PillarComposeHeader(IContainer container, AiCountryPillarResponse data)
         {
             var logoPath = Path.Combine(
                 Directory.GetCurrentDirectory(),
@@ -1582,7 +1582,7 @@ namespace PeaceEnablers.Common.Implementation
                             .Bold()
                             .FontColor(Colors.White);
 
-                        col.Item().Text($"{data.CityName}, {data.State}, {data.Country} | Data Year: {data.AIDataYear}")
+                        col.Item().Text($"{data.CountryName}, {data.Continent} | Data Year: {data.AIDataYear}")
                             .FontSize(10)
                             .FontColor("#E8F3F0");
 
@@ -1617,7 +1617,7 @@ namespace PeaceEnablers.Common.Implementation
                         text.Span(" of "); text.TotalPages();
                     });
                     col.Item().PaddingTop(5).AlignCenter()
-                        .Text("City Assessment Platform").FontSize(8).FontColor("#9E9E9E");
+                        .Text("Country Assessment Platform").FontSize(8).FontColor("#9E9E9E");
                 });
             });
         }
@@ -1637,14 +1637,14 @@ namespace PeaceEnablers.Common.Implementation
                 .Normalize(NormalizationForm.FormKC);
         }
 
-        void CitySummeryComposeContent(IContainer container, AiCitySummeryDto data, UserRole userRole)
+        void CitySummeryComposeContent(IContainer container, AiCountrySummeryDto data, UserRole userRole)
         {
             container.PaddingTop(4).Column(column =>
             {
                 // =========================
                 // PROGRESS SECTION
                 // =========================
-                var random = new AiCityPillarResponse
+                var random = new AiCountryPillarResponse
                 {
                     EvaluatorScore = data.EvaluatorScore,
                     Discrepancy = data.Discrepancy,
@@ -1776,7 +1776,7 @@ namespace PeaceEnablers.Common.Implementation
         }
 
         void PillarComposeContent(
-     IContainer container, AiCityPillarResponse data, UserRole userRole)
+     IContainer container, AiCountryPillarResponse data, UserRole userRole)
         {
             container.PaddingTop(8).Column(column =>
             {
@@ -1893,7 +1893,7 @@ namespace PeaceEnablers.Common.Implementation
         }
 
         void PillarProgressSection(
-            IContainer container, AiCityPillarResponse data, UserRole userRole)
+            IContainer container, AiCountryPillarResponse data, UserRole userRole)
         {
             container
                 .Background(Colors.White)
@@ -2102,7 +2102,7 @@ namespace PeaceEnablers.Common.Implementation
 
 
 
-        #endregion pdf pillars and city report
+        #endregion pdf pillars and country report
 
     }
 
@@ -2114,10 +2114,10 @@ namespace PeaceEnablers.Common.Implementation
 
         private const int MaxPillars = 14;
 
-        // Palette: index 0 = selected city (gold), 1-5 = peer cities
+        // Palette: index 0 = selected country (gold), 1-5 = peer countries
         private static readonly string[] CityPalette =
         {
-            "#F0B429",   // gold  – selected city
+            "#F0B429",   // gold  – selected country
             "#4CAF8A",   // teal
             "#1E88E5",   // blue
             "#FB8C00",   // orange
@@ -2139,16 +2139,16 @@ namespace PeaceEnablers.Common.Implementation
 
         void AddPeerCityComparisonSection(
             IDocumentContainer container,
-            List<PeerCityHistoryReportDto> peerCities,
-            AiCitySummeryDto cityDetails,
+            List<PeerCountryHistoryReportDto> peerCountries,
+            AiCountrySummeryDto countryDetails,
             UserRole userRole)
         {
-            if (peerCities == null || !peerCities.Any()) return;
+            if (peerCountries == null || !peerCountries.Any()) return;
 
-            // Separate: main city entry + actual peer entries (cap at MaxPeerCities)
-            var main = FindMainCity(peerCities, cityDetails);
-            var peers = peerCities
-                .Where(p => !IsSameCity(p.CityName, cityDetails.CityName))
+            // Separate: main country entry + actual peer entries (cap at MaxpeerCountries)
+            var main = FindMainCountry(peerCountries, countryDetails);
+            var peers = peerCountries
+                .Where(p => !IsSameCountry(p.CountryName, countryDetails.CountryName))
                 .ToList();
 
             // ── 5.1  Population-Based ────────────────────────────────────────────
@@ -2156,9 +2156,9 @@ namespace PeaceEnablers.Common.Implementation
             {
                 ApplyPageDefaults(page);
                 page.Header().Element(x =>
-                    CityComposeHeader(x, cityDetails, userRole, "Population-Based Peer Comparison"));
+                    CountryComposeHeader(x, countryDetails, userRole, "Population-Based Peer Comparison"));
                 page.Content().Element(c =>
-                    PopulationPeerPage(c, peers, main, cityDetails));
+                    PopulationPeerPage(c, peers, main, countryDetails));
                 PageFooter(page);
             });
 
@@ -2167,9 +2167,9 @@ namespace PeaceEnablers.Common.Implementation
             {
                 ApplyPageDefaults(page);
                 page.Header().Element(x =>
-                    CityComposeHeader(x, cityDetails, userRole, "Regional Peer Group Comparison"));
+                    CountryComposeHeader(x, countryDetails, userRole, "Regional Peer Group Comparison"));
                 page.Content().Element(c =>
-                    RegionalPeerPage(c, peers, main, cityDetails));
+                    RegionalPeerPage(c, peers, main, countryDetails));
                 PageFooter(page);
             });
 
@@ -2178,9 +2178,9 @@ namespace PeaceEnablers.Common.Implementation
             {
                 ApplyPageDefaults(page);
                 page.Header().Element(x =>
-                    CityComposeHeader(x, cityDetails, userRole, "Income-Level Peer Comparison"));
+                    CountryComposeHeader(x, countryDetails, userRole, "Income-Level Peer Comparison"));
                 page.Content().Element(c =>
-                    IncomePeerPage(c, peers, main, cityDetails));
+                    IncomePeerPage(c, peers, main, countryDetails));
                 PageFooter(page);
             });
 
@@ -2190,24 +2190,24 @@ namespace PeaceEnablers.Common.Implementation
             {
                 ApplyPageDefaults(page);
                 page.Header().Element(x =>
-                    CityComposeHeader(x, cityDetails, userRole, "Relative Ranking Among Peer Cities"));
+                    CountryComposeHeader(x, countryDetails, userRole, "Relative Ranking Among Peer countries"));
                 page.Content().Element(c =>
-                    RelativeRankingPage(c, peers, main, cityDetails));
+                    RelativeRankingPage(c, peers, main, countryDetails));
                 PageFooter(page);
             });
         }
 
         void AddPerformanceTrendsSection(
             IDocumentContainer container,
-            List<PeerCityHistoryReportDto> peerCities,
-            AiCitySummeryDto cityDetails,
+            List<PeerCountryHistoryReportDto> peerCountries,
+            AiCountrySummeryDto countryDetails,
             UserRole userRole)
         {
-            if (peerCities == null || !peerCities.Any()) return;
+            if (peerCountries == null || !peerCountries.Any()) return;
 
-            var main = FindMainCity(peerCities, cityDetails);
-            var peers = peerCities
-                .Where(p => !IsSameCity(p.CityName, cityDetails.CityName))      
+            var main = FindMainCountry(peerCountries, countryDetails);
+            var peers = peerCountries
+                .Where(p => !IsSameCountry(p.CountryName, countryDetails.CountryName))      
                 .ToList();
 
             // ── 6.1 + 6.2  Historical & Five-Year Evolution ──────────────────────
@@ -2215,9 +2215,9 @@ namespace PeaceEnablers.Common.Implementation
             {
                 ApplyPageDefaults(page);
                 page.Header().Element(x =>
-                    CityComposeHeader(x, cityDetails, userRole, "Performance Trends Over Time"));
+                    CountryComposeHeader(x, countryDetails, userRole, "Performance Trends Over Time"));
                 page.Content().Element(c =>
-                    HistoricalTrendsPage(c, peers, main, cityDetails));
+                    HistoricalTrendsPage(c, peers, main, countryDetails));
                 PageFooter(page);
             });
 
@@ -2226,9 +2226,9 @@ namespace PeaceEnablers.Common.Implementation
             {
                 ApplyPageDefaults(page);
                 page.Header().Element(x =>
-                    CityComposeHeader(x, cityDetails, userRole, "Pillar-Level Trend Analysis"));
+                    CountryComposeHeader(x, countryDetails, userRole, "Pillar-Level Trend Analysis"));
                 page.Content().Element(c =>
-                    PillarTrendPage(c, main, cityDetails));
+                    PillarTrendPage(c, main, countryDetails));
                 PageFooter(page);
             });
         }
@@ -2239,12 +2239,12 @@ namespace PeaceEnablers.Common.Implementation
 
         void PopulationPeerPage(
             IContainer container,
-            List<PeerCityHistoryReportDto> peers,
-            PeerCityHistoryReportDto? main,
-            AiCitySummeryDto cityDetails)
+            List<PeerCountryHistoryReportDto> peers,
+            PeerCountryHistoryReportDto? main,
+            AiCountrySummeryDto countryDetails)
         {
-            // All cities (main + peers) sorted by population desc
-            var all = BuildAllCities(main, peers)
+            // All countries (main + peers) sorted by population desc
+            var all = BuildAllCountries(main, peers)
                 .Where(c => c.Population.HasValue)
                 .OrderByDescending(c => c.Population)
                 .ToList();
@@ -2258,26 +2258,26 @@ namespace PeaceEnablers.Common.Implementation
                 col.Spacing(12);
 
                 col.Item().Element(x => DrawInsightBand(x,
-                    $"{all.Count} cities compared  |  " +
-                    $"Largest: {all.First().CityName} ({FormatPop(all.First().Population)})  |  " +
-                    $"Smallest: {all.Last().CityName} ({FormatPop(all.Last().Population)})"));
+                    $"{all.Count} countries compared  |  " +
+                    $"Largest: {all.First().CountryName} ({FormatPop(all.First().Population)})  |  " +
+                    $"Smallest: {all.Last().CountryName} ({FormatPop(all.Last().Population)})"));
 
                 // ── Population bar chart ──────────────────────────────────────
-                col.Item().Text("Population Size by City")
+                col.Item().Text("Population Size by Country")
                     .FontSize(11).Bold().FontColor("#12352f");
 
                 col.Item().Height(all.Count * 40).Canvas((canvas, size) =>
-                    DrawPopulationBars(canvas, size, all, cityDetails, maxPop));
+                    DrawPopulationBars(canvas, size, all, countryDetails, maxPop));
 
-                col.Item().Element(x => DrawCityLegend(x, all, cityDetails));
+                col.Item().Element(x => DrawCityLegend(x, all, countryDetails));
 
                 // ── Score vs Population scatter ───────────────────────────────
                 col.Item().PaddingTop(8)
-                    .Text("Score vs Population  (each dot = one city)")
+                    .Text("Score vs Population  (each dot = one country)")
                     .FontSize(11).Bold().FontColor("#12352f");
 
                 col.Item().Height(all.Count * 40).Canvas((canvas, size) =>
-                    DrawScatterPlot(canvas, size, all, cityDetails,
+                    DrawScatterPlot(canvas, size, all, countryDetails,
                         c => (float)(c.Population ?? 0),
                         c => GetLatestScoreOrZero(c),
                         "Population", "Score"));
@@ -2286,32 +2286,32 @@ namespace PeaceEnablers.Common.Implementation
 
         void DrawPopulationBars(
             SKCanvas canvas, Size size,
-            List<PeerCityHistoryReportDto> cities,
-            AiCitySummeryDto cityDetails,
+            List<PeerCountryHistoryReportDto> countries,
+            AiCountrySummeryDto countryDetails,
             long maxPop)
         {
             float rowH = 30f;
             float labelW = 130f;
             float barArea = size.Width - labelW - 72f;
 
-            for (int i = 0; i < cities.Count; i++)
+            for (int i = 0; i < countries.Count; i++)
             {
-                var city = cities[i];
+                var country = countries[i];
                 float y = i * rowH + 4f;
-                float barW = (float)((city.Population ?? 0) / (double)maxPop * barArea);
-                bool isMain = IsSameCity(city.CityName, cityDetails.CityName);
+                float barW = (float)((country.Population ?? 0) / (double)maxPop * barArea);
+                bool isMain = IsSameCountry(country.CountryName, countryDetails.CountryName);
 
                 // Row background
                 if (i % 2 == 0)
                     canvas.DrawRect(new SKRect(0, y - 2, size.Width, y + rowH - 4),
                         new SKPaint { Color = SKColor.Parse("#f4f7f5") });
 
-                // Highlight selected city row
+                // Highlight selected country row
                 if (isMain)
                     canvas.DrawRect(new SKRect(0, y - 2, size.Width, y + rowH - 4),
                         new SKPaint { Color = SKColor.Parse("#FFF8E1") });
 
-                DrawCanvasText(canvas, city.CityName, 4, y + 5, 9,
+                DrawCanvasText(canvas, country.CountryName, 4, y + 5, 9,
                     isMain ? "#12352f" : "#444444", bold: isMain);
 
                 string barColor = isMain ? CityPalette[0] : CityPalette[1 + (i % (CityPalette.Length - 1))];
@@ -2319,7 +2319,7 @@ namespace PeaceEnablers.Common.Implementation
                     new SKRoundRect(new SKRect(labelW, y + 4, labelW + barW, y + rowH - 6), 3),
                     new SKPaint { Color = SKColor.Parse(barColor), IsAntialias = true });
 
-                DrawCanvasText(canvas, FormatPop(city.Population),
+                DrawCanvasText(canvas, FormatPop(country.Population),
                     labelW + barW + 5, y + 5, 9, "#555555");
             }
         }
@@ -2330,11 +2330,11 @@ namespace PeaceEnablers.Common.Implementation
 
         void RegionalPeerPage(
             IContainer container,
-            List<PeerCityHistoryReportDto> peers,
-            PeerCityHistoryReportDto? main,
-            AiCitySummeryDto cityDetails)
+            List<PeerCountryHistoryReportDto> peers,
+            PeerCountryHistoryReportDto? main,
+            AiCountrySummeryDto countryDetails)
         {
-            var all = BuildAllCities(main, peers);
+            var all = BuildAllCountries(main, peers);
 
             var byRegion = all
                 .GroupBy(p => string.IsNullOrWhiteSpace(p.Region) ? p.Country ?? "Unknown" : p.Region)
@@ -2346,9 +2346,9 @@ namespace PeaceEnablers.Common.Implementation
                 col.Spacing(12);
 
                 col.Item().Element(x => DrawInsightBand(x,
-                    $"{byRegion.Count} region(s)  |  {all.Count} total cities analysed"));
+                    $"{byRegion.Count} region(s)  |  {all.Count} total countries analysed"));
 
-                col.Item().Text("City Distribution by Region")
+                col.Item().Text("Country Distribution by Region")
                     .FontSize(11).Bold().FontColor("#12352f");
 
                 col.Item().Height(180).Canvas((canvas, size) =>
@@ -2418,17 +2418,17 @@ namespace PeaceEnablers.Common.Implementation
         }
 
         void IncomePeerPage(
-             IContainer container,
-             List<PeerCityHistoryReportDto> peers,
-             PeerCityHistoryReportDto? main,
-             AiCitySummeryDto cityDetails)
+              IContainer container,
+              List<PeerCountryHistoryReportDto> peers,
+              PeerCountryHistoryReportDto? main,
+              AiCountrySummeryDto countryDetails)
         {
             var categoryOrder = new[]
             {
                 "Low Income", "Lower-Middle Income", "Upper-Middle Income", "High Income"
             };
 
-            var all = BuildAllCities(main, peers);
+            var all = BuildAllCountries(main, peers);
             var withIncome = all.Where(p => p.Income.HasValue).OrderBy(p => p.Income).ToList();
 
             if (!withIncome.Any()) { DrawNoDataPage(container); return; }
@@ -2443,7 +2443,7 @@ namespace PeaceEnablers.Common.Implementation
 
                 // ── Insight band ─────────────────────────────────────────────
                 col.Item().Element(x => DrawInsightBand(x,
-                    $"Income quartile analysis  |  {withIncome.Count} cities  |  " +
+                    $"Income quartile analysis  |  {withIncome.Count} countries  |  " +
                     $"Range: {withIncome.Min(p => p.Income):C0} – {withIncome.Max(p => p.Income):C0}"));
 
                 // ── Avg score per quartile bars (UNCHANGED) ──────────────────
@@ -2456,9 +2456,9 @@ namespace PeaceEnablers.Common.Implementation
                     for (int i = 0; i < categoryOrder.Length; i++)
                     {
                         var label = categoryOrder[i];
-                        if (!segments.TryGetValue(label, out var cities) || !cities.Any()) continue;
+                        if (!segments.TryGetValue(label, out var countries) || !countries.Any()) continue;
 
-                        float avg = cities.Average(c => GetLatestScoreOrZero(c));
+                        float avg = countries.Average(c => GetLatestScoreOrZero(c));
                         float barH = avg / 100f * 90f;
                         float x = 20 + i * ((size.Width - 40f) / 4f);
 
@@ -2468,170 +2468,21 @@ namespace PeaceEnablers.Common.Implementation
 
                         DrawCanvasText(canvas, $"{avg:F1}", x + barAreaW / 2 - 10, 100 - barH - 14, 9, "#12352f", true);
                         DrawCanvasText(canvas, label, x, 108, 8, "#555555");
-                        DrawCanvasText(canvas, $"n={cities.Count}", x, 118, 8, "#888888");
+                        DrawCanvasText(canvas, $"n={countries.Count}", x, 118, 8, "#888888");
                     }
                 });
 
                 // ── Scatter: Income vs Score (UNCHANGED) ─────────────────────
                 col.Item().PaddingTop(4)
-                    .Text("Income vs Composite Score  (each dot = one city)")
+                    .Text("Income vs Composite Score  (each dot = one country)")
                     .FontSize(11).Bold().FontColor("#12352f");
 
                 col.Item().Height(160).Canvas((canvas, size) =>
-                    DrawScatterPlot(canvas, size, withIncome, cityDetails,
+                    DrawScatterPlot(canvas, size, withIncome, countryDetails,
                         c => (float)(c.Income ?? 0),
                         c => GetLatestScoreOrZero(c),
                         "Income (USD)", "Score"));
 
-                // ════════════════════════════════════════════════════════════
-                // NEW ── PPP Analytical Section
-                // ════════════════════════════════════════════════════════════
-                var withPpp = all.Where(p => p.PPP.HasValue && p.PPP > 0).ToList();
-
-                if (withPpp.Any())
-                {
-                    col.Item().PaddingTop(8)
-                        .BorderTop(1f).BorderColor("#12352f")
-                        .PaddingTop(6)
-                        .Text("Purchasing Power Parity (PPP) Analysis")
-                        .FontSize(12).Bold().FontColor("#12352f");
-
-                    col.Item().Text(
-                        "PPP-adjusted income reflects real purchasing power in International Dollars, " +
-                        "correcting for local price differences. A higher PPP vs Nominal income " +
-                        "indicates a more affordable city; a lower PPP suggests high cost of living " +
-                        "that erodes nominal earnings. Use this alongside structural factors " +
-                        "(inequality, informal markets) for a complete welfare picture.")
-                        .FontSize(8).Italic().FontColor("#555555");
-
-                    // ── PPP vs Nominal scatter ────────────────────────────────
-                    col.Item().PaddingTop(6)
-                        .Text("Nominal Income vs PPP-Adjusted Income  (each dot = one city)")
-                        .FontSize(11).Bold().FontColor("#12352f");
-
-                    col.Item().Height(160).Canvas((canvas, size) =>
-                        DrawScatterPlot(canvas, size, withPpp, cityDetails,
-                            c => (float)(c.Income ?? 0),
-                            c => (float)(c.PPP ?? 0),
-                            "Nominal Income (USD)", "PPP Income (Int'l $)"));
-
-                    // ── PPP Comparison Table ──────────────────────────────────
-                    col.Item().PaddingTop(6)
-                        .Text("Nominal vs PPP-Adjusted Income Comparison")
-                        .FontSize(11).Bold().FontColor("#12352f");
-
-                    col.Item().Table(table =>
-                    {
-                        table.ColumnsDefinition(cols =>
-                        {
-                            cols.RelativeColumn(2f);   // City
-                            cols.ConstantColumn(55);   // Country
-                            cols.ConstantColumn(45);   // Score
-                            cols.ConstantColumn(70);   // Nominal Income
-                            cols.ConstantColumn(70);   // PPP Income
-                            cols.ConstantColumn(55);   // Difference
-                            cols.RelativeColumn(1.5f); // PPP Signal
-                        });
-
-                        DrawTableHeader(table, new[]
-                        {
-                            "City", "Country", "Score",
-                            "Nominal (USD)", "PPP (Int'l $)", "Δ Difference", "Signal"
-                        });
-
-                        foreach (var city in withPpp.OrderByDescending(c => c.PPP))
-                        {
-                            bool isMain = IsSameCity(city.CityName, cityDetails.CityName);
-                            string rowBg = isMain ? "#fff9e6" : Colors.White;
-                            float score = GetLatestScoreOrZero(city);
-                            decimal nominal = city.Income ?? 0;
-                            decimal ppp = city.PPP ?? 0;
-                            decimal diff = ppp - nominal;
-
-                            // Signal logic based on user-entered PPP vs Nominal
-                            string nomCat = GetIncomeCategory(nominal);
-                            string pppCat = GetIncomeCategory(ppp);
-                            bool upgraded = pppCat != nomCat && ppp > nominal;
-                            bool downgraded = pppCat != nomCat && ppp < nominal;
-                            decimal ratio = nominal > 0 ? Math.Round(ppp / nominal, 2) : 1m;
-
-                            string signalLabel = ratio switch
-                            {
-                                >= 2.0m => "Strong PPP Advantage",
-                                >= 1.3m => "Moderate PPP Advantage",
-                                >= 0.9m => "Near-Parity",
-                                >= 0.7m => "Cost Pressure",
-                                _ => "High Cost Penalty"
-                            };
-                            string signalColor = ratio switch
-                            {
-                                >= 2.0m => "#2E7D32",
-                                >= 1.3m => "#5BC0DE",
-                                >= 0.9m => "#888888",
-                                >= 0.7m => "#F0AD4E",
-                                _ => "#D9534F"
-                            };
-
-                            string diffStr = diff >= 0
-                                ? $"+{FormatPop(diff)}"
-                                : $"-{FormatPop(Math.Abs(diff))}";
-                            string diffColor = diff >= 0 ? "#2E7D32" : "#D9534F";
-
-                            table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor("#e0e0e0")
-                                .Padding(5).Text(city.CityName).FontSize(8)
-                                .FontColor(isMain ? "#12352f" : "#333333").Bold();
-
-                            table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor("#e0e0e0")
-                                .Padding(5).Text(city.Country ?? "—").FontSize(8).FontColor("#555555");
-
-                            table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor("#e0e0e0")
-                                .Padding(5).Text($"{score:F1}").FontSize(8).Bold().FontColor(ScoreColor(score));
-
-                            table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor("#e0e0e0")
-                                .Padding(5).Text(FormatPop(nominal).ToString()).FontSize(8).FontColor("#555555");
-
-                            // PPP cell — green if upgraded category, red if downgraded
-                            table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor("#e0e0e0")
-                                .Padding(5).Text(
-                                    FormatPop(ppp) + (upgraded ? " ▲" : downgraded ? " ▼" : ""))
-                                .FontSize(8).Bold()
-                                .FontColor(upgraded ? "#2E7D32" : downgraded ? "#D9534F" : "#333333");
-
-                            table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor("#e0e0e0")
-                                .Padding(5).Text(diffStr).FontSize(8).Bold().FontColor(diffColor);
-
-                            table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor("#e0e0e0")
-                                .Padding(4).Background(signalColor + "22")
-                                .Text(signalLabel).FontSize(7).FontColor(signalColor).Bold();
-                        }
-                    });
-
-                    // ── Legend + footnote ─────────────────────────────────────
-                    col.Item().PaddingTop(4).Row(r =>
-                    {
-                        foreach (var (sig, clr) in new[]
-                        {
-                            ("Strong PPP Advantage ≥2×",  "#2E7D32"),
-                            ("Moderate ≥1.3×",             "#5BC0DE"),
-                            ("Near-Parity 0.9–1.3×",       "#888888"),
-                            ("Cost Pressure 0.7–0.9×",     "#F0AD4E"),
-                            ("High Cost Penalty <0.7×",    "#D9534F"),
-                        })
-                        {
-                            r.AutoItem().PaddingRight(8).Row(inner =>
-                            {
-                                inner.ConstantItem(8).Height(8).Background(clr);
-                                inner.AutoItem().PaddingLeft(2).Text(sig).FontSize(7).FontColor("#555555");
-                            });
-                        }
-                    });
-
-                    col.Item().PaddingTop(3)
-                        .Text("▲ PPP adjustment moves city to a higher income category.  " +
-                              "▼ PPP adjustment moves city to a lower income category.  " +
-                              "Ratio = PPP ÷ Nominal Income.")
-                        .FontSize(7).Italic().FontColor("#999999");
-                }
 
                 // ── Top performers table (UPDATED — PPP column added) ────────
                 col.Item().PaddingTop(8)
@@ -2642,48 +2493,40 @@ namespace PeaceEnablers.Common.Implementation
                 {
                     table.ColumnsDefinition(cols =>
                     {
-                        cols.ConstantColumn(100);  // City
+                        cols.ConstantColumn(100);  // Country
                         cols.ConstantColumn(55);   // Country
                         cols.ConstantColumn(40);   // Score
                         cols.RelativeColumn();     // Income Group
                         cols.ConstantColumn(55);   // Income
-                        cols.ConstantColumn(60);   // PPP  ← NEW
+                        //cols.ConstantColumn(60);   // PPP  ← NEW
                     });
 
                     DrawTableHeader(table, new[]
                     {
-                        "City", "Country", "Score", "Income Group", "Income", "PPP (Int'l $)"
+                        "Country", "Continent", "Score", "Income Group", "Income"
                     });
 
-                    foreach (var (label, cities) in segments)
+                    foreach (var (label, countries) in segments)
                     {
-                        foreach (var city in cities.OrderByDescending(c => GetLatestScoreOrZero(c)))
+                        foreach (var country in countries.OrderByDescending(c => GetLatestScoreOrZero(c)))
                         {
-                            bool isMain = IsSameCity(city.CityName, cityDetails.CityName);
+                            bool isMain = IsSameCountry(country.CountryName, countryDetails.Continent);
                             string rowBg = isMain ? "#fff9e6" : Colors.White;
-                            float score = GetLatestScoreOrZero(city);
+                            float score = GetLatestScoreOrZero(country);
 
                             table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor("#e0e0e0")
-                                .Padding(5).Text(city.CityName).FontSize(8)
+                                .Padding(5).Text(country.CountryName).FontSize(8)
                                 .FontColor(isMain ? "#12352f" : "#333333");
                             table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor("#e0e0e0")
-                                .Padding(5).Text(city.Country ?? "—").FontSize(8).FontColor("#555555");
+                                .Padding(5).Text(country.Country ?? "—").FontSize(8).FontColor("#555555");
                             table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor("#e0e0e0")
                                 .Padding(5).Text($"{score:F1}").FontSize(8).Bold().FontColor(ScoreColor(score));
                             table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor("#e0e0e0")
                                 .Padding(5).Text(label).FontSize(8).FontColor("#555555");
                             table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor("#e0e0e0")
-                                .Padding(5).Text(FormatPop(city.Income).ToString()).FontSize(8).FontColor("#555555");
+                                .Padding(5).Text(FormatPop(country.Income).ToString()).FontSize(8).FontColor("#555555");
 
-                            // ← NEW PPP cell
-                            var pppDisplay = city.PPP.HasValue && city.PPP > 0
-                                ? FormatPop(city.PPP).ToString()
-                                : "—";
-                            var pppColor = city.PPP > city.Income ? "#2E7D32"
-                                         : city.PPP < city.Income ? "#D9534F"
-                                         : "#555555";
-                            table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor("#e0e0e0")
-                                .Padding(5).Text(pppDisplay).FontSize(8).Bold().FontColor(pppColor);
+
                         }
                     }
                 });
@@ -2692,23 +2535,23 @@ namespace PeaceEnablers.Common.Implementation
 
 
         // ══════════════════════════════════════════════════════════════════════════
-        //  5.5  RELATIVE RANKING AMONG PEER CITIES
+        //  5.5  RELATIVE RANKING AMONG PEER countries
         // ══════════════════════════════════════════════════════════════════════════
 
         void RelativeRankingPage(
             IContainer container,
-            List<PeerCityHistoryReportDto> peers,
-            PeerCityHistoryReportDto? main,
-            AiCitySummeryDto cityDetails)
+            List<PeerCountryHistoryReportDto> peers,
+            PeerCountryHistoryReportDto? main,
+            AiCountrySummeryDto countryDetails)
         {
-            // Build ranked list including main city; include 0-score cities
-            var all = BuildAllCities(main, peers)
-                .Select(c => (City: c, Score: GetLatestScoreOrZero(c)))
+            // Build ranked list including main country; include 0-score countries
+            var all = BuildAllCountries(main, peers)
+                .Select(c => (Country: c, Score: GetLatestScoreOrZero(c)))
                 .OrderByDescending(x => x.Score)
                 .ToList();
 
             int total = all.Count;
-            int mainRank = all.FindIndex(r => IsSameCity(r.City.CityName, cityDetails.CityName)) + 1;
+            int mainRank = all.FindIndex(r => IsSameCountry(r.Country.CountryName, countryDetails.CountryName)) + 1;
             float mainScore = mainRank > 0 ? all[mainRank - 1].Score : 0f;
             float pctile = mainRank > 0 ? (1f - (float)mainRank / total) * 100f : 0f;
 
@@ -2723,7 +2566,7 @@ namespace PeaceEnablers.Common.Implementation
                     {
                         c.Item().Text($"#{mainRank} of {total}")
                             .FontSize(32).Bold().FontColor("#f0b429");
-                        c.Item().Text($"{cityDetails.CityName}  \u00b7  {cityDetails.Country}")
+                        c.Item().Text($"{countryDetails.CountryName}  \u00b7  {countryDetails.Continent}")
                             .FontSize(12).FontColor("#a5d6c2");
                     });
                     row.ConstantItem(130).Column(c =>
@@ -2737,7 +2580,7 @@ namespace PeaceEnablers.Common.Implementation
                 });
 
                 // ── Score distribution histogram ──────────────────────────────
-                col.Item().Text("Score Distribution Among All Cities")
+                col.Item().Text("Score Distribution Among All countries")
                     .FontSize(11).Bold().FontColor("#12352f");
 
                 col.Item().Height(150).Canvas((canvas, size) =>
@@ -2745,26 +2588,26 @@ namespace PeaceEnablers.Common.Implementation
                         all.Select(r => r.Score).ToList(), mainScore, 10));
 
                 // ── Full ranking table ────────────────────────────────────────
-                col.Item().Text("Full City Ranking").FontSize(11).Bold().FontColor("#12352f");
+                col.Item().Text("Full Country Ranking").FontSize(11).Bold().FontColor("#12352f");
 
                 col.Item().Table(table =>
                 {
                     table.ColumnsDefinition(cols =>
                     {
                         cols.ConstantColumn(24);   // rank
-                        cols.RelativeColumn();     // city name
+                        cols.RelativeColumn();     // country name
                         cols.ConstantColumn(65);   // country
                         cols.ConstantColumn(55);   // region
                         cols.ConstantColumn(52);   // population
                         cols.ConstantColumn(70);   // score bar
                     });
 
-                    DrawTableHeader(table, new[] { "#", "City", "Country", "Region", "Pop.", "Score" });
+                    DrawTableHeader(table, new[] { "#", "Country", "Continent", "Region", "Pop.", "Score" });
 
 
                     foreach (var (entry, idx) in all.Select((e, i) => (e, i)))
                     {
-                        bool isMain = IsSameCity(entry.City.CityName, cityDetails.CityName);
+                        bool isMain = IsSameCountry(entry.Country.CountryName, countryDetails.CountryName);
                         string bg = isMain ? "#fff9e6" : (idx % 2 == 0 ? Colors.White : "#fafafa");
                         string rankColor = idx == 0 ? "#f0b429"
                                          : idx == 1 ? "#a5a8ad"
@@ -2773,15 +2616,15 @@ namespace PeaceEnablers.Common.Implementation
                         table.Cell().Background(bg).BorderBottom(0.5f).BorderColor("#e8e8e8")
                             .Padding(4).Text($"{idx + 1}").FontSize(8).FontColor(rankColor);
                         table.Cell().Background(bg).BorderBottom(0.5f).BorderColor("#e8e8e8")
-                            .Padding(4).Text(entry.City.CityName).FontSize(8)
+                            .Padding(4).Text(entry.Country.CountryName).FontSize(8)
                             .FontColor(isMain ? "#12352f" : "#333333");
                         table.Cell().Background(bg).BorderBottom(0.5f).BorderColor("#e8e8e8")
-                            .Padding(4).Text(entry.City.Country ?? "—").FontSize(8).FontColor("#555555");
+                            .Padding(4).Text(entry.Country.Continent ?? "—").FontSize(8).FontColor("#555555");
                         table.Cell().Background(bg).BorderBottom(0.5f).BorderColor("#e8e8e8")
-                            .Padding(4).Text(entry.City.Region ?? "—").FontSize(8).FontColor("#555555");
+                            .Padding(4).Text(entry.Country.Region ?? "—").FontSize(8).FontColor("#555555");
                         table.Cell().Background(bg).BorderBottom(0.5f).BorderColor("#e8e8e8")
                             .Padding(4).AlignRight()
-                            .Text(FormatPop(entry.City.Population)).FontSize(8).FontColor("#555555");
+                            .Text(FormatPop(entry.Country.Population)).FontSize(8).FontColor("#555555");
 
                         table.Cell()
                         .Background(bg)
@@ -2815,18 +2658,18 @@ namespace PeaceEnablers.Common.Implementation
 
         void HistoricalTrendsPage(
             IContainer container,
-            List<PeerCityHistoryReportDto> peers,
-            PeerCityHistoryReportDto? main,
-            AiCitySummeryDto cityDetails)
+            List<PeerCountryHistoryReportDto> peers,
+            PeerCountryHistoryReportDto? main,
+            AiCountrySummeryDto countryDetails)
         {
-            var all = BuildAllCities(main, peers);
-            var mainCity = main ?? peers.FirstOrDefault();
+            var all = BuildAllCountries(main, peers);
+            var mainCountry = main ?? peers.FirstOrDefault();
 
-            if (mainCity == null) { DrawNoDataPage(container); return; }
+            if (mainCountry == null) { DrawNoDataPage(container); return; }
 
-            // All distinct years across all cities
+            // All distinct years across all countries
             var allYears = all
-                .SelectMany(c => c.CityHistory ?? Enumerable.Empty<PeerCityYearHistoryDto>())
+                .SelectMany(c => c.CountryHistory ?? Enumerable.Empty<PeerCountryYearHistoryDto>())
                 .Select(h => h.Year)
                 .Distinct()
                 .OrderBy(y => y)
@@ -2834,14 +2677,14 @@ namespace PeaceEnablers.Common.Implementation
 
             if (!allYears.Any()) { DrawNoDataPage(container); return; }
 
-            var mainHistory = (mainCity.CityHistory ?? new())
+            var mainHistory = (mainCountry.CountryHistory ?? new())
                 .OrderBy(h => h.Year).ToList();
 
             // Peer average per year (include 0-score years)
             var peerAvg = allYears.Select(yr =>
             {
                 var scores = peers
-                    .Select(p => p.CityHistory?.FirstOrDefault(h => h.Year == yr))
+                    .Select(p => p.CountryHistory?.FirstOrDefault(h => h.Year == yr))
                     .Select(h => h != null ? (float?)h.ScoreProgress : null)
                     .Where(s => s.HasValue)
                     .Select(s => s!.Value)
@@ -2861,9 +2704,9 @@ namespace PeaceEnablers.Common.Implementation
                     float delta = last - first;
                     col.Item().Element(x => DrawInsightBand(x,
                         $"Period: {allYears.First()} – {allYears.Last()}  |  " +
-                        $"{mainCity.CityName}: {(delta >= 0 ? "+" : "")}{delta:F1} pts  |  " +
+                        $"{mainCountry.CountryName}: {(delta >= 0 ? "+" : "")}{delta:F1} pts  |  " +
                         $"Latest score: {last:F1}  |  " +
-                        $"{peers.Count} peer city(ies)"));
+                        $"{peers.Count} peer country(ies)"));
                 }
 
                 // ── 6.1  Multi-line trend ────────────────────────────────────
@@ -2871,10 +2714,10 @@ namespace PeaceEnablers.Common.Implementation
                     .FontSize(12).Bold().FontColor("#12352f");
 
                 col.Item().Height(190).Canvas((canvas, size) =>
-                    DrawMultiLineTrendChart(canvas, size, allYears, peers, mainCity, cityDetails, peerAvg));
+                    DrawMultiLineTrendChart(canvas, size, allYears, peers, mainCountry, countryDetails, peerAvg));
 
-                // Legend: one entry per city
-                col.Item().Element(x => DrawCityLineLegend(x, mainCity, peers, cityDetails));
+                // Legend: one entry per country
+                col.Item().Element(x => DrawCityLineLegend(x, mainCountry, peers, countryDetails));
 
                 col.Item().PaddingVertical(4).LineHorizontal(0.5f).LineColor("#e0e0e0");
 
@@ -2903,7 +2746,7 @@ namespace PeaceEnablers.Common.Implementation
         void DrawYoYTable(
             IContainer container,
             List<int> years,
-            List<PeerCityYearHistoryDto> mainHistory,
+            List<PeerCountryYearHistoryDto> mainHistory,
             List<(int Year, float Avg)> peerAvg)
         {
             container.Table(table =>
@@ -2966,24 +2809,24 @@ namespace PeaceEnablers.Common.Implementation
         }
 
         // ══════════════════════════════════════════════════════════════════════════
-        //  6.3  PILLAR-LEVEL TREND  (main city only; up to 14 pillars)
+        //  6.3  PILLAR-LEVEL TREND  (main country only; up to 14 pillars)
         // ══════════════════════════════════════════════════════════════════════════
 
         void PillarTrendPage(
             IContainer container,
-            PeerCityHistoryReportDto? mainCity,
-            AiCitySummeryDto cityDetails)
+            PeerCountryHistoryReportDto? mainCity,
+            AiCountrySummeryDto countryDetails)
         {
             if (mainCity == null) { DrawNoDataPage(container); return; }
 
-            var history = mainCity.CityHistory ?? new();
+            var history = mainCity.CountryHistory ?? new();            
             var allYears = history.Select(h => h.Year).OrderBy(y => y).ToList();
 
             if (!allYears.Any()) { DrawNoDataPage(container); return; }
 
             // Collect all unique pillars (cap at MaxPillars = 14)
             var pillars = history
-                .SelectMany(h => h.Pillars ?? Enumerable.Empty<PeerCityPillarHistoryReportDto>())
+                .SelectMany(h => h.Pillars ?? Enumerable.Empty<PeerCountryPillarHistoryReportDto>())
                 .GroupBy(p => p.PillarID)
                 .Select(g => g.OrderBy(p => p.DisplayOrder).First())
                 .OrderBy(p => p.DisplayOrder)
@@ -2995,7 +2838,7 @@ namespace PeaceEnablers.Common.Implementation
                 col.Spacing(12);
 
                 col.Item().Element(x => DrawInsightBand(x,
-                    $"{pillars.Count} pillar(s)  |  {allYears.Count} year(s)  |  City: {mainCity.CityName}"));
+                    $"{pillars.Count} pillar(s)  |  {allYears.Count} year(s)  |  Country: {mainCity.CountryName}"));
 
                 col.Item().Text("Pillar Score Trajectory Over Time")
                     .FontSize(11).Bold().FontColor("#12352f");
@@ -3109,15 +2952,15 @@ namespace PeaceEnablers.Common.Implementation
         // ══════════════════════════════════════════════════════════════════════════
 
         /// <summary>
-        /// Multi-line trend chart: one coloured line per city (gold = main, palette = peers).
+        /// Multi-line trend chart: one coloured line per country (gold = main, palette = peers).
         /// Thin grey peer lines are no longer used; each peer gets its own distinct colour.
         /// </summary>
         void DrawMultiLineTrendChart(
             SKCanvas canvas, Size size,
             List<int> years,
-            List<PeerCityHistoryReportDto> peers,
-            PeerCityHistoryReportDto mainCity,
-            AiCitySummeryDto cityDetails,
+            List<PeerCountryHistoryReportDto> peers,
+            PeerCountryHistoryReportDto mainCity,
+            AiCountrySummeryDto countryDetails,
             List<(int Year, float Avg, bool HasData)> peerAvg)
         {
             if (years.Count < 2) return;
@@ -3163,7 +3006,7 @@ namespace PeaceEnablers.Common.Implementation
                 var peer = peers[pi];
                 string clr = CityPalette[1 + (pi % (CityPalette.Length - 1))];
 
-                var pts = (peer.CityHistory ?? new())
+                var pts = (peer.CountryHistory ?? new())
                     .Where(h => years.Contains(h.Year))
                     .OrderBy(h => h.Year)
                     .Select(h => new SKPoint(Xp(h.Year), Yp((float)h.ScoreProgress)))
@@ -3179,8 +3022,8 @@ namespace PeaceEnablers.Common.Implementation
                     });
             }
 
-            // Main city line (gold, bold)
-            var mainPts = (mainCity.CityHistory ?? new())
+            // Main country line (gold, bold)
+            var mainPts = (mainCity.CountryHistory ?? new())
                 .Where(h => years.Contains(h.Year))
                 .OrderBy(h => h.Year)
                 .Select(h => new SKPoint(Xp(h.Year), Yp((float)h.ScoreProgress)))
@@ -3203,7 +3046,7 @@ namespace PeaceEnablers.Common.Implementation
         void DrawAreaComparisonChart(
             SKCanvas canvas, Size size,
             List<int> years,
-            List<PeerCityYearHistoryDto> mainHistory,
+            List<PeerCountryYearHistoryDto> mainHistory,
             List<(int Year, float Avg)> peerAvg)
         {
             if (years.Count < 2) return;
@@ -3279,8 +3122,8 @@ namespace PeaceEnablers.Common.Implementation
         void DrawPillarLineChart(
             SKCanvas canvas, Size size,
             List<int> years,
-            List<PeerCityYearHistoryDto> history,
-            List<PeerCityPillarHistoryReportDto> pillars)
+            List<PeerCountryYearHistoryDto> history,
+            List<PeerCountryPillarHistoryReportDto> pillars)
         {
             if (years.Count < 2) return;
 
@@ -3335,18 +3178,18 @@ namespace PeaceEnablers.Common.Implementation
 
         void DrawScatterPlot(
             SKCanvas canvas, Size size,
-            List<PeerCityHistoryReportDto> cities,
-            AiCitySummeryDto cityDetails,
-            Func<PeerCityHistoryReportDto, float> xVal,
-            Func<PeerCityHistoryReportDto, float> yVal,
+            List<PeerCountryHistoryReportDto> countries,
+            AiCountrySummeryDto countryDetails,
+            Func<PeerCountryHistoryReportDto, float> xVal,
+            Func<PeerCountryHistoryReportDto, float> yVal,
             string xLabel, string yLabel)
         {
             const float padL = 42f, padR = 14f, padT = 8f, padB = 24f;
             float w = size.Width - padL - padR;
             float h = size.Height - padT - padB;
 
-            float xMin = cities.Any() ? cities.Min(xVal) : 0f;
-            float xMax = cities.Any() ? cities.Max(xVal) : 1f;
+            float xMin = countries.Any() ? countries.Min(xVal) : 0f;
+            float xMax = countries.Any() ? countries.Max(xVal) : 1f;
             if (xMax <= xMin) xMax = xMin + 1;
 
             float Xp(float v) => padL + (v - xMin) / (xMax - xMin) * w;
@@ -3366,12 +3209,12 @@ namespace PeaceEnablers.Common.Implementation
                 DrawCanvasText(canvas, s.ToString(), 2, y - 5, 7, "#999999");
             }
 
-            for (int i = 0; i < cities.Count; i++)
+            for (int i = 0; i < countries.Count; i++)
             {
-                var city = cities[i];
-                bool isMain = IsSameCity(city.CityName, cityDetails.CityName);
-                float x = Xp(xVal(city));
-                float y = Yp(yVal(city));
+                var country = countries[i];
+                bool isMain = IsSameCountry(country.CountryName, countryDetails.CountryName);
+                float x = Xp(xVal(country));
+                float y = Yp(yVal(country));
                 string clr = isMain ? CityPalette[0] : CityPalette[1 + (i % (CityPalette.Length - 1))];
 
                 canvas.DrawCircle(x, y, isMain ? 6f : 4.5f,
@@ -3479,7 +3322,7 @@ namespace PeaceEnablers.Common.Implementation
                 DrawCanvasText(canvas, (b * bucketSz).ToString("F0"),
                     padL + b * binW - 6, padT + h + 5, 7, "#888888");
 
-            // Marker for selected city
+            // Marker for selected country
             float mx = padL + Math.Clamp(markerValue, 0, 100) / 100f * w;
             canvas.DrawLine(mx, padT, mx, padT + h,
                 new SKPaint
@@ -3493,11 +3336,11 @@ namespace PeaceEnablers.Common.Implementation
 
         void DrawRolePillarHeatmap(
             IContainer container,
-            List<(string Role, List<PeerCityHistoryReportDto> Cities)> roles)
+            List<(string Role, List<PeerCountryHistoryReportDto> countries)> roles)
         {
             var pillars = roles
-                .SelectMany(r => r.Cities)
-                .SelectMany(c => c.CityHistory ?? new())
+                .SelectMany(r => r.countries)
+                .SelectMany(c => c.CountryHistory ?? new())
                 .SelectMany(h => h.Pillars ?? new())
                 .GroupBy(p => p.PillarID)
                 .Select(g => g.First())
@@ -3522,7 +3365,7 @@ namespace PeaceEnablers.Common.Implementation
                         .Text(Shorten(p.PillarName, 8))
                         .FontSize(7).Bold().FontColor(Colors.White);
 
-                foreach (var (role, cities) in roles)
+                foreach (var (role, countries) in roles)
                 {
                     table.Cell().Background("#f4f7f5").BorderBottom(0.5f).BorderColor("#e0e0e0")
                         .Padding(5).Text(role).FontSize(7).FontColor("#333333");
@@ -3530,8 +3373,8 @@ namespace PeaceEnablers.Common.Implementation
                     foreach (var pillar in pillars)
                     {
                         // include 0-score entries
-                        var validScores = cities
-                            .SelectMany(c => c.CityHistory ?? new())
+                        var validScores = countries
+                            .SelectMany(c => c.CountryHistory ?? new())
                             .SelectMany(h => h.Pillars ?? new())
                             .Where(p => p.PillarID == pillar.PillarID)
                             .Select(p => (float)p.ScoreProgress)
@@ -3608,36 +3451,36 @@ namespace PeaceEnablers.Common.Implementation
             });
         }
 
-        /// <summary>City-specific legend: gold dot for selected city, palette dots for peers.</summary>
+        /// <summary>Country-specific legend: gold dot for selected country, palette dots for peers.</summary>
         void DrawCityLineLegend(
             IContainer container,
-            PeerCityHistoryReportDto mainCity,
-            List<PeerCityHistoryReportDto> peers,
-            AiCitySummeryDto cityDetails)
+            PeerCountryHistoryReportDto mainCity,
+            List<PeerCountryHistoryReportDto> peers,
+            AiCountrySummeryDto countryDetails)
         {
             var items = new List<(string Color, string Label)>
             {
-                (CityPalette[0],  $"{cityDetails.CityName} (selected)"),
+                (CityPalette[0],  $"{countryDetails.CountryName} (selected)"),
                 ("#4CAF8A",       "Peer Average")
             };
             for (int i = 0; i < peers.Count; i++)
-                items.Add((CityPalette[1 + (i % (CityPalette.Length - 1))], peers[i].CityName));
+                items.Add((CityPalette[1 + (i % (CityPalette.Length - 1))], peers[i].CountryName));
 
             DrawLegend(container, items.ToArray());
         }
 
-        /// <summary>Legend row showing a coloured dot for every city in the chart.</summary>
+        /// <summary>Legend row showing a coloured dot for every country in the chart.</summary>
         void DrawCityLegend(
             IContainer container,
-            List<PeerCityHistoryReportDto> allCities,
-            AiCitySummeryDto cityDetails)
+            List<PeerCountryHistoryReportDto> allcountries,
+            AiCountrySummeryDto countryDetails)
         {
-            var items = allCities
+            var items = allcountries
                 .Select((c, i) => (
-                    Color: IsSameCity(c.CityName, cityDetails.CityName)
+                    Color: IsSameCountry(c.CountryName, countryDetails.CountryName)
                         ? CityPalette[0]
                         : CityPalette[1 + (i % (CityPalette.Length - 1))],
-                    Label: c.CityName
+                    Label: c.CountryName
                 ))
                 .ToArray();
 
@@ -3688,29 +3531,29 @@ namespace PeaceEnablers.Common.Implementation
         /// Returns the latest year's score including 0.
         /// Returns -1 only when there is genuinely NO history entry at all.
         /// </summary>
-        static float GetLatestScoreOrZero(PeerCityHistoryReportDto city)
+        static float GetLatestScoreOrZero(PeerCountryHistoryReportDto country)
         {
-            var last = city.CityHistory?
+            var last = country.CountryHistory?
                 .OrderByDescending(h => h.Year)
                 .FirstOrDefault();
             return last != null ? (float)last.ScoreProgress : -1f;
         }
 
-        /// <summary>Returns main-city entry from the combined list; null if not found.</summary>
-        static PeerCityHistoryReportDto? FindMainCity(
-            List<PeerCityHistoryReportDto> all, AiCitySummeryDto cityDetails) =>
-            all.FirstOrDefault(p => IsSameCity(p.CityName, cityDetails.CityName));
+        /// <summary>Returns main-country entry from the combined list; null if not found.</summary>
+        static PeerCountryHistoryReportDto? FindMainCountry(
+            List<PeerCountryHistoryReportDto> all, AiCountrySummeryDto countryDetails) =>
+            all.FirstOrDefault(p => IsSameCountry(p.CountryName, countryDetails.CountryName));
 
-        /// <summary>Case-insensitive city name equality check.</summary>
-        static bool IsSameCity(string? a, string? b) =>
+        /// <summary>Case-insensitive country name equality check.</summary>
+        static bool IsSameCountry(string? a, string? b) =>
             string.Equals(a?.Trim(), b?.Trim(), StringComparison.OrdinalIgnoreCase);
 
-        /// <summary>Builds a deduplicated list: main city first, then peers.</summary>
-        static List<PeerCityHistoryReportDto> BuildAllCities(
-            PeerCityHistoryReportDto? main,
-            List<PeerCityHistoryReportDto> peers)
+        /// <summary>Builds a deduplicated list: main country first, then peers.</summary>
+        static List<PeerCountryHistoryReportDto> BuildAllCountries(
+            PeerCountryHistoryReportDto? main,
+            List<PeerCountryHistoryReportDto> peers)
         {
-            var list = new List<PeerCityHistoryReportDto>();
+            var list = new List<PeerCountryHistoryReportDto>();
             if (main != null) list.Add(main);
             list.AddRange(peers);
             return list;
@@ -3719,13 +3562,13 @@ namespace PeaceEnablers.Common.Implementation
         static string ScoreColor(float score) =>
             score >= 70 ? "#336b58" : score >= 40 ? "#f5a623" : "#e05252";
 
-        static string DeriveRole(PeerCityHistoryReportDto city)
+        static string DeriveRole(PeerCountryHistoryReportDto country)
         {
-            if (city.Population >= 5_000_000) return "Metropolis";
-            if (city.Population >= 1_000_000) return "Major City";
-            if (city.Population >= 300_000) return "Mid-Sized City";
-            if (city.Population >= 100_000) return "Large Town";
-            return "Small City";
+            if (country.Population >= 5_000_000) return "Metropolis";
+            if (country.Population >= 1_000_000) return "Major Country";
+            if (country.Population >= 300_000) return "Mid-Sized Country";
+            if (country.Population >= 100_000) return "Large Town";
+            return "Small Country";
         }
 
         static string FormatPop(decimal? value)

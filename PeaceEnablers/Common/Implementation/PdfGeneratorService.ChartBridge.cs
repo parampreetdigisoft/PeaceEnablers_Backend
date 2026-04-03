@@ -35,7 +35,7 @@ namespace PeaceEnablers.Common.Implementation
     public partial class PdfGeneratorService
     {
         // ── Donut / gauge chart ──────────────────────────────────────────────
-        /// <param name="score">0–100 city progress score.</param>
+        /// <param name="score">0–100 country progress score.</param>
         internal static void PaintDonutPublic(SKCanvas c, QPDF.Size s, float score)
             => PaintDonut(c, s, score);
 
@@ -189,35 +189,35 @@ namespace PeaceEnablers.Common.Implementation
         // ── Population bar chart (canvas-only, no IContainer wrapper) ───────
         internal static void DrawPopulationBarsCanvas(
             SKCanvas c, QPDF.Size s,
-            List<PeerCityHistoryReportDto> cities, AiCitySummeryDto cityDetails)
+            List<PeerCountryHistoryReportDto> countries, AiCountrySummeryDto countryDetails)
         {
-            if (!cities.Any()) return;
-            long maxPop = (long)(cities.Max(p => p.Population) ?? 1);
-            float rowH   = s.Height / Math.Max(cities.Count, 1);
+            if (!countries.Any()) return;
+            long maxPop = (long)(countries.Max(p => p.Population) ?? 1);
+            float rowH   = s.Height / Math.Max(countries.Count, 1);
             float labelW = 130f, barArea = s.Width - labelW - 72f;
             string[] palette = { "F0B429", "4CAF8A", "1E88E5", "FB8C00", "7B61FF", "E05252" };
 
-            for (int i = 0; i < cities.Count; i++)
+            for (int i = 0; i < countries.Count; i++)
             {
-                var city = cities[i];
+                var country = countries[i];
                 float y  = i * rowH;
-                float bw = (float)((city.Population ?? 0) / (double)maxPop * barArea);
-                bool isMain = IsSameCityStatic(city.CityName, cityDetails.CityName);
+                float bw = (float)((country.Population ?? 0) / (double)maxPop * barArea);
+                bool isMain = IsSameCountryStatic(country.CountryName, countryDetails.CountryName);
                 if (i % 2 == 0) c.DrawRect(new SKRect(0, y, s.Width, y + rowH), new SKPaint { Color = SKColor.Parse("#F4F7F5") });
                 if (isMain)     c.DrawRect(new SKRect(0, y, s.Width, y + rowH), new SKPaint { Color = SKColor.Parse("#FFF8E1") });
 
                 using var txt = new SKPaint { Color = SKColor.Parse(isMain ? "#12352f" : "#444444"), TextSize = 9f, IsAntialias = true, FakeBoldText = isMain };
-                c.DrawText(city.CityName, 4, y + rowH * 0.65f, txt);
+                c.DrawText(country.CountryName, 4, y + rowH * 0.65f, txt);
                 string clr = isMain ? palette[0] : palette[1 + (i % (palette.Length - 1))];
                 c.DrawRoundRect(new SKRoundRect(new SKRect(labelW, y + 4, labelW + bw, y + rowH - 6), 3), new SKPaint { Color = SKColor.Parse(clr), IsAntialias = true });
                 using var num = new SKPaint { Color = SKColor.Parse("#555555"), TextSize = 9f, IsAntialias = true };
-                c.DrawText(FormatPopStatic(city.Population), labelW + bw + 5, y + rowH * 0.65f, num);
+                c.DrawText(FormatPopStatic(country.Population), labelW + bw + 5, y + rowH * 0.65f, num);
             }
         }
 
         // ── Regional score bars (canvas only) ───────────────────────────────
         internal static void DrawRegionalBarsCanvas(
-            SKCanvas c, QPDF.Size s, List<PeerCityHistoryReportDto> all)
+            SKCanvas c, QPDF.Size s, List<PeerCountryHistoryReportDto> all)
         {
             var byRegion = all
                 .GroupBy(p => string.IsNullOrWhiteSpace(p.Region) ? p.Country ?? "Unknown" : p.Region)
@@ -231,7 +231,7 @@ namespace PeaceEnablers.Common.Implementation
             {
                 var g    = byRegion[i];
                 float y  = i * barH;
-                float avg = (float)g.Average(city => GetLatestScoreOrZeroStatic(city));
+                float avg = (float)g.Average(country => GetLatestScoreOrZeroStatic(country));
                 if (avg < 0) avg = 0;
                 float bw = avg / 100f * barArea;
                 if (i % 2 == 0) c.DrawRect(new SKRect(0, y, s.Width, y + barH), new SKPaint { Color = SKColor.Parse("#F4F7F5") });
@@ -247,8 +247,8 @@ namespace PeaceEnablers.Common.Implementation
         // ── Multi-line trend chart ────────────────────────────────────────────
         internal static void DrawMultiLineTrendChartCanvas(
             SKCanvas c, QPDF.Size s,
-            List<int> years, List<PeerCityHistoryReportDto> peers,
-            PeerCityHistoryReportDto? mainCity, AiCitySummeryDto cityDetails,
+            List<int> years, List<PeerCountryHistoryReportDto> peers,
+            PeerCountryHistoryReportDto? mainCity, AiCountrySummeryDto countryDetails,
             List<(int Year, float Avg, bool HasData)> peerAvg)
         {
             if (years.Count < 2) return;
@@ -266,13 +266,13 @@ namespace PeaceEnablers.Common.Implementation
             string[] pal = { "F0B429","4CAF8A","1E88E5","FB8C00","7B61FF","E05252" };
             for (int pi = 0; pi < peers.Count; pi++)
             {
-                var pts = (peers[pi].CityHistory ?? new()).Where(h => years.Contains(h.Year)).OrderBy(h => h.Year)
+                var pts = (peers[pi].CountryHistory ?? new()).Where(h => years.Contains(h.Year)).OrderBy(h => h.Year)
                     .Select(h => new SKPoint(Xp(h.Year), Yp((float)h.ScoreProgress))).ToList();
                 DrawPolylineStatic(c, pts, new SKPaint { Color = SKColor.Parse(pal[1 + (pi % (pal.Length - 1))]).WithAlpha(180), StrokeWidth = 1.2f, IsAntialias = true, IsStroke = true });
             }
 
             // Main city line
-            var mainPts = (mainCity?.CityHistory ?? new()).Where(h => years.Contains(h.Year)).OrderBy(h => h.Year)
+            var mainPts = (mainCity?.CountryHistory ?? new()).Where(h => years.Contains(h.Year)).OrderBy(h => h.Year)
                 .Select(h => new SKPoint(Xp(h.Year), Yp((float)h.ScoreProgress))).ToList();
             DrawPolylineStatic(c, mainPts, new SKPaint { Color = SKColor.Parse(pal[0]), StrokeWidth = 2.5f, IsAntialias = true, IsStroke = true });
             foreach (var pt in mainPts) c.DrawCircle(pt.X, pt.Y, 4f, new SKPaint { Color = SKColor.Parse(pal[0]), IsAntialias = true });
@@ -281,8 +281,8 @@ namespace PeaceEnablers.Common.Implementation
         // ── Pillar line chart ─────────────────────────────────────────────────
         internal static void DrawPillarLineChartCanvas(
             SKCanvas c, QPDF.Size s,
-            List<int> years, List<PeerCityYearHistoryDto> history,
-            List<PeerCityPillarHistoryReportDto> pillars)
+            List<int> years, List<PeerCountryYearHistoryDto> history,
+            List<PeerCountryPillarHistoryReportDto> pillars)
         {
             if (years.Count < 2) return;
             string[] pal = { "12352F","336B58","4CAF8A","F0B429","F5A623","E05252","7B61FF","1E88E5","43A047","FB8C00","0097A7","8D6E63","E91E63","607D8B" };
@@ -320,12 +320,12 @@ namespace PeaceEnablers.Common.Implementation
         private static SKColor GetColorStatic(float v)
             => v >= 70 ? SKColor.Parse("#2E7D32") : v >= 40 ? SKColor.Parse("#F9A825") : SKColor.Parse("#C62828");
 
-        private static bool IsSameCityStatic(string? a, string? b)
+        private static bool IsSameCountryStatic(string? a, string? b)
             => string.Equals(a?.Trim(), b?.Trim(), StringComparison.OrdinalIgnoreCase);
 
-        private static float GetLatestScoreOrZeroStatic(PeerCityHistoryReportDto city)
+        private static float GetLatestScoreOrZeroStatic(PeerCountryHistoryReportDto country)
         {
-            var last = city.CityHistory?.OrderByDescending(h => h.Year).FirstOrDefault();
+            var last = country.CountryHistory?.OrderByDescending(h => h.Year).FirstOrDefault();
             return last != null ? (float)last.ScoreProgress : -1f;
         }
 
@@ -350,13 +350,13 @@ namespace PeaceEnablers.Common.Implementation
         // ── Scatter plot (population or income vs score) ─────────────────────
         internal static void DrawScatterPlotCanvas(
             SKCanvas c, QPDF.Size s,
-            List<PeerCityHistoryReportDto> cities,
-            AiCitySummeryDto cityDetails,
-            Func<PeerCityHistoryReportDto, float> xVal,
-            Func<PeerCityHistoryReportDto, float> yVal,
+            List<PeerCountryHistoryReportDto> countries,
+            AiCountrySummeryDto countryDetails,
+            Func<PeerCountryHistoryReportDto, float> xVal,
+            Func<PeerCountryHistoryReportDto, float> yVal,
             string xLabel, string yLabel)
         {
-            if (!cities.Any()) return;
+            if (!countries.Any()) return;
 
             string[] palette = { "#F0B429", "#4CAF8A", "#1E88E5", "#FB8C00", "#7B61FF", "#E05252" };
 
@@ -364,8 +364,8 @@ namespace PeaceEnablers.Common.Implementation
             float w = s.Width - padL - padR;
             float h = s.Height - padT - padB;
 
-            float xMin = cities.Min(xVal);
-            float xMax = cities.Max(xVal);
+            float xMin = countries.Min(xVal);
+            float xMax = countries.Max(xVal);
             if (xMax <= xMin) xMax = xMin + 1;
 
             float Xp(float v) => padL + (v - xMin) / (xMax - xMin) * w;
@@ -385,11 +385,11 @@ namespace PeaceEnablers.Common.Implementation
             }
 
             // Dots
-            for (int i = 0; i < cities.Count; i++)
+            for (int i = 0; i < countries.Count; i++)
             {
-                bool isMain = IsSameCityStatic(cities[i].CityName, cityDetails.CityName);
-                float x = Xp(xVal(cities[i]));
-                float y = Yp(yVal(cities[i]));
+                bool isMain = IsSameCountryStatic(countries[i].CountryName, countryDetails.CountryName);
+                float x = Xp(xVal(countries[i]));
+                float y = Yp(yVal(countries[i]));
                 string clr = isMain ? palette[0] : palette[1 + (i % (palette.Length - 1))];
 
                 using var dot = new SKPaint { Color = SKColor.Parse(clr), IsAntialias = true };
@@ -418,7 +418,7 @@ namespace PeaceEnablers.Common.Implementation
         // ── Income quartile vertical bars ─────────────────────────────────────
         internal static void DrawIncomeQuartileBarsCanvas(
             SKCanvas c, QPDF.Size s,
-            List<PeerCityHistoryReportDto> all)
+            List<PeerCountryHistoryReportDto> all)
         {
             string[] categoryOrder = { "Low Income", "Lower-Middle Income", "Upper-Middle Income", "High Income" };
             string[] segColors = { "#D9534F", "#F0AD4E", "#5BC0DE", "#2E7D32" };
@@ -443,7 +443,7 @@ namespace PeaceEnablers.Common.Implementation
                 float slotX = 20f + i * slotW;
                 float barX = slotX + (slotW - barW) / 2f;
 
-                if (!segments.TryGetValue(label, out var cities) || !cities.Any())
+                if (!segments.TryGetValue(label, out var countries) || !countries.Any())
                 {
                     using var noData = new SKPaint { Color = SKColor.Parse("#DDDDDD"), IsAntialias = true };
                     c.DrawRoundRect(new SKRoundRect(new SKRect(barX, baseY - 4, barX + barW, baseY), 4), noData);
@@ -451,7 +451,7 @@ namespace PeaceEnablers.Common.Implementation
                     continue;
                 }
 
-                float avg = cities.Average(city => { float sc = GetLatestScoreOrZeroStatic(city); return sc < 0 ? 0 : sc; });
+                float avg = countries.Average(country => { float sc = GetLatestScoreOrZeroStatic(country); return sc < 0 ? 0 : sc; });
                 float barH = avg / 100f * maxBarH;
 
                 using var barPaint = new SKPaint { Color = SKColor.Parse(segColors[i]), IsAntialias = true };
@@ -462,14 +462,14 @@ namespace PeaceEnablers.Common.Implementation
 
                 string shortLabel = label.Length > 14 ? label[..14] + "…" : label;
                 c.DrawText(shortLabel, slotX, baseY + 12, catPaint);
-                c.DrawText($"n={cities.Count}", slotX, baseY + 22, nPaint);
+                c.DrawText($"n={countries.Count}", slotX, baseY + 22, nPaint);
             }
         }
 
         // Add this alongside the other internal helpers at the bottom of the partial class
         /// <summary>Exposed so DocxGeneratorService can pass it as a Func delegate.</summary>
-        internal static float GetLatestScoreOrZeroForDocx(PeerCityHistoryReportDto city)
-            => GetLatestScoreOrZeroStatic(city);
+        internal static float GetLatestScoreOrZeroForDocx(PeerCountryHistoryReportDto country)
+            => GetLatestScoreOrZeroStatic(country);
 
         // ── Score distribution histogram ──────────────────────────────────────
         internal static void DrawHistogramCanvas(
