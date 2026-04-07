@@ -131,7 +131,7 @@ namespace PeaceEnablers.Services
 
     public static class AiEndpoints
     {
-        private const string BasePath = "/api/cities-score-analysis";
+        private const string BasePath = "/api/countries-score-analysis";
 
         public static string AnalyzeAllCountriesFull =>
             $"{BasePath}/analyze/full";

@@ -51,7 +51,7 @@ namespace PeaceEnablers.Common.Implementation
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GenerateCityDetailsPdf", ex);
+                await _appLogger.LogAsync("Error Occured in GenerateCountryDetailsPdf", ex);
                 return Array.Empty<byte>();
             }
         }
@@ -132,7 +132,7 @@ namespace PeaceEnablers.Common.Implementation
                     {
                         column.Spacing(10);
                         column.Item().Element(x =>
-                            CitySummeryComposeContent(x, countryDetails, userRole));
+                            CountrySummeryComposeContent(x, countryDetails, userRole));
                     });
                 });
                 PageFooter(page);
@@ -156,7 +156,7 @@ namespace PeaceEnablers.Common.Implementation
             // ── Section 1 : Global Dashboard ─────────────────────────────────
             if (!isAllCountries)
             {
-                AddPeerCityComparisonSection(container, peerCountries, countryDetails, userRole);
+                AddPeerCountryComparisonSection(container, peerCountries, countryDetails, userRole);
                 AddPerformanceTrendsSection(container, peerCountries, countryDetails, userRole);
             }
 
@@ -469,7 +469,7 @@ namespace PeaceEnablers.Common.Implementation
             using var ringPaint = new SKPaint
             {
                 Style = SKPaintStyle.Stroke,
-                Color = SKColor.Parse("#DDE8E3"),
+                Color = SKColor.Parse("#D6E3F0"),
                 StrokeWidth = 0.7f,
                 IsAntialias = true
             };
@@ -493,7 +493,7 @@ namespace PeaceEnablers.Common.Implementation
             // ── spoke axes ──────────────────────────────────────────────────────
             using var axisPaint = new SKPaint
             {
-                Color = SKColor.Parse("#C8D8D0"),
+                Color = SKColor.Parse("#B8CCE0"),
                 StrokeWidth = 0.7f,
                 IsAntialias = true
             };
@@ -517,14 +517,14 @@ namespace PeaceEnablers.Common.Implementation
             using var fillPaint = new SKPaint
             {
                 Style = SKPaintStyle.Fill,
-                Color = SKColor.Parse("#336b58").WithAlpha(55),
+                Color = SKColor.Parse("#2C6EA3").WithAlpha(55),
                 IsAntialias = true
             };
             using var edgePaint = new SKPaint
             {
                 Style = SKPaintStyle.Stroke,
                 StrokeWidth = 2f,
-                Color = SKColor.Parse("#2E7D32"),
+                Color = SKColor.Parse("#1F4E79"),
                 IsAntialias = true
             };
             canvas.DrawPath(dataPath, fillPaint);
@@ -534,7 +534,7 @@ namespace PeaceEnablers.Common.Implementation
             using var dotPaint = new SKPaint
             {
                 Style = SKPaintStyle.Fill,
-                Color = SKColor.Parse("#2E7D32"),
+                Color = SKColor.Parse("#1F4E79"),
                 IsAntialias = true
             };
             using var dotBorder = new SKPaint
@@ -555,14 +555,14 @@ namespace PeaceEnablers.Common.Implementation
             // ── axis labels ──────────────────────────────────────────────────────
             using var lblPaint = new SKPaint
             {
-                Color = SKColor.Parse("#2c3e35"),
+                Color = SKColor.Parse("#1B2F44"),
                 TextSize = 8f,
                 IsAntialias = true,
                 TextAlign = SKTextAlign.Center
             };
             using var valPaint = new SKPaint
             {
-                Color = SKColor.Parse("#558a70"),
+                Color = SKColor.Parse("#4F7FA8"),
                 TextSize = 7f,
                 IsAntialias = true,
                 TextAlign = SKTextAlign.Center
@@ -631,6 +631,8 @@ namespace PeaceEnablers.Common.Implementation
                     });
                 });
         }
+
+       
 
         /// <summary>Single coloured stat card used inside the distribution band.</summary>
         static void DashboardStatCard(IContainer container, string value, string label, string bg, string textColor)
@@ -1524,7 +1526,7 @@ namespace PeaceEnablers.Common.Implementation
 
             container.Column(column =>
             {
-                column.Item().Background("#134534").Padding(12).Row(row =>
+                column.Item().Background("#003160").Padding(12).Row(row =>
                 {
                     // Left content
                     row.RelativeItem().Column(col =>
@@ -1637,7 +1639,7 @@ namespace PeaceEnablers.Common.Implementation
                 .Normalize(NormalizationForm.FormKC);
         }
 
-        void CitySummeryComposeContent(IContainer container, AiCountrySummeryDto data, UserRole userRole)
+        void CountrySummeryComposeContent(IContainer container, AiCountrySummeryDto data, UserRole userRole)
         {
             container.PaddingTop(4).Column(column =>
             {
@@ -1683,7 +1685,7 @@ namespace PeaceEnablers.Common.Implementation
                 // =====================================================
                 // INTEGRITY CHECKS
                 // =====================================================
-                column.Item().PageBreak();
+                //column.Item().PageBreak();
 
                 //column.Item().PaddingTop(15).Text("Integrity Checks")
                 //    .FontSize(16).Bold();
@@ -1700,7 +1702,7 @@ namespace PeaceEnablers.Common.Implementation
                 // =====================================================
                 // STRESS TESTS
                 // =====================================================
-                column.Item().PageBreak();
+                //column.Item().PageBreak();
 
                 //column.Item().PaddingTop(15).Text("Stress Tests")
                 //    .FontSize(16).Bold();
@@ -1713,10 +1715,10 @@ namespace PeaceEnablers.Common.Implementation
 
                 column.Item().PaddingTop(8).Element(c =>
                     PillarContentSection(c, "Narrative Shock", SanitizeText(data.NarrativeShock), "#e6f2ff"));
-                column.Item().PageBreak();
+                //column.Item().PageBreak();
 
-                column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Overall Stress Resilience", SanitizeText(data.OverallStressResilience), "#e6ffe6"));
+                //column.Item().PaddingTop(8).Element(c =>
+                //    PillarContentSection(c, "Overall Stress Resilience", SanitizeText(data.OverallStressResilience), "#e6ffe6"));
 
                 column.Item().PaddingTop(8).Element(c =>
                     PillarContentSection(c, "Stress Score Adjustment", SanitizeText(data.StressScoreAdjustment), "#ffe6f2"));
@@ -1724,7 +1726,7 @@ namespace PeaceEnablers.Common.Implementation
                 // =====================================================
                 // GOVERNANCE ADJUSTMENTS
                 // =====================================================
-                column.Item().PageBreak();
+                //column.Item().PageBreak();
 
                 //column.Item().PaddingTop(15).Text("Governance Adjustments")
                 //    .FontSize(16).Bold();
@@ -1741,7 +1743,7 @@ namespace PeaceEnablers.Common.Implementation
                 // =====================================================
                 // SYSTEM ANALYSIS
                 // =====================================================
-                column.Item().PageBreak();
+                //column.Item().PageBreak();
 
                 //column.Item().PaddingTop(15).Text("System Analysis")
                 //    .FontSize(16).Bold();
@@ -1755,17 +1757,14 @@ namespace PeaceEnablers.Common.Implementation
                 column.Item().PaddingTop(8).Element(c =>
                     PillarContentSection(c, "Equity Assessment", SanitizeText(data.EquityAssessment), "#e8f5e9"));
 
-                column.Item().PageBreak();
+                //column.Item().PageBreak();
                 column.Item().PaddingTop(8).Element(c =>
                     PillarContentSection(c, "Conflict Risk Outlook", SanitizeText(data.ConflictRiskOutlook), "#fce4ec"));
 
                 // =====================================================
                 // STRATEGIC OUTPUT
                 // =====================================================
-                column.Item().PageBreak();
-
-                column.Item().PaddingTop(15).Text("Strategic Output")
-                    .FontSize(16).Bold();
+                //column.Item().PageBreak();                
 
                 column.Item().PaddingTop(8).Element(c =>
                     PillarContentSection(c, "Strategic Policy Priorities", SanitizeText(data.StrategicRecommendation), "#2e9975"));
@@ -1790,7 +1789,7 @@ namespace PeaceEnablers.Common.Implementation
                 // EXECUTIVE SUMMARY
                 // =========================
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Evidence Summary", SanitizeText(data.EvidenceSummary), "#163329"));
+                    PillarContentSection(c, "Executive Summary", SanitizeText(data.EvidenceSummary), "#163329"));
 
                 // =====================================================
                 // EVIDENCE SECTION
@@ -1810,7 +1809,7 @@ namespace PeaceEnablers.Common.Implementation
                 // =====================================================
                 // INTEGRITY CHECKS
                 // =====================================================
-                column.Item().PageBreak();
+                //column.Item().PageBreak();
 
                 column.Item().PaddingTop(8).Element(c =>
                     PillarContentSection(c, "Temporal Scope", SanitizeText(data.TemporalScope), "#5f497a"));
@@ -1824,7 +1823,7 @@ namespace PeaceEnablers.Common.Implementation
                 // =====================================================
                 // STRESS TESTS
                 // =====================================================
-                column.Item().PageBreak();
+                //column.Item().PageBreak();
 
                 column.Item().PaddingTop(8).Element(c =>
                     PillarContentSection(c, "Political Shock", SanitizeText(data.StressPoliticalShock), "#7f6000"));
@@ -1835,10 +1834,10 @@ namespace PeaceEnablers.Common.Implementation
                 column.Item().PaddingTop(8).Element(c =>
                     PillarContentSection(c, "Narrative Shock", SanitizeText(data.StressNarrativeShock), "#ffd966"));
 
-                column.Item().PageBreak();
+                //column.Item().PageBreak();
 
-                column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Overall Stress Resilience", SanitizeText(data.StressOverallResilience), "#c55a11"));
+                //column.Item().PaddingTop(8).Element(c =>
+                //    PillarContentSection(c, "Overall Stress Resilience", SanitizeText(data.StressOverallResilience), "#c55a11"));
 
                 column.Item().PaddingTop(8).Element(c =>
                     PillarContentSection(c, "Stress Score Adjustment", SanitizeText(data.StressScoreAdjustment), "#e26b0a"));
@@ -1846,7 +1845,7 @@ namespace PeaceEnablers.Common.Implementation
                 // =====================================================
                 // GOVERNANCE ADJUSTMENTS
                 // =====================================================
-                column.Item().PageBreak();
+                //column.Item().PageBreak();
 
                 column.Item().PaddingTop(8).Element(c =>
                     PillarContentSection(c, "Inequality Adjustment", SanitizeText(data.InequalityAdjustment), "#274e13"));
@@ -1860,7 +1859,7 @@ namespace PeaceEnablers.Common.Implementation
                 // =====================================================
                 // ALERTS & EQUITY
                 // =====================================================
-                column.Item().PageBreak();
+                //column.Item().PageBreak();
 
                 column.Item().PaddingTop(8).Element(c =>
                     PillarContentSection(c, "Red Flags", SanitizeText(data.RedFlag), "#ED561A", "#eb4634"));
@@ -1871,7 +1870,7 @@ namespace PeaceEnablers.Common.Implementation
                 // =====================================================
                 // SYSTEM / INSTITUTIONAL ANALYSIS
                 // =====================================================
-                column.Item().PageBreak();
+                //column.Item().PageBreak();
 
                 column.Item().PaddingTop(8).Element(c =>
                     PillarContentSection(c, "Institutional Assessment", SanitizeText(data.InstitutionalAssessment), "#2e9975"));
@@ -1893,20 +1892,25 @@ namespace PeaceEnablers.Common.Implementation
         }
 
         void PillarProgressSection(
-            IContainer container, AiCountryPillarResponse data, UserRole userRole)
+    IContainer container, AiCountryPillarResponse data, UserRole userRole)
         {
             container
                 .Background(Colors.White)
-                .Border(1).BorderColor("#E0E0E0")
+                .Border(1).BorderColor("#D6E3F0") // ✅ light blue border
                 .Padding(15)
                 .Column(column =>
                 {
-                    column.Item().Text("Progress Metrics")
-                        .FontSize(16).Bold().FontColor("#203d33");
+                    column.Item()
+                        .Text("Progress Metrics")
+                        .FontSize(16)
+                        .Bold()
+                        .FontColor("#1B2F44"); // ✅ dark blue title
 
                     column.Item().PaddingTop(12).Column(col =>
                     {
-                        PillarProgressBar(col, "Score", data.AIProgress, "#58a389");
+                        // ✅ Blue theme progress bar
+                        PillarProgressBar(col, "Score", data.AIProgress, "#2C6EA3");
+
                         col.Item().PaddingTop(10);
                     });
                 });
@@ -2064,14 +2068,13 @@ namespace PeaceEnablers.Common.Implementation
         //  COLOR / FORMAT UTILITIES  (all static, reusable across pages)
         // ─────────────────────────────────────────────────────────────────────────────
 
+
         static SKColor GetColor(float value)
         {
             if (value >= 70) return SKColor.Parse("#2E7D32");
             if (value >= 40) return SKColor.Parse("#F9A825");
             return SKColor.Parse("#C62828");
         }
-       
-
         static string GetBarColor(float value)
         {
             if (value >= 70) return "#2E7D32";
@@ -2115,7 +2118,7 @@ namespace PeaceEnablers.Common.Implementation
         private const int MaxPillars = 14;
 
         // Palette: index 0 = selected country (gold), 1-5 = peer countries
-        private static readonly string[] CityPalette =
+        private static readonly string[] CountryPalette =
         {
             "#F0B429",   // gold  – selected country
             "#4CAF8A",   // teal
@@ -2134,10 +2137,10 @@ namespace PeaceEnablers.Common.Implementation
         };
 
         // ══════════════════════════════════════════════════════════════════════════
-        //  ENTRY POINTS  – called from AddCityDetailsPdf
+        //  ENTRY POINTS  – called from AddCountryDetailsPdf
         // ══════════════════════════════════════════════════════════════════════════
 
-        void AddPeerCityComparisonSection(
+        void AddPeerCountryComparisonSection(
             IDocumentContainer container,
             List<PeerCountryHistoryReportDto> peerCountries,
             AiCountrySummeryDto countryDetails,
@@ -2269,7 +2272,7 @@ namespace PeaceEnablers.Common.Implementation
                 col.Item().Height(all.Count * 40).Canvas((canvas, size) =>
                     DrawPopulationBars(canvas, size, all, countryDetails, maxPop));
 
-                col.Item().Element(x => DrawCityLegend(x, all, countryDetails));
+                col.Item().Element(x => DrawCountryLegend(x, all, countryDetails));
 
                 // ── Score vs Population scatter ───────────────────────────────
                 col.Item().PaddingTop(8)
@@ -2314,7 +2317,7 @@ namespace PeaceEnablers.Common.Implementation
                 DrawCanvasText(canvas, country.CountryName, 4, y + 5, 9,
                     isMain ? "#12352f" : "#444444", bold: isMain);
 
-                string barColor = isMain ? CityPalette[0] : CityPalette[1 + (i % (CityPalette.Length - 1))];
+                string barColor = isMain ? CountryPalette[0] : CountryPalette[1 + (i % (CountryPalette.Length - 1))];
                 canvas.DrawRoundRect(
                     new SKRoundRect(new SKRect(labelW, y + 4, labelW + barW, y + rowH - 6), 3),
                     new SKPaint { Color = SKColor.Parse(barColor), IsAntialias = true });
@@ -2717,7 +2720,7 @@ namespace PeaceEnablers.Common.Implementation
                     DrawMultiLineTrendChart(canvas, size, allYears, peers, mainCountry, countryDetails, peerAvg));
 
                 // Legend: one entry per country
-                col.Item().Element(x => DrawCityLineLegend(x, mainCountry, peers, countryDetails));
+                col.Item().Element(x => DrawCountryLineLegend(x, mainCountry, peers, countryDetails));
 
                 col.Item().PaddingVertical(4).LineHorizontal(0.5f).LineColor("#e0e0e0");
 
@@ -2814,12 +2817,12 @@ namespace PeaceEnablers.Common.Implementation
 
         void PillarTrendPage(
             IContainer container,
-            PeerCountryHistoryReportDto? mainCity,
+            PeerCountryHistoryReportDto? mainCountry,
             AiCountrySummeryDto countryDetails)
         {
-            if (mainCity == null) { DrawNoDataPage(container); return; }
+            if (mainCountry == null) { DrawNoDataPage(container); return; }
 
-            var history = mainCity.CountryHistory ?? new();            
+            var history = mainCountry.CountryHistory ?? new();            
             var allYears = history.Select(h => h.Year).OrderBy(y => y).ToList();
 
             if (!allYears.Any()) { DrawNoDataPage(container); return; }
@@ -2838,7 +2841,7 @@ namespace PeaceEnablers.Common.Implementation
                 col.Spacing(12);
 
                 col.Item().Element(x => DrawInsightBand(x,
-                    $"{pillars.Count} pillar(s)  |  {allYears.Count} year(s)  |  Country: {mainCity.CountryName}"));
+                    $"{pillars.Count} pillar(s)  |  {allYears.Count} year(s)  |  Country: {mainCountry.CountryName}"));
 
                 col.Item().Text("Pillar Score Trajectory Over Time")
                     .FontSize(11).Bold().FontColor("#12352f");
@@ -2959,7 +2962,7 @@ namespace PeaceEnablers.Common.Implementation
             SKCanvas canvas, Size size,
             List<int> years,
             List<PeerCountryHistoryReportDto> peers,
-            PeerCountryHistoryReportDto mainCity,
+            PeerCountryHistoryReportDto mainCountry,
             AiCountrySummeryDto countryDetails,
             List<(int Year, float Avg, bool HasData)> peerAvg)
         {
@@ -3004,7 +3007,7 @@ namespace PeaceEnablers.Common.Implementation
             for (int pi = 0; pi < peers.Count; pi++)
             {
                 var peer = peers[pi];
-                string clr = CityPalette[1 + (pi % (CityPalette.Length - 1))];
+                string clr = CountryPalette[1 + (pi % (CountryPalette.Length - 1))];
 
                 var pts = (peer.CountryHistory ?? new())
                     .Where(h => years.Contains(h.Year))
@@ -3023,7 +3026,7 @@ namespace PeaceEnablers.Common.Implementation
             }
 
             // Main country line (gold, bold)
-            var mainPts = (mainCity.CountryHistory ?? new())
+            var mainPts = (mainCountry.CountryHistory ?? new())
                 .Where(h => years.Contains(h.Year))
                 .OrderBy(h => h.Year)
                 .Select(h => new SKPoint(Xp(h.Year), Yp((float)h.ScoreProgress)))
@@ -3032,7 +3035,7 @@ namespace PeaceEnablers.Common.Implementation
             DrawPolyline(canvas, mainPts,
                 new SKPaint
                 {
-                    Color = SKColor.Parse(CityPalette[0]),
+                    Color = SKColor.Parse(CountryPalette[0]),
                     StrokeWidth = 2.5f,
                     IsAntialias = true,
                     IsStroke = true
@@ -3040,7 +3043,7 @@ namespace PeaceEnablers.Common.Implementation
 
             foreach (var pt in mainPts)
                 canvas.DrawCircle(pt.X, pt.Y, 4f,
-                    new SKPaint { Color = SKColor.Parse(CityPalette[0]), IsAntialias = true });
+                    new SKPaint { Color = SKColor.Parse(CountryPalette[0]), IsAntialias = true });
         }
 
         void DrawAreaComparisonChart(
@@ -3092,7 +3095,7 @@ namespace PeaceEnablers.Common.Implementation
             mainPath.LineTo(Xp(years.Last()), Yp(0));
             mainPath.Close();
             canvas.DrawPath(mainPath,
-                new SKPaint { Color = SKColor.Parse(CityPalette[0]).WithAlpha(50), IsAntialias = true });
+                new SKPaint { Color = SKColor.Parse(CountryPalette[0]).WithAlpha(50), IsAntialias = true });
 
             // Outlines
             DrawPolyline(canvas,
@@ -3111,7 +3114,7 @@ namespace PeaceEnablers.Common.Implementation
                     Yp((float)(mainHistory.FirstOrDefault(h => h.Year == yr)?.ScoreProgress ?? 0)))).ToList(),
                 new SKPaint
                 {
-                    Color = SKColor.Parse(CityPalette[0]),
+                    Color = SKColor.Parse(CountryPalette[0]),
                     StrokeWidth = 2f,
                     IsAntialias = true,
                     IsStroke = true
@@ -3215,7 +3218,7 @@ namespace PeaceEnablers.Common.Implementation
                 bool isMain = IsSameCountry(country.CountryName, countryDetails.CountryName);
                 float x = Xp(xVal(country));
                 float y = Yp(yVal(country));
-                string clr = isMain ? CityPalette[0] : CityPalette[1 + (i % (CityPalette.Length - 1))];
+                string clr = isMain ? CountryPalette[0] : CountryPalette[1 + (i % (CountryPalette.Length - 1))];
 
                 canvas.DrawCircle(x, y, isMain ? 6f : 4.5f,
                     new SKPaint { Color = SKColor.Parse(clr), IsAntialias = true });
@@ -3327,11 +3330,11 @@ namespace PeaceEnablers.Common.Implementation
             canvas.DrawLine(mx, padT, mx, padT + h,
                 new SKPaint
                 {
-                    Color = SKColor.Parse(CityPalette[0]),
+                    Color = SKColor.Parse(CountryPalette[0]),
                     StrokeWidth = 2f,
                     PathEffect = SKPathEffect.CreateDash(new[] { 4f, 3f }, 0)
                 });
-            DrawCanvasText(canvas, $"^{markerValue:F1}", mx - 12, padT - 1, 7, CityPalette[0], bold: true);
+            DrawCanvasText(canvas, $"^{markerValue:F1}", mx - 12, padT - 1, 7, CountryPalette[0], bold: true);
         }
 
         void DrawRolePillarHeatmap(
@@ -3452,25 +3455,25 @@ namespace PeaceEnablers.Common.Implementation
         }
 
         /// <summary>Country-specific legend: gold dot for selected country, palette dots for peers.</summary>
-        void DrawCityLineLegend(
+        void DrawCountryLineLegend(
             IContainer container,
-            PeerCountryHistoryReportDto mainCity,
+            PeerCountryHistoryReportDto mainCountry,
             List<PeerCountryHistoryReportDto> peers,
             AiCountrySummeryDto countryDetails)
         {
             var items = new List<(string Color, string Label)>
             {
-                (CityPalette[0],  $"{countryDetails.CountryName} (selected)"),
+                (CountryPalette[0],  $"{countryDetails.CountryName} (selected)"),
                 ("#4CAF8A",       "Peer Average")
             };
             for (int i = 0; i < peers.Count; i++)
-                items.Add((CityPalette[1 + (i % (CityPalette.Length - 1))], peers[i].CountryName));
+                items.Add((CountryPalette[1 + (i % (CountryPalette.Length - 1))], peers[i].CountryName));
 
             DrawLegend(container, items.ToArray());
         }
 
         /// <summary>Legend row showing a coloured dot for every country in the chart.</summary>
-        void DrawCityLegend(
+        void DrawCountryLegend(
             IContainer container,
             List<PeerCountryHistoryReportDto> allcountries,
             AiCountrySummeryDto countryDetails)
@@ -3478,8 +3481,8 @@ namespace PeaceEnablers.Common.Implementation
             var items = allcountries
                 .Select((c, i) => (
                     Color: IsSameCountry(c.CountryName, countryDetails.CountryName)
-                        ? CityPalette[0]
-                        : CityPalette[1 + (i % (CityPalette.Length - 1))],
+                        ? CountryPalette[0]
+                        : CountryPalette[1 + (i % (CountryPalette.Length - 1))],
                     Label: c.CountryName
                 ))
                 .ToArray();

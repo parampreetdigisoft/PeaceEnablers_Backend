@@ -47,8 +47,8 @@ namespace PeaceEnablers.Common.Implementation
         private const int    ContentDxa      = (int)(PageWidthDxa - 2 * MarginDxa); // 10 466 DXA
         private const long   ContentWidthEmu = 6_645_000L;   // ≈ 7.27 inch in EMU
         private const long   HalfWidthEmu    = 3_220_000L;   // ≈ 3.52 inch in EMU
-        private const string DarkGreen       = "134534";
-        private const string MedGreen        = "336B58";
+        private const string DarkBlue       = "1B2F44";
+        private const string MedBlue        = "336B58";
         private const string White           = "FFFFFF";
 
         // Unique image ID counter — reset per document
@@ -81,7 +81,7 @@ namespace PeaceEnablers.Common.Implementation
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error in GenerateCityDetailsDocx", ex);
+                await _appLogger.LogAsync("Error in GenerateCountryDetailsDocx", ex);
                 return Array.Empty<byte>();
             }
         }
@@ -104,7 +104,7 @@ namespace PeaceEnablers.Common.Implementation
                 {
                     var body = mainPart.Document.Body!;
                     _imgId = 1;
-                    AppendCityHeader(mainPart, countryDetails, pillarData.PillarName);
+                    AppendCountryHeader(mainPart, countryDetails, pillarData.PillarName);
                     AddPillarSection(body, mainPart, pillarData, userRole);
                     FinalizeLastSection(mainPart);
                 });
@@ -204,18 +204,18 @@ namespace PeaceEnablers.Common.Implementation
             // ── 1. Global Dashboard ──────────────────────────────────────────────────
             if (!isAllCountries)
             {
-                AppendCityHeader(mainPart, countryDetails, "Country Performance Dashboard");
+                AppendCountryHeader(mainPart, countryDetails, "Country Performance Dashboard");
                 AddDashboardSection(body, mainPart, countryDetails, pillarChartItems, kpiChartItems);
             }
 
             // ── 2. Country Summary ──────────────────────────────────────────────────────
-            AppendCityHeader(mainPart, countryDetails, null);          
-            AddCitySummarySection(body, mainPart, countryDetails, userRole);
+            AppendCountryHeader(mainPart, countryDetails, null);          
+            AddCountrySummarySection(body, mainPart, countryDetails, userRole);
 
             // ── 3. Pillar Radial Overview ────────────────────────────────────────────
             if (pillars.Any())
             {
-                AppendCityHeader(mainPart, countryDetails, "Pillar Performance Overview");
+                AppendCountryHeader(mainPart, countryDetails, "Pillar Performance Overview");
                 AddPillarOverviewSection(body, mainPart, pillarChartItems);
             }
 
@@ -232,14 +232,14 @@ namespace PeaceEnablers.Common.Implementation
 
             foreach (var pillar in accessiblePillars)
             {
-                AppendCityHeader(mainPart, countryDetails, pillar.PillarName);
+                AppendCountryHeader(mainPart, countryDetails, pillar.PillarName);
                 AddPillarSection(body, mainPart, pillar, userRole);
             }
 
             // ── 6. KPI Dashboard (LAST section) ─────────────────────────────────────
             if (kpiChartItems.Any())
             {
-                AppendCityHeader(mainPart, countryDetails, "KPI Dashboard");
+                AppendCountryHeader(mainPart, countryDetails, "KPI Dashboard");
                 AddKpiDashboardSection(body, mainPart, kpiChartItems);
             }
 
@@ -414,7 +414,7 @@ namespace PeaceEnablers.Common.Implementation
                 new Shading { Val = ShadingPatternValues.Clear, Color = "auto", Fill = "FFFFFF" }));
 
             // ── Heading ──
-            cell.Append(CenteredBoldPara("Overall City Score", "12352f", "20"));
+            cell.Append(CenteredBoldPara("Overall Country Score", "212529", "20"));
 
             // ── Donut image ──
             cell.Append(EmbedImage(mainPart, donutPng, imgEmuW, imgEmuH));
@@ -557,13 +557,13 @@ namespace PeaceEnablers.Common.Implementation
         //  CITY SUMMARY SECTION
         // ════════════════════════════════════════════════════════════════════
 
-        private void AddCitySummarySection( Body body, MainDocumentPart mainPart, AiCountrySummeryDto data, UserRole userRole)
+        private void AddCountrySummarySection( Body body, MainDocumentPart mainPart, AiCountrySummeryDto data, UserRole userRole)
         {
             // =========================
             // PROGRESS SECTION
             // =========================
-            body.AppendChild(SectionHeading("Progress Metrics", DarkGreen));
-            body.AppendChild(CreateProgressBar("Score", (float)(data.AIProgress ?? 0), MedGreen));
+            body.AppendChild(SectionHeading("Progress Metrics", DarkBlue));
+            body.AppendChild(CreateProgressBar("Score", (float)(data.AIProgress ?? 0), MedBlue));
             body.AppendChild(Gap(160));
 
             // =========================
@@ -577,7 +577,7 @@ namespace PeaceEnablers.Common.Implementation
             AppendContentSection(body, "Structural Evidence", data.StructuralEvidence, "e6ccff");
             AppendContentSection(body, "Operational Evidence", data.OperationalEvidence, "c2f0f0");
 
-            body.AppendChild(PageBreak());
+            //body.AppendChild(PageBreak());
 
             AppendContentSection(body, "Outcome Evidence", data.OutcomeEvidence, "ffe6cc");
             AppendContentSection(body, "Perception Evidence", data.PerceptionEvidence, "e6f7ff");
@@ -585,7 +585,7 @@ namespace PeaceEnablers.Common.Implementation
             // =====================================================
             // INTEGRITY CHECKS
             // =====================================================
-            body.AppendChild(PageBreak());
+            //body.AppendChild(PageBreak());
 
             AppendContentSection(body, "Temporal Scope", data.TemporalScope, "d9e6ff");
             AppendContentSection(body, "Distortion Screening", data.DistortionScreening, "f2d9e6");
@@ -602,13 +602,13 @@ namespace PeaceEnablers.Common.Implementation
 
             //body.AppendChild(PageBreak());
 
-            AppendContentSection(body, "Overall Stress Resilience", data.OverallStressResilience, "e6ffe6");
+            //AppendContentSection(body, "Overall Stress Resilience", data.OverallStressResilience, "e6ffe6");
             AppendContentSection(body, "Stress Score Adjustment", data.StressScoreAdjustment, "ffe6f2");
 
             // =====================================================
             // GOVERNANCE ADJUSTMENTS
             // =====================================================
-            body.AppendChild(PageBreak());
+            //body.AppendChild(PageBreak());
 
             AppendContentSection(body, "Inequality Adjustment", data.InequalityAdjustment, "f9e6ff");
             AppendContentSection(body, "Opacity Risk", data.OpacityRisk, "fff0e6");
@@ -622,7 +622,7 @@ namespace PeaceEnablers.Common.Implementation
             AppendContentSection(body, "Cross-Pillar System Dynamics", data.CrossPillarPatterns, "6e9688");
             AppendContentSection(body, "Institutional Capacity Assessment", data.InstitutionalCapacity, "0d8057");
 
-            body.AppendChild(PageBreak());
+            //body.AppendChild(PageBreak());
 
             AppendContentSection(body, "Equity Assessment", data.EquityAssessment, "e8f5e9");
             AppendContentSection(body, "Conflict Risk Outlook", data.ConflictRiskOutlook, "fce4ec");
@@ -630,7 +630,7 @@ namespace PeaceEnablers.Common.Implementation
             // =====================================================
             // STRATEGIC OUTPUT
             // =====================================================
-            body.AppendChild(PageBreak());
+            //body.AppendChild(PageBreak());
 
             AppendContentSection(body, "Strategic Policy Priorities", data.StrategicRecommendation, "2e9975");
             AppendContentSection(body, "Why This Assessment Matters", data.DataTransparencyNote, "63a68f");
@@ -665,14 +665,14 @@ namespace PeaceEnablers.Common.Implementation
             // =========================
             // PROGRESS SECTION
             // =========================
-            body.AppendChild(SectionHeading("Progress Metrics", DarkGreen));
-            body.AppendChild(CreateProgressBar("Score", (float)(data.AIProgress ?? 0), MedGreen));
+            body.AppendChild(SectionHeading("Progress Metrics", DarkBlue));
+            body.AppendChild(CreateProgressBar("Score", (float)(data.AIProgress ?? 0), MedBlue));
             body.AppendChild(Gap(160));
 
             // =========================
             // EVIDENCE SUMMARY
             // =========================
-            AppendContentSection(body, "Evidence Summary", data.EvidenceSummary, "163329");
+            AppendContentSection(body, "Executive Summary", data.EvidenceSummary, "163329");
 
             // =====================================================
             // EVIDENCE SECTION
@@ -680,7 +680,7 @@ namespace PeaceEnablers.Common.Implementation
             AppendContentSection(body, "Structural Evidence", data.StructuralEvidence, "1f4e79");
             AppendContentSection(body, "Operational Evidence", data.OperationalEvidence, "2e75b6");
 
-            body.AppendChild(PageBreak());
+            //body.AppendChild(PageBreak());
 
             AppendContentSection(body, "Outcome Evidence", data.OutcomeEvidence, "5b9bd5");
             AppendContentSection(body, "Perception Evidence", data.PerceptionEvidence, "9dc3e6");
@@ -688,7 +688,7 @@ namespace PeaceEnablers.Common.Implementation
             // =====================================================
             // INTEGRITY CHECKS
             // =====================================================
-            body.AppendChild(PageBreak());
+            //body.AppendChild(PageBreak());
 
             AppendContentSection(body, "Temporal Scope", data.TemporalScope, "5f497a");
             AppendContentSection(body, "Distortion Screening", data.DistortionScreening, "8064a2");
@@ -697,21 +697,21 @@ namespace PeaceEnablers.Common.Implementation
             // =====================================================
             // STRESS TEST
             // =====================================================
-            body.AppendChild(PageBreak());
+            //body.AppendChild(PageBreak());
 
             AppendContentSection(body, "Stress Political Shock", data.StressPoliticalShock, "7f6000");
             AppendContentSection(body, "Stress Economic Shock", data.StressEconomicShock, "bf9000");
             AppendContentSection(body, "Stress Narrative Shock", data.StressNarrativeShock, "ffd966");
 
-            body.AppendChild(PageBreak());
+            //body.AppendChild(PageBreak());
 
-            AppendContentSection(body, "Stress Overall Resilience", data.StressOverallResilience, "c55a11");
+            //AppendContentSection(body, "Stress Overall Resilience", data.StressOverallResilience, "c55a11");
             AppendContentSection(body, "Stress Score Adjustment", data.StressScoreAdjustment, "e26b0a");
 
             // =====================================================
             // GOVERNANCE ADJUSTMENTS
             // =====================================================
-            body.AppendChild(PageBreak());
+            //body.AppendChild(PageBreak());
 
             AppendContentSection(body, "Inequality Adjustment", data.InequalityAdjustment, "274e13");
             AppendContentSection(body, "Opacity Risk", data.OpacityRisk, "38761d");
@@ -720,7 +720,7 @@ namespace PeaceEnablers.Common.Implementation
             // =====================================================
             // ALERTS & EQUITY
             // =====================================================
-            body.AppendChild(PageBreak());
+            //body.AppendChild(PageBreak());
 
             AppendContentSection(body, "Red Flags", data.RedFlag, "ED561A", "eb4634");
             AppendContentSection(body, "Geographic Equity Note", data.GeographicEquityNote, "0d8057");
@@ -728,7 +728,7 @@ namespace PeaceEnablers.Common.Implementation
             // =====================================================
             // INSTITUTIONAL ANALYSIS
             // =====================================================
-            body.AppendChild(PageBreak());
+            //body.AppendChild(PageBreak());
 
             AppendContentSection(body, "Institutional Assessment", data.InstitutionalAssessment, "2e9975");
 
@@ -871,7 +871,7 @@ namespace PeaceEnablers.Common.Implementation
         /// Automatically closes the PREVIOUS section with a next-page section break
         /// (which replaces the manual PageBreak() call between sections).
         /// </summary>
-        private void AppendCityHeader(
+        private void AppendCountryHeader(
             MainDocumentPart mainPart,
             AiCountrySummeryDto data,
             string? sectionTitle = null)
@@ -921,7 +921,7 @@ namespace PeaceEnablers.Common.Implementation
             var leftCell = new TableCell(
                 new TableCellProperties(
                 new TableCellWidth { Width = leftColW.ToString(), Type = TableWidthUnitValues.Dxa },
-                new Shading { Fill = "134534" },
+                new Shading { Fill = "003160" },
                 new TableCellVerticalAlignment { Val = TableVerticalAlignmentValues.Center },
                 new TableCellMargin(
                         new TopMargin { Width = "200", Type = TableWidthUnitValues.Dxa },
@@ -944,7 +944,7 @@ namespace PeaceEnablers.Common.Implementation
             var rightCell = new TableCell(
                 new TableCellProperties(
                     new TableCellWidth { Width = logoColW.ToString(), Type = TableWidthUnitValues.Dxa },
-                    new Shading { Fill = "134534" },
+                    new Shading { Fill = "003160" },
                     new TableCellVerticalAlignment { Val = TableVerticalAlignmentValues.Center }
                 ),
                 new TableCellMargin(
@@ -1853,7 +1853,7 @@ namespace PeaceEnablers.Common.Implementation
             if (!allYears.Any()) return;
 
             // Historical trend
-            AppendCityHeader(mainPart, countryDetails, "Performance Trends Over Time");
+            AppendCountryHeader(mainPart, countryDetails, "Performance Trends Over Time");
             var peerAvg = allYears.Select(yr =>
             {
                 var scores = peers.Select(p => p.CountryHistory?.FirstOrDefault(h => h.Year == yr))
@@ -1875,7 +1875,7 @@ namespace PeaceEnablers.Common.Implementation
             body.AppendChild(PageBreak());
 
             // Pillar trend
-            AppendCityHeader(mainPart, countryDetails, "Pillar-Level Trend Analysis");
+            AppendCountryHeader(mainPart, countryDetails, "Pillar-Level Trend Analysis");
             if (main != null)
             {
                 var pillars = (main.CountryHistory ?? new())
@@ -1918,7 +1918,7 @@ namespace PeaceEnablers.Common.Implementation
             var all = BuildAllCountries(main, peers);
 
             // ── 5.1  Population-Based ────────────────────────────────────────────
-            AppendCityHeader(mainPart, countryDetails, "Population-Based Peer Comparison");
+            AppendCountryHeader(mainPart, countryDetails, "Population-Based Peer Comparison");
 
             var popSorted = all
                 .Where(c => c.Population.HasValue)
@@ -1932,17 +1932,17 @@ namespace PeaceEnablers.Common.Implementation
                     $"Largest: {popSorted.First().CountryName} ({FormatPop(popSorted.First().Population)})  |  " +
                     $"Smallest: {popSorted.Last().CountryName} ({FormatPop(popSorted.Last().Population)})"));
 
-                body.AppendChild(SectionHeading("Population Size by City", DarkGreen));
+                body.AppendChild(SectionHeading("Population Size by Country", DarkBlue));
                 int popH = Math.Max(popSorted.Count * 40, 80);
                 var popPng = RenderPng(
                     (c, s) => PdfGeneratorService.DrawPopulationBarsCanvas(c, s, popSorted, countryDetails),
                     700, popH);
                 body.AppendChild(CreateFullWidthImage(mainPart, popPng, popH));
                 body.AppendChild(Gap(80));
-                body.AppendChild(CreateCityLegendTable(popSorted, countryDetails));
+                body.AppendChild(CreateCountryLegendTable(popSorted, countryDetails));
                 body.AppendChild(Gap(120));
 
-                body.AppendChild(SectionHeading("Score vs Population  (each dot = one country)", DarkGreen));
+                body.AppendChild(SectionHeading("Score vs Population  (each dot = one country)", DarkBlue));
                 int scatterH = Math.Max(popSorted.Count * 30, 160);
                 var scatterPng = RenderPng(
                     (c, s) => PdfGeneratorService.DrawScatterPlotCanvas(
@@ -1956,13 +1956,13 @@ namespace PeaceEnablers.Common.Implementation
             body.AppendChild(PageBreak());
 
             // ── 5.2  Regional ────────────────────────────────────────────────────
-            AppendCityHeader(mainPart, countryDetails, "Regional Peer Group Comparison");
+            AppendCountryHeader(mainPart, countryDetails, "Regional Peer Group Comparison");
             var regionPng = RenderPng((c, s) => PaintRegionalBars(c, s, all), 700, 220);
             body.AppendChild(CreateFullWidthImage(mainPart, regionPng, 220));
             body.AppendChild(PageBreak());
 
             // ── 5.3  Income-Level ────────────────────────────────────────────────
-            AppendCityHeader(mainPart, countryDetails, "Income-Level Peer Comparison");
+            AppendCountryHeader(mainPart, countryDetails, "Income-Level Peer Comparison");
 
             // ══════════════════════════════════════════════════════════════════
             // IncomePeerPage — DOCX (updated with PPP section)
@@ -1976,7 +1976,7 @@ namespace PeaceEnablers.Common.Implementation
                     $"Range: {withIncome.Min(p => p.Income):C0} – {withIncome.Max(p => p.Income):C0}"));
 
                 // ── Quartile bars ─────────────────────────────────────────────
-                body.AppendChild(SectionHeading("Average Score by Income Quartile", DarkGreen));
+                body.AppendChild(SectionHeading("Average Score by Income Quartile", DarkBlue));
                 var quartilePng = RenderPng(
                     (c, s) => PdfGeneratorService.DrawIncomeQuartileBarsCanvas(c, s, all),
                     700, 145);
@@ -1984,7 +1984,7 @@ namespace PeaceEnablers.Common.Implementation
                 body.AppendChild(Gap(80));
 
                 // ── Income vs Score scatter ───────────────────────────────────
-                body.AppendChild(SectionHeading("Income vs Composite Score  (each dot = one country)", DarkGreen));
+                body.AppendChild(SectionHeading("Income vs Composite Score  (each dot = one country)", DarkBlue));
                 var incScatterPng = RenderPng(
                     (c, s) => PdfGeneratorService.DrawScatterPlotCanvas(
                         c, s, withIncome, countryDetails,
@@ -2002,7 +2002,7 @@ namespace PeaceEnablers.Common.Implementation
                 //if (withPpp.Any())
                 //{
                 //    // Section divider heading
-                //    body.AppendChild(CreateSectionDivider("Purchasing Power Parity (PPP) Analysis", DarkGreen));
+                //    body.AppendChild(CreateSectionDivider("Purchasing Power Parity (PPP) Analysis", DarkBlue));
 
                 //    // Explanatory note
                 //    body.AppendChild(CreateItalicNote(
@@ -2015,7 +2015,7 @@ namespace PeaceEnablers.Common.Implementation
 
                 //    // ── Nominal vs PPP scatter ────────────────────────────────
                 //    body.AppendChild(SectionHeading(
-                //        "Nominal Income vs PPP-Adjusted Income  (each dot = one city)", DarkGreen));
+                //        "Nominal Income vs PPP-Adjusted Income  (each dot = one city)", DarkBlue));
                 //    var pppScatterPng = RenderPng(
                 //        (c, s) => PdfGeneratorService.DrawScatterPlotCanvas(
                 //            c, s, withPpp, countryDetails,
@@ -2028,7 +2028,7 @@ namespace PeaceEnablers.Common.Implementation
 
                 //    // ── PPP Comparison Table ──────────────────────────────────
                 //    body.AppendChild(SectionHeading(
-                //        "Nominal vs PPP-Adjusted Income Comparison", DarkGreen));
+                //        "Nominal vs PPP-Adjusted Income Comparison", DarkBlue));
                 //    //body.AppendChild(CreatePppComparisonTable(withPpp, countryDetails));
                 //    body.AppendChild(Gap(60));
 
@@ -2045,13 +2045,13 @@ namespace PeaceEnablers.Common.Implementation
                 //}
 
                 // ── Top performers by income group (PPP column added) ─────────
-                body.AppendChild(SectionHeading("Top Performers by Income Group", DarkGreen));
+                body.AppendChild(SectionHeading("Top Performers by Income Group", DarkBlue));
                 body.AppendChild(CreateIncomeGroupTable(all, countryDetails));
             }
             body.AppendChild(PageBreak());
 
             // ── 5.5  Relative Ranking ────────────────────────────────────────────
-            AppendCityHeader(mainPart, countryDetails, "Relative Ranking Among Peer Countries");
+            AppendCountryHeader(mainPart, countryDetails, "Relative Ranking Among Peer Countries");
             AddRankingSection(body, mainPart, all, countryDetails);
         }
 
@@ -2065,11 +2065,11 @@ namespace PeaceEnablers.Common.Implementation
             AiCountrySummeryDto countryDetails)
         {
             var ranked = all
-                .Select(c => (City: c, Score: GetLatestScoreOrZero(c)))
+                .Select(c => (Country: c, Score: GetLatestScoreOrZero(c)))
                 .OrderByDescending(x => x.Score)
                 .ToList();
 
-            int mainRank = ranked.FindIndex(r => IsSameCountry(r.City.CountryName, countryDetails.CountryName)) + 1;
+            int mainRank = ranked.FindIndex(r => IsSameCountry(r.Country.CountryName, countryDetails.CountryName)) + 1;
             float mainScore = mainRank > 0 ? ranked[mainRank - 1].Score : 0f;
             float pctile = mainRank > 0 ? (1f - (float)mainRank / ranked.Count) * 100f : 0f;
 
@@ -2078,7 +2078,7 @@ namespace PeaceEnablers.Common.Implementation
             body.AppendChild(Gap(120));
 
             // Score distribution histogram
-            body.AppendChild(SectionHeading("Score Distribution Among All Countries", DarkGreen));
+            body.AppendChild(SectionHeading("Score Distribution Among All Countries", DarkBlue));
             var histPng = RenderPng(
                 (c, s) => PdfGeneratorService.DrawHistogramCanvas(
                     c, s, ranked.Select(r => r.Score).ToList(), mainScore, 10),
@@ -2087,22 +2087,22 @@ namespace PeaceEnablers.Common.Implementation
             body.AppendChild(Gap(100));
 
             // Full ranking table
-            body.AppendChild(SectionHeading("Full City Ranking", DarkGreen));
+            body.AppendChild(SectionHeading("Full Country Ranking", DarkBlue));
             var rows = ranked.Select((r, i) => new[]
             {
         (i + 1).ToString(),
-        r.City.CountryName,
-        r.City.Country    ?? "—",
-        r.City.Region     ?? "—",
-        FormatPop(r.City.Population),
+        r.Country.CountryName,
+        r.Country.Continent    ?? "—",
+        r.Country.Region     ?? "—",
+        FormatPop(r.Country.Population),
         $"{r.Score:F1}"
     }).ToArray();
 
             body.AppendChild(CreateStyledTable(
-                new[] { "#", "City", "Country", "Region", "Pop.", "Score" },
+                new[] { "#", "Country", "Continent", "Region", "Pop.", "Score" },
                 new[] { 360, 2000, 1300, 1400, 1000, 900 },
                 rows,
-                highlightRow: i => IsSameCountry(ranked[i].City.CountryName, countryDetails.CountryName)));
+                highlightRow: i => IsSameCountry(ranked[i].Country.CountryName, countryDetails.CountryName)));
             body.AppendChild(PageBreak());
         }
 
@@ -2234,7 +2234,7 @@ namespace PeaceEnablers.Common.Implementation
                 return new[]
                 {
                     country.CountryName,
-                    country.Country ?? "—",
+                    country.Continent ?? "—",
                     sc < 0 ? "—" : $"{sc:F1}",
                     PdfGeneratorService.GetIncomeCategory(country.Income ?? 0),
                     FormatPop(country.Income)         // ← NEW column
@@ -2242,14 +2242,14 @@ namespace PeaceEnablers.Common.Implementation
             }).ToArray();
 
             return CreateStyledTableWithCellColors(
-                headers: new[] { "City", "Country", "Score", "Income Group", "Income" },
+                headers: new[] { "Country", "Continent", "Score", "Income Group", "Income" },
                 widths: new[] { 1800, 1000, 700, 2000, 1200 },
                 rows: rows,
                 highlightRow: i => IsSameCountry(orderedCountries[i].CountryName, countryDetails.CountryName)
                 );
         }
 
-        private static Table CreateCityLegendTable(
+        private static Table CreateCountryLegendTable(
             List<PeerCountryHistoryReportDto> allCountries, AiCountrySummeryDto countryDetails)
         {
             string[] palette = { "F0B429", "4CAF8A", "1E88E5", "FB8C00", "7B61FF", "E05252" };
@@ -2260,7 +2260,7 @@ namespace PeaceEnablers.Common.Implementation
                 rows.Add(new[] { isMain ? "★" : "•", allCountries[i].CountryName, allCountries[i].Country ?? "—" });
             }
             return CreateStyledTable(
-                new[] { "", "City", "Country" },
+                new[] { "", "Country", "Country" },
                 new[] { 300, 4000, 2000 },
                 rows.ToArray());
         }
