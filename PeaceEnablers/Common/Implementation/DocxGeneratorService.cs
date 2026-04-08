@@ -48,7 +48,7 @@ namespace PeaceEnablers.Common.Implementation
         private const long   ContentWidthEmu = 6_645_000L;   // ≈ 7.27 inch in EMU
         private const long   HalfWidthEmu    = 3_220_000L;   // ≈ 3.52 inch in EMU
         private const string DarkBlue       = "1B2F44";
-        private const string MedBlue        = "336B58";
+        private const string MedBlue        = "2C6EA3";
         private const string White           = "FFFFFF";
 
         // Unique image ID counter — reset per document
@@ -968,10 +968,10 @@ namespace PeaceEnablers.Common.Implementation
                     new Shading { Fill = "FFFFFF" },
                     new TableCellVerticalAlignment { Val = TableVerticalAlignmentValues.Center },
                     new TableCellMargin(
-                        new TopMargin { Width = "80", Type = TableWidthUnitValues.Dxa },
-                        new BottomMargin { Width = "80", Type = TableWidthUnitValues.Dxa },
-                        new LeftMargin { Width = "80", Type = TableWidthUnitValues.Dxa },
-                        new RightMargin { Width = "80", Type = TableWidthUnitValues.Dxa }
+                        new TopMargin { Width = "0", Type = TableWidthUnitValues.Dxa },
+                        new BottomMargin { Width = "0", Type = TableWidthUnitValues.Dxa },
+                        new LeftMargin { Width = "0", Type = TableWidthUnitValues.Dxa },
+                        new RightMargin { Width = "0", Type = TableWidthUnitValues.Dxa }
                     )
                 )
             );

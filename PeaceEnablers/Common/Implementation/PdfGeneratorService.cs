@@ -1572,7 +1572,7 @@ namespace PeaceEnablers.Common.Implementation
 
             container.Column(column =>
             {
-                column.Item().Background("#134534").Padding(12).Row(row =>
+                column.Item().Background("#003160").Padding(12).Row(row =>
                 {
                     // Left content
                     row.RelativeItem().Column(col =>
@@ -1594,11 +1594,11 @@ namespace PeaceEnablers.Common.Implementation
                     });
 
                     // Logo
-                    row.ConstantItem(60)
+                    row.ConstantItem(90)
                         .AlignRight()
                         .AlignMiddle()
                         .Background(Colors.White)
-                        .Padding(4)
+                        .Padding(1)
                         .Image(logoPath)
                         .FitArea();
                 });

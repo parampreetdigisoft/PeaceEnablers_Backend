@@ -628,7 +628,7 @@ namespace PeaceEnablers.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GeneratecountryDetailsReport", ex);
+                await _appLogger.LogAsync("Error Occured in GenerateCountryDetailsReport", ex);
                 return Array.Empty<byte>();
             }
         }
