@@ -182,11 +182,11 @@ namespace PeaceEnablers.Services
                     var r = await SendTwoFactorOTPAsync(user);
                     if (r.Succeeded) 
                     {
-                        var sendOpt = new UserResponseDto {};
+                        var sendOpt = new UserResponseDto {};                        
                         return ResultResponseDto<UserResponseDto>.Success(sendOpt,
                           new string[] { "We've sent a one-time verification code (OTP) to your registered email address. Please check your inbox and enter the OTP to continue." });
                     }
-                    return ResultResponseDto<UserResponseDto>.Failure(new string[] { "Faild to send OTP Please try again." });
+                    return ResultResponseDto<UserResponseDto>.Failure(new string[] { "Failed to send OTP Please try again." });
                 }
                 else
                 {
