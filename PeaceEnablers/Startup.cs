@@ -58,10 +58,10 @@ namespace PeaceEnablers
                 {
                     builder.WithOrigins(
                         "http://localhost:4200",
-                        "http://veridianurbansystems.com",
-                        "https://veridianurbansystems.com",
-                        "http://portal.veridianurbansystems.com",
-                        "https://portal.veridianurbansystems.com"
+                        "http://peacemappers.ai",
+                        "https://peacemappers.ai",
+                        "http://portal.peacemappers.ai",
+                        "https://portal.peacemappers.ai"
                         )
                         .AllowAnyHeader()
                         .AllowAnyMethod()
