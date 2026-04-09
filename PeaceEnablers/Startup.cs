@@ -61,7 +61,9 @@ namespace PeaceEnablers
                         "http://peacemappers.ai",
                         "https://peacemappers.ai",
                         "http://portal.peacemappers.ai",
-                        "https://portal.peacemappers.ai"
+                        "https://portal.peacemappers.ai",
+                        "https://app.peacemappers.ai",
+                        "https://app.peacemappers.ai"
                         )
                         .AllowAnyHeader()
                         .AllowAnyMethod()
