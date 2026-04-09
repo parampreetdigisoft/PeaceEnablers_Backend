@@ -742,10 +742,11 @@ namespace PeaceEnablers.Services
                     from c in _context.Countries
                     where !c.IsDeleted && c.IsActive
                     join uc in _context.UserCountryMappings.Where(predicate)
-                        on c.CountryID equals uc.CountryID 
+                        on c.CountryID equals uc.CountryID into ucGroup
+                    from uc in ucGroup.DefaultIfEmpty()
                     join a in _context.Assessments.Where(x => x.IsActive && x.UpdatedAt >= startDate && x.UpdatedAt <= endDate)
-                        on uc.UserCountryMappingID equals a.UserCountryMappingID into cityAssessments 
-                    from a in cityAssessments.DefaultIfEmpty()
+                        on uc.UserCountryMappingID equals a.UserCountryMappingID into countryAssessments 
+                    from a in countryAssessments.DefaultIfEmpty()
                     select new
                     {
                         c.CountryID,
@@ -754,20 +755,20 @@ namespace PeaceEnablers.Services
                     }
                 ).ToListAsync();
 
-                // First, extract the list of CityIDs from your countryQuery
-                var cityIds = countryQuery.Select(c => c.CountryID).Distinct().ToList();
+                // First, extract the list of countryIds from your countryQuery
+                var countryIds = countryQuery.Select(c => c.CountryID).Distinct().ToList();
 
-                // Then, get all AICityScores for those cities
-                var aICity = await _context.AICountryScores
-                    .Where(x => cityIds.Contains(x.CountryID) && x.Year == year)
+                // Then, get all aICountryScores for those cities
+                var aICountry = await _context.AICountryScores
+                    .Where(x => countryIds.Contains(x.CountryID) && x.Year == year)
                     .ToListAsync();
 
                 countryHistory.TotalCountry = countryQuery.Select(x => x.CountryID).Distinct().Count();
                 countryHistory.ActiveCountry = countryQuery.Where(x => x.HasMapping).Select(x => x.CountryID).Distinct().Count();
                 countryHistory.CompeleteCountry = countryQuery.Where(x => x.IsCompleted).Select(x => x.CountryID).Distinct().Count();
                 countryHistory.InprocessCountry = countryHistory.ActiveCountry - countryHistory.CompeleteCountry;
-                countryHistory.FinalizeCountry = aICity.Where(x=>x.IsVerified).Count();
-                countryHistory.UnFinalize = aICity.Where(x => !x.IsVerified).Count();
+                countryHistory.FinalizeCountry = aICountry.Where(x=>x.IsVerified).Count();
+                countryHistory.UnFinalize = aICountry.Where(x => !x.IsVerified).Count();
 
                 // 2️⃣ Get evaluators & analysts in a single query
                 var userCounts = await _context.Users
@@ -785,7 +786,7 @@ namespace PeaceEnablers.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetCityHistory", ex);
+                await _appLogger.LogAsync("Error Occure in GetCountryHistory", ex);
                 return ResultResponseDto<CountryHistoryDto>.Failure(new string[] { "There is an error please try later" });
             }
         }
@@ -818,8 +819,8 @@ namespace PeaceEnablers.Services
                     join c in _context.Countries.Where(c => !c.IsDeleted && c.IsActive)
                         on uc.CountryID equals c.CountryID
                     join a in _context.AICountryScores.Where(x =>  x.Year == year)
-                        on c.CountryID equals a.CountryID into aICityScores
-                    from a in aICityScores.DefaultIfEmpty()
+                        on c.CountryID equals a.CountryID into aICountryScores
+                    from a in aICountryScores.DefaultIfEmpty()
                     select new
                     {
                         c.CountryID,

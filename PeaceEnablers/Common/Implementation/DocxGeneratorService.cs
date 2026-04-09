@@ -872,9 +872,9 @@ namespace PeaceEnablers.Common.Implementation
         /// (which replaces the manual PageBreak() call between sections).
         /// </summary>
         private void AppendCountryHeader(
-            MainDocumentPart mainPart,
-            AiCountrySummeryDto data,
-            string? sectionTitle = null)
+     MainDocumentPart mainPart,
+     AiCountrySummeryDto data,
+     string? sectionTitle = null)
         {
             var body = mainPart.Document.Body!;
 
@@ -893,11 +893,11 @@ namespace PeaceEnablers.Common.Implementation
                 Directory.GetCurrentDirectory(),
                 "wwwroot/assets/images/pem.png");
 
-            int logoColW = 2600;   // ⬆️ from 2000
+            int logoColW = 2600;
             int leftColW = ContentDxa - logoColW;
 
-            const long logoWidthEmu = 900_000L;   // ⬆️ from 600k
-            const long logoHeightEmu = 420_000L;  // maintain ratio
+            const long logoWidthEmu = 900_000L;
+            const long logoHeightEmu = 450_000L; // ✅ slightly increased
 
             // ✅ MAIN TABLE
             var layoutTable = new Table(
@@ -910,9 +910,10 @@ namespace PeaceEnablers.Common.Implementation
 
             var mainRow = new TableRow(
                 new TableRowProperties(
-                    new TableRowHeight {
-                        Val = 0,
-                        HeightType = HeightRuleValues.Auto
+                    new TableRowHeight
+                    {
+                        Val = 900, // ✅ prevent compression
+                        HeightType = HeightRuleValues.AtLeast
                     }
                 )
             );
@@ -920,10 +921,10 @@ namespace PeaceEnablers.Common.Implementation
             // ✅ LEFT CELL
             var leftCell = new TableCell(
                 new TableCellProperties(
-                new TableCellWidth { Width = leftColW.ToString(), Type = TableWidthUnitValues.Dxa },
-                new Shading { Fill = "003160" },
-                new TableCellVerticalAlignment { Val = TableVerticalAlignmentValues.Center },
-                new TableCellMargin(
+                    new TableCellWidth { Width = leftColW.ToString(), Type = TableWidthUnitValues.Dxa },
+                    new Shading { Fill = "003160" },
+                    new TableCellVerticalAlignment { Val = TableVerticalAlignmentValues.Center },
+                    new TableCellMargin(
                         new TopMargin { Width = "200", Type = TableWidthUnitValues.Dxa },
                         new BottomMargin { Width = "200", Type = TableWidthUnitValues.Dxa },
                         new LeftMargin { Width = "250", Type = TableWidthUnitValues.Dxa },
@@ -940,19 +941,19 @@ namespace PeaceEnablers.Common.Implementation
 
             mainRow.Append(leftCell);
 
-            // ✅ RIGHT CELL (GREEN BACKGROUND)
+            // ✅ RIGHT CELL (BLUE BACKGROUND)
             var rightCell = new TableCell(
                 new TableCellProperties(
                     new TableCellWidth { Width = logoColW.ToString(), Type = TableWidthUnitValues.Dxa },
                     new Shading { Fill = "003160" },
-                    new TableCellVerticalAlignment { Val = TableVerticalAlignmentValues.Center }
-                ),
-                new TableCellMargin(
-                new TopMargin { Width = "200", Type = TableWidthUnitValues.Dxa },
-                new BottomMargin { Width = "200", Type = TableWidthUnitValues.Dxa },
-                new LeftMargin { Width = "200", Type = TableWidthUnitValues.Dxa },
-                new RightMargin { Width = "200", Type = TableWidthUnitValues.Dxa }
-            )
+                    new TableCellVerticalAlignment { Val = TableVerticalAlignmentValues.Center },
+                    new TableCellMargin(
+                        new TopMargin { Width = "200", Type = TableWidthUnitValues.Dxa },
+                        new BottomMargin { Width = "200", Type = TableWidthUnitValues.Dxa },
+                        new LeftMargin { Width = "200", Type = TableWidthUnitValues.Dxa },
+                        new RightMargin { Width = "200", Type = TableWidthUnitValues.Dxa }
+                    )
+                )
             );
 
             // ✅ INNER TABLE (WHITE BOX)
@@ -963,15 +964,16 @@ namespace PeaceEnablers.Common.Implementation
             );
 
             var innerRow = new TableRow();
+
             var innerCell = new TableCell(
                 new TableCellProperties(
                     new Shading { Fill = "FFFFFF" },
                     new TableCellVerticalAlignment { Val = TableVerticalAlignmentValues.Center },
                     new TableCellMargin(
-                        new TopMargin { Width = "0", Type = TableWidthUnitValues.Dxa },
-                        new BottomMargin { Width = "0", Type = TableWidthUnitValues.Dxa },
-                        new LeftMargin { Width = "0", Type = TableWidthUnitValues.Dxa },
-                        new RightMargin { Width = "0", Type = TableWidthUnitValues.Dxa }
+                        new TopMargin { Width = "120", Type = TableWidthUnitValues.Dxa },   // ✅ FIX
+                        new BottomMargin { Width = "120", Type = TableWidthUnitValues.Dxa },
+                        new LeftMargin { Width = "120", Type = TableWidthUnitValues.Dxa },
+                        new RightMargin { Width = "120", Type = TableWidthUnitValues.Dxa }
                     )
                 )
             );
@@ -986,7 +988,14 @@ namespace PeaceEnablers.Common.Implementation
                 );
 
                 logoPara.ParagraphProperties = new ParagraphProperties(
-                    new Justification { Val = JustificationValues.Center }
+                    new Justification { Val = JustificationValues.Center },
+                    new SpacingBetweenLines
+                    {
+                        Before = "0",   // ✅ REMOVE extra space
+                        After = "0",
+                        Line = "240",
+                        LineRule = LineSpacingRuleValues.Auto
+                    }
                 );
 
                 innerCell.Append(logoPara);
@@ -1008,7 +1017,12 @@ namespace PeaceEnablers.Common.Implementation
             var divider = new Paragraph(
                 new ParagraphProperties(
                     new ParagraphBorders(
-                        new BottomBorder { Val = BorderValues.Single, Size = 6, Color = "d9e2df" }
+                        new BottomBorder
+                        {
+                            Val = BorderValues.Single,
+                            Size = 6,
+                            Color = "d9e2df"
+                        }
                     )
                 )
             );
