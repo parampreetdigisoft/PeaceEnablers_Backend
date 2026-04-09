@@ -8,9 +8,9 @@ namespace PeaceEnablers.IServices
 {
     public interface IAuthService
     {
-        User Register(string fullName, string email, string phn, string password, UserRole role);
+        User Register(string fullName, string email, string phn, string password, UserRole role, Enums.TieredAccessPlan? tier = Enums.TieredAccessPlan.Pending);
         User GetByEmail(string email);
-        Task<User?> GetByEmailAysync(string email);
+        Task<User?> GetByEmailAsync(string email);
         bool VerifyPassword(string password, string hash);
         Task<ResultResponseDto<UserResponseDto>> Login(string email, string password);
         Task<ResultResponseDto<object>> ForgotPassword(string email);

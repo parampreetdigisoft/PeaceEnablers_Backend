@@ -1,13 +1,14 @@
+using Microsoft.EntityFrameworkCore;
 using PeaceEnablers.Common.Implementation;
 using PeaceEnablers.Common.Models;
 using PeaceEnablers.Data;
 using PeaceEnablers.Dtos.AssessmentDto;
-using PeaceEnablers.Dtos.CountryDto;
 using PeaceEnablers.Dtos.CommonDto;
+using PeaceEnablers.Dtos.CountryDto;
 using PeaceEnablers.Dtos.UserDtos;
+using PeaceEnablers.Enums;
 using PeaceEnablers.IServices;
 using PeaceEnablers.Models;
-using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
 
 namespace PeaceEnablers.Services
@@ -40,14 +41,14 @@ namespace PeaceEnablers.Services
 
                 Expression<Func<User, bool>> predicate = currentUser.Role switch
                 {
-                    UserRole.Admin => x => !x.IsDeleted && request.GetUserRole.HasValue ? x.Role == request.GetUserRole : (x.Role == UserRole.Evaluator || x.Role == UserRole.CountryUser),
+                    UserRole.Admin => x => !x.IsDeleted && (request.GetUserRole.HasValue
+                                        ? x.Role == request.GetUserRole
+                                        : (x.Role == UserRole.Evaluator || x.Role == UserRole.CountryUser)),
                     _ => x => !x.IsDeleted && x.Role == UserRole.Evaluator
                 };
 
-                // Build one-row-per-user by taking at most 1 mapping row per user
-                // NOTE: use a deterministic column to order (e.g., CreatedAt or primary key).
                 var query =
-                    from u in _context.Users.Where(predicate)                    
+                    from u in _context.Users.Where(predicate)
                     from uc in filteredMappings
                                 .Where(m => m.UserID == u.UserID)
                                 .Take(1).DefaultIfEmpty()
@@ -65,45 +66,74 @@ namespace PeaceEnablers.Services
                         IsDeleted = u.IsDeleted,
                         IsEmailConfirmed = u.IsEmailConfirmed,
                         CreatedAt = u.CreatedAt,
-                        CreatedByName = ab != null ? ab.FullName : null
+                        CreatedByName = ab != null ? ab.FullName : null,
+                        Tier = u.Tier,
+                        Countries = new List<AddUpdateCountryDto>(),
+                        Pillars = new List<int>()  // initialize empty list
                     };
 
-
-                // Apply pagination + search
                 var response = await query.ApplyPaginationAsync(
                     request,
                     x => string.IsNullOrEmpty(request.SearchText) ||
                          x.Email.Contains(request.SearchText) ||
                          x.FullName.Contains(request.SearchText));
 
-                // Get all countries for fetched users in one query
                 var userIds = response.Data.Select(x => x.UserID).Distinct().ToList();
-                var countryMap = await _context.UserCountryMappings
-                .Where(x => !x.IsDeleted && userIds.Contains(x.UserID) && (x.AssignedByUserId == request.UserID || currentUser.Role == UserRole.Admin))
-                .Join(_context.Countries,
-                      cm => cm.CountryID,
-                      c => c.CountryID,
-                      (cm, c) => new
-                      {
-                          cm.UserID,
-                          Country = new AddUpdateCountryDto
-                          {
-                              CountryID = c.CountryID,
-                              CountryName = c.CountryName,
-                              Region = c.Region,
-                              Continent = c.Continent
-                          }
-                      }).Distinct()
-                .ToListAsync();
 
-                var result = countryMap
-                    .GroupBy(x => x.UserID)
-                    .ToDictionary(g => g.Key, g => g.Select(x => x.Country).ToList());
-
-                foreach (var item in response.Data)
+                if (request.GetUserRole == UserRole.CountryUser)
                 {
-                    result.TryGetValue(item.UserID, out var countries);
-                    item.Countries = countries ?? new List<AddUpdateCountryDto>();
+                    // Fetch countries from PublicUserCountryMappings
+                    var countryMap = await _context.PublicUserCountryMappings
+                        .Where(x => x.IsActive && userIds.Contains(x.UserID))
+                        .Join(_context.Countries,
+                            cm => cm.CountryID,
+                            c => c.CountryID,
+                            (cm, c) => new { cm.UserID, Country = new AddUpdateCountryDto { CountryID = c.CountryID, CountryName = c.CountryName, Region = c.Region, Continent = c.Continent } })
+                        .ToListAsync();
+
+                    // Fetch pillar IDs from CountryUserPillarMappings
+                    var pillarMap = await _context.CountryUserPillarMappings
+                        .Where(x => x.IsActive && userIds.Contains(x.UserID))
+                        .Select(x => new { x.UserID, x.PillarID })
+                        .ToListAsync();
+
+                    var countriesGrouped = countryMap.GroupBy(x => x.UserID)
+                        .ToDictionary(g => g.Key, g => g.Select(x => x.Country).ToList());
+
+                    var pillarsGrouped = pillarMap.GroupBy(x => x.UserID)
+                        .ToDictionary(g => g.Key, g => g.Select(x => x.PillarID).ToList());
+
+                    foreach (var item in response.Data)
+                    {
+                        countriesGrouped.TryGetValue(item.UserID, out var countries);
+                        pillarsGrouped.TryGetValue(item.UserID, out var pillars);
+
+                        item.Countries = countries ?? new List<AddUpdateCountryDto>();
+                        item.Pillars = pillars ?? new List<int>();
+                    }
+                }
+                else
+                {
+                    // For Evaluator / Analyst, keep your existing logic for countries
+                    var countryMap = await _context.UserCountryMappings
+                        .Where(x => !x.IsDeleted &&
+                               userIds.Contains(x.UserID) &&
+                               (x.AssignedByUserId == request.UserID || currentUser.Role == UserRole.Admin))
+                        .Join(_context.Countries,
+                            cm => cm.CountryID,
+                            c => c.CountryID,
+                            (cm, c) => new { cm.UserID, Country = new AddUpdateCountryDto { CountryID = c.CountryID, CountryName = c.CountryName, Region = c.Region, Continent = c.Continent } })
+                        .ToListAsync();
+
+                    var countriesGrouped = countryMap.GroupBy(x => x.UserID)
+                        .ToDictionary(g => g.Key, g => g.Select(x => x.Country).ToList());
+
+                    foreach (var item in response.Data)
+                    {
+                        countriesGrouped.TryGetValue(item.UserID, out var countries);
+                        item.Countries = countries ?? new List<AddUpdateCountryDto>();
+                        item.Pillars = new List<int>(); // no pillars for other roles
+                    }
                 }
 
                 return response;

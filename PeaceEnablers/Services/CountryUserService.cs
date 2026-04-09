@@ -740,7 +740,7 @@ namespace PeaceEnablers.Services
 
                 var utcNow = DateTime.UtcNow;
 
-                var newCityMappings = payload.Countries.Select(countryId => new PublicUserCountryMapping
+                var newCountryMappings = payload.Countries.Select(countryId => new PublicUserCountryMapping
                 {
                     CountryID = countryId,
                     UserID = userId,
@@ -756,7 +756,7 @@ namespace PeaceEnablers.Services
                     UpdatedAt = utcNow
                 });
 
-                await _context.PublicUserCountryMappings.AddRangeAsync(newCityMappings);
+                await _context.PublicUserCountryMappings.AddRangeAsync(newCountryMappings);
                 await _context.CountryUserPillarMappings.AddRangeAsync(newPillarMappings);
 
                 await _context.SaveChangesAsync();

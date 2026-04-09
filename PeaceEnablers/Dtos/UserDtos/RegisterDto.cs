@@ -1,4 +1,5 @@
-﻿using PeaceEnablers.Models;
+﻿using PeaceEnablers.Enums;
+using PeaceEnablers.Models;
 
 namespace PeaceEnablers.Dtos.UserDtos
 {
@@ -9,11 +10,15 @@ namespace PeaceEnablers.Dtos.UserDtos
         public string Phone { get; set; }
         public string Password { get; set; } = "sdfjru32brjfew";
         public UserRole Role { get; set; }
+        public TieredAccessPlan? Tier { get; set; }
+        public List<int>? Pillars { get; set; }
     }
     public class InviteUserDto : RegisterDto
     {
         public int InvitedUserID { get; set; }
         public List<int> CountryID { get; set; } = new();
+
+        public List<int>? Pillars { get; set; }
 
     }
 

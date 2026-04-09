@@ -77,6 +77,7 @@ namespace PeaceEnablers.Controllers
         public string Email { get; set; }
         public string Phone { get; set; }
         public string Password { get; set; }
+        public Enums.TieredAccessPlan? Tier { get; set; } = Enums.TieredAccessPlan.Pending;
         public UserRole Role { get; set; }
     }
 } 
