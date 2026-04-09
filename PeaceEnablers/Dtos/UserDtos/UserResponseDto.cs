@@ -7,8 +7,7 @@ namespace PeaceEnablers.Dtos.UserDtos
     {
         public DateTime TokenExpirationDate { get; set; } 
         public string? ProfileImagePath { get; set; }
-        public string Token { get; set; }
-        public TieredAccessPlan? tier { get; set; }
+        public string Token { get; set; }        
     }
 
     public class PublicUserResponse
@@ -24,5 +23,8 @@ namespace PeaceEnablers.Dtos.UserDtos
         public DateTime CreatedAt { get; set; }
         public bool IsEmailConfirmed { get; set; }
         public bool IsLoggedIn { get; set; }
+        public TieredAccessPlan? Tier { get; set; }
+
+        public List<int>? Pillars { get; set; }
     }
 }

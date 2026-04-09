@@ -130,7 +130,7 @@ namespace PeaceEnablers.Controllers
         {
             if (_authService.GetByEmail(req.Email) != null)
                 return BadRequest("User already exists");
-            var user = _authService.Register(req.FullName, req.Email, req.Phone, req.Password, req.Role);
+            var user = _authService.Register(req.FullName, req.Email, req.Phone, req.Password, req.Role, req.Tier);
             return Created($"/api/user/{user.UserID}", new { user.UserID, user.FullName, user.Email, user.Role });
         }
 
