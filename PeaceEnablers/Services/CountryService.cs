@@ -48,7 +48,7 @@ namespace PeaceEnablers.Services
                 string image = string.Empty;
                 if (q.ImageFile != null)
                 {
-                    string uploadsFolder = Path.Combine(_env.WebRootPath, "assets/cities");
+                    string uploadsFolder = Path.Combine(_env.WebRootPath, "assets/countries");
                     if (!Directory.Exists(uploadsFolder))
                         Directory.CreateDirectory(uploadsFolder);
 
@@ -71,12 +71,12 @@ namespace PeaceEnablers.Services
                         await q.ImageFile.CopyToAsync(stream);
                     }
 
-                    image = "/assets/cities/" + fileName;
+                    image = "/assets/countries/" + fileName;
                 }
                 if(q.CountryID > 0)
                 {
-                    var existCity = await _context.Countries.FirstOrDefaultAsync(x => x.IsActive && !x.IsDeleted && q.CountryName == x.CountryName && x.Continent == q.Continent && x.CountryID != q.CountryID);
-                    if (existCity != null)
+                    var existCountry = await _context.Countries.FirstOrDefaultAsync(x => x.IsActive && !x.IsDeleted && q.CountryName == x.CountryName && x.Continent == q.Continent && x.CountryID != q.CountryID);
+                    if (existCountry != null)
                     {
                         return ResultResponseDto<string>.Failure(new string[] { "Country already exists" });
                     }
@@ -342,8 +342,8 @@ namespace PeaceEnablers.Services
 
             try
             {
-                var existCity = await _context.Countries.FirstOrDefaultAsync(x => x.IsActive && !x.IsDeleted && q.CountryName == x.CountryName && x.Continent == q.Continent && x.CountryID != id);
-                if (existCity != null)
+                var existCountry = await _context.Countries.FirstOrDefaultAsync(x => x.IsActive && !x.IsDeleted && q.CountryName == x.CountryName && x.Continent == q.Continent && x.CountryID != id);
+                if (existCountry != null)
                 {
                     return ResultResponseDto<Country>.Failure(new string[] { "Country already exists" });
                 }
@@ -548,7 +548,7 @@ namespace PeaceEnablers.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in getAllCityByUserId", ex);
+                await _appLogger.LogAsync("Error Occure in getAllCountryByUserId", ex);
                 return ResultResponseDto<List<UserCountryMappingResponseDto>>.Failure(new string[] { "There is an error please try later" });
             }
         }
@@ -596,17 +596,17 @@ namespace PeaceEnablers.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in AssingCityToUser", ex);
+                await _appLogger.LogAsync("Error Occure in AssingCountryToUser", ex);
                 return ResultResponseDto<object>.Failure(new string[] { "There is an error please try later" });
             }
         }
 
-        public async Task<ResultResponseDto<object>> EditAssingCountry(int id, int userId, int cityId, int assignedByUserId)
+        public async Task<ResultResponseDto<object>> EditAssingCountry(int id, int userId, int countryId, int assignedByUserId)
         {
             try
             {
 
-                if (_context.UserCountryMappings.Any(x => x.UserID == userId && x.CountryID == cityId && x.AssignedByUserId == assignedByUserId))
+                if (_context.UserCountryMappings.Any(x => x.UserID == userId && x.CountryID == countryId && x.AssignedByUserId == assignedByUserId))
                 {
                     return ResultResponseDto<object>.Failure(new string[] { "Country already assigned to user" });
                 }
@@ -618,7 +618,7 @@ namespace PeaceEnablers.Services
                 }
 
                 userMapping.UserID = userId;
-                userMapping.CountryID = cityId;
+                userMapping.CountryID = countryId;
                 userMapping.AssignedByUserId = assignedByUserId;
                 _context.UserCountryMappings.Update(userMapping);
                 await _context.SaveChangesAsync();
@@ -653,7 +653,7 @@ namespace PeaceEnablers.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in UnAssignCity", ex);
+                await _appLogger.LogAsync("Error Occure in UnAssignCountry", ex);
                 return ResultResponseDto<object>.Failure(new string[] { "There is an error please try later" });
             }
         }
@@ -676,16 +676,16 @@ namespace PeaceEnablers.Services
                 && (a.AssessmentPhase == AssessmentPhase.Completed || a.AssessmentPhase == AssessmentPhase.EditRejected || a.AssessmentPhase == AssessmentPhase.EditRequested);
 
                 // Get distinct UserCityMappings which are not show to user
-                var userCityMappingIds = _context.Assessments
+                var userCountryMappingIds = _context.Assessments
                     .Where(predicate)
                     .Select(a => a.UserCountryMappingID)
                     .Distinct();
 
                 // Project into response DTO
-                var cityQuery =
+                var countryQuery =
                      from c in _context.Countries
                      join cm in _context.UserCountryMappings
-                         .Where(x => !x.IsDeleted && x.UserID == userId && !userCityMappingIds.Contains(x.UserCountryMappingID))
+                         .Where(x => !x.IsDeleted && x.UserID == userId && !userCountryMappingIds.Contains(x.UserCountryMappingID))
                          on c.CountryID equals cm.CountryID
                      join u in _context.Users on cm.AssignedByUserId equals u.UserID
                      select new UserCountryMappingResponseDto
@@ -703,7 +703,7 @@ namespace PeaceEnablers.Services
                          UserCountryMappingID = cm.UserCountryMappingID
                      };
 
-                var result = await cityQuery.ToListAsync();
+                var result = await countryQuery.ToListAsync();
 
                 if (!result.Any())
                 {
@@ -726,7 +726,7 @@ namespace PeaceEnablers.Services
                 var startDate = new DateTime(year, 1, 1);
                 var endDate = new DateTime(year + 1, 1, 1);
 
-                var cityHistory = new CountryHistoryDto();
+                var countryHistory = new CountryHistoryDto();
 
                 Expression<Func<UserCountryMapping, bool>> predicate;
 
@@ -738,7 +738,7 @@ namespace PeaceEnablers.Services
                     predicate = x => !x.IsDeleted;
 
                 // 1️⃣ Get country-related counts in a single round trip
-                var cityQuery = await (
+                var countryQuery = await (
                     from c in _context.Countries
                     where !c.IsDeleted && c.IsActive
                     join uc in _context.UserCountryMappings.Where(predicate)
@@ -754,20 +754,20 @@ namespace PeaceEnablers.Services
                     }
                 ).ToListAsync();
 
-                // First, extract the list of CityIDs from your cityQuery
-                var cityIds = cityQuery.Select(c => c.CountryID).Distinct().ToList();
+                // First, extract the list of CityIDs from your countryQuery
+                var cityIds = countryQuery.Select(c => c.CountryID).Distinct().ToList();
 
                 // Then, get all AICityScores for those cities
                 var aICity = await _context.AICountryScores
                     .Where(x => cityIds.Contains(x.CountryID) && x.Year == year)
                     .ToListAsync();
 
-                cityHistory.TotalCountry = cityQuery.Select(x => x.CountryID).Distinct().Count();
-                cityHistory.ActiveCountry = cityQuery.Where(x => x.HasMapping).Select(x => x.CountryID).Distinct().Count();
-                cityHistory.CompeleteCountry = cityQuery.Where(x => x.IsCompleted).Select(x => x.CountryID).Distinct().Count();
-                cityHistory.InprocessCountry = cityHistory.ActiveCountry - cityHistory.CompeleteCountry;
-                cityHistory.FinalizeCountry = aICity.Where(x=>x.IsVerified).Count();
-                cityHistory.UnFinalize = aICity.Where(x => !x.IsVerified).Count();
+                countryHistory.TotalCountry = countryQuery.Select(x => x.CountryID).Distinct().Count();
+                countryHistory.ActiveCountry = countryQuery.Where(x => x.HasMapping).Select(x => x.CountryID).Distinct().Count();
+                countryHistory.CompeleteCountry = countryQuery.Where(x => x.IsCompleted).Select(x => x.CountryID).Distinct().Count();
+                countryHistory.InprocessCountry = countryHistory.ActiveCountry - countryHistory.CompeleteCountry;
+                countryHistory.FinalizeCountry = aICity.Where(x=>x.IsVerified).Count();
+                countryHistory.UnFinalize = aICity.Where(x => !x.IsVerified).Count();
 
                 // 2️⃣ Get evaluators & analysts in a single query
                 var userCounts = await _context.Users
@@ -777,11 +777,11 @@ namespace PeaceEnablers.Services
                     .ToListAsync();
                 if(userRole == UserRole.Admin)
                 {
-                    cityHistory.TotalEvaluator = userCounts.FirstOrDefault(x => x.Role == UserRole.Evaluator)?.Count ?? 0;
-                    cityHistory.TotalAnalyst = userCounts.FirstOrDefault(x => x.Role == UserRole.Analyst)?.Count ?? 0;
+                    countryHistory.TotalEvaluator = userCounts.FirstOrDefault(x => x.Role == UserRole.Evaluator)?.Count ?? 0;
+                    countryHistory.TotalAnalyst = userCounts.FirstOrDefault(x => x.Role == UserRole.Analyst)?.Count ?? 0;
                 }
 
-                return ResultResponseDto<CountryHistoryDto>.Success(cityHistory, new List<string> { "Get history successfully" });
+                return ResultResponseDto<CountryHistoryDto>.Success(countryHistory, new List<string> { "Get history successfully" });
             }
             catch (Exception ex)
             {
@@ -832,7 +832,7 @@ namespace PeaceEnablers.Services
                 var manualAssessmentList = await _commonService.GetCountriesProgressAsync(userID, (int)userRole, year);
 
                 // Now do grouping/aggregation in memory (LINQ to Objects)
-                var citySubmission = cityRaw
+                var countrySubmission = cityRaw
                     .Select(g =>
                     {
                         var allPillars = manualAssessmentList.Where(x => x.CountryID == g.CountryID);
@@ -850,12 +850,12 @@ namespace PeaceEnablers.Services
                         };
                     }).ToList();
 
-                return ResultResponseDto<List<GetCountriesSubmitionHistoryResponseDto>>.Success(citySubmission ?? new(), new List<string> { "Get Cities history successfully" });
+                return ResultResponseDto<List<GetCountriesSubmitionHistoryResponseDto>>.Success(countrySubmission ?? new(), new List<string> { "Get Countries history successfully" });
 
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetCitiesProgressByUserId", ex);
+                await _appLogger.LogAsync("Error Occure in GetCountriesProgressByUserId", ex);
                 return ResultResponseDto<List<GetCountriesSubmitionHistoryResponseDto>>.Failure(new string[] { "There is an error please try later" });
             }
         }
@@ -878,7 +878,7 @@ namespace PeaceEnablers.Services
                      a.AssessmentPhase == AssessmentPhase.EditRejected ||
                      a.AssessmentPhase == AssessmentPhase.EditRequested);
 
-                var userCityMappingIds = await _context.Assessments
+                var userCountryMappingIds = await _context.Assessments
                     .Where(predicate)
                     .Select(a => a.UserCountryMappingID)
                     .Distinct()
@@ -888,7 +888,7 @@ namespace PeaceEnablers.Services
                 var cityList = await (
                     from c in _context.Countries
                     join cm in _context.UserCountryMappings
-                        .Where(x => !x.IsDeleted && x.UserID == r.UserID && !userCityMappingIds.Contains(x.UserCountryMappingID))
+                        .Where(x => !x.IsDeleted && x.UserID == r.UserID && !userCountryMappingIds.Contains(x.UserCountryMappingID))
                         on c.CountryID equals cm.CountryID
                     join u in _context.Users on cm.AssignedByUserId equals u.UserID
                     select new UserCountryMappingResponseDto

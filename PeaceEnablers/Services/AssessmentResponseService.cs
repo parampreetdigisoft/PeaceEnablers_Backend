@@ -129,7 +129,7 @@ namespace PeaceEnablers.Services
                         .FirstOrDefaultAsync(x => x.UserCountryMappingID == request.UserCountryMappingID);
 
                     if (ucm == null)
-                        return ResultResponseDto<string>.Failure(new[] { "City is not assigned" });
+                        return ResultResponseDto<string>.Failure(new[] { "Country is not assigned" });
 
                     assessment = new Assessment
                     {
@@ -546,7 +546,7 @@ namespace PeaceEnablers.Services
                         Pillars = new List<CountryPillarQuestionHistoryResponseDto>()
                     };
                 }
-                var cityHistory = new CountryHistoryDto();
+                var countryHistory = new CountryHistoryDto();
 
                 Expression<Func<UserCountryMapping, bool>> predicate = user.Role switch
                 {
@@ -642,7 +642,7 @@ namespace PeaceEnablers.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetCityQuestionHistory", ex);
+                await _appLogger.LogAsync("Error Occure in GetCountryQuestionHistory", ex);
                 return new GetCountryQuestionHistoryResponseDto
                 {
                     CountryID = 0,
@@ -748,25 +748,25 @@ namespace PeaceEnablers.Services
                 if (transferAssessment == null)
                     return ResultResponseDto<string>.Failure(new[] { "Invalid assessment." });
 
-                var cityAssigned = await _context.UserCountryMappings
+                var countryAssigned = await _context.UserCountryMappings
                     .FirstOrDefaultAsync(x => x.CountryID == transferAssessment.UserCountryMapping.CountryID &&
                                               x.UserID == r.TransferToUserID);
 
-                if (cityAssigned == null)
+                if (countryAssigned == null)
                     return ResultResponseDto<string>.Failure(new[] { "This assessment can’t be imported because the selected user hasn’t been assigned to this country yet." });
 
                 // Load existing assessment for that user/country/year (with pillars/responses)
                 var existingAssessment = await _context.Assessments
                     .Include(a => a.PillarAssessments)
                         .ThenInclude(p => p.Responses)
-                    .FirstOrDefaultAsync(a => a.UserCountryMappingID == cityAssigned.UserCountryMappingID &&
+                    .FirstOrDefaultAsync(a => a.UserCountryMappingID == countryAssigned.UserCountryMappingID &&
                                               a.UpdatedAt.Year == currentDate.Year);
 
                 if (existingAssessment == null)
                 {
                     existingAssessment = new Assessment
                     {
-                        UserCountryMappingID = cityAssigned.UserCountryMappingID,
+                        UserCountryMappingID = countryAssigned.UserCountryMappingID,
                         CreatedAt = currentDate,
                         UpdatedAt = currentDate,
                         IsActive = true,
@@ -893,7 +893,7 @@ namespace PeaceEnablers.Services
                     .OrderBy(x => x.DisplayOrder)
                     .ToListAsync();
 
-                var aiCityProgress = await _context.AICountryScores
+                var aiCountryProgress = await _context.AICountryScores
                     .Where(x => x.CountryID == request.CountryID && x.Year == year)
                     .MaxAsync(x => x.AIProgress);
 
@@ -925,8 +925,8 @@ namespace PeaceEnablers.Services
                 var response = new AiCountryPillarDashboardResponseDto
                 {
                     CountryID = request.CountryID,
-                    CityName = country?.CountryName ?? string.Empty,
-                    AiValue = aiCityProgress ?? 0,
+                    CountryName = country?.CountryName ?? string.Empty,
+                    AiValue = aiCountryProgress ?? 0,
                     EvaluationValue = Math.Round(pillarEvaluations.Select(x => x.ScoreProgress).DefaultIfEmpty(0).Sum()/pillarCount, 2),
                     Pillars = pillarResults
                 };

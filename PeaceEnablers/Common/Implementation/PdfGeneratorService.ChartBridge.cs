@@ -248,7 +248,7 @@ namespace PeaceEnablers.Common.Implementation
         internal static void DrawMultiLineTrendChartCanvas(
             SKCanvas c, QPDF.Size s,
             List<int> years, List<PeerCountryHistoryReportDto> peers,
-            PeerCountryHistoryReportDto? mainCity, AiCountrySummeryDto countryDetails,
+            PeerCountryHistoryReportDto? mainCountry, AiCountrySummeryDto countryDetails,
             List<(int Year, float Avg, bool HasData)> peerAvg)
         {
             if (years.Count < 2) return;
@@ -272,7 +272,7 @@ namespace PeaceEnablers.Common.Implementation
             }
 
             // Main city line
-            var mainPts = (mainCity?.CountryHistory ?? new()).Where(h => years.Contains(h.Year)).OrderBy(h => h.Year)
+            var mainPts = (mainCountry?.CountryHistory ?? new()).Where(h => years.Contains(h.Year)).OrderBy(h => h.Year)
                 .Select(h => new SKPoint(Xp(h.Year), Yp((float)h.ScoreProgress))).ToList();
             DrawPolylineStatic(c, mainPts, new SKPaint { Color = SKColor.Parse(pal[0]), StrokeWidth = 2.5f, IsAntialias = true, IsStroke = true });
             foreach (var pt in mainPts) c.DrawCircle(pt.X, pt.Y, 4f, new SKPaint { Color = SKColor.Parse(pal[0]), IsAntialias = true });

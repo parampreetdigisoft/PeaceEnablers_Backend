@@ -329,7 +329,7 @@ namespace PeaceEnablers.Services
                         };
                     }).ToList();
 
-                return ResultResponseDto<List<GetCountriesSubmitionHistoryResponseDto>>.Success(result, new List<string> { "Get Cities history successfully" });
+                return ResultResponseDto<List<GetCountriesSubmitionHistoryResponseDto>>.Success(result, new List<string> { "Get Countries history successfully" });
             }
             catch (Exception ex)
             {
@@ -686,7 +686,7 @@ namespace PeaceEnablers.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error occurred in GetCityUserCities", ex);
+                await _appLogger.LogAsync("Error occurred in GetCountryUserCountries", ex);
                 return ResultResponseDto<List<PartnerCountryResponseDto>>.Failure(
                     new[] { "There was an error. Please try again later." }
                 );
@@ -727,7 +727,7 @@ namespace PeaceEnablers.Services
                 }
 
                 //  Remove existing mappings
-                var existingCities = await _context.PublicUserCountryMappings
+                var existingCountries = await _context.PublicUserCountryMappings
                     .Where(m => m.UserID == userId)
                     .ToListAsync();
 
@@ -735,7 +735,7 @@ namespace PeaceEnablers.Services
                     .Where(m => m.UserID == userId)
                     .ToListAsync();
 
-                _context.PublicUserCountryMappings.RemoveRange(existingCities);
+                _context.PublicUserCountryMappings.RemoveRange(existingCountries);
                 _context.CountryUserPillarMappings.RemoveRange(existingPillars);
 
                 var utcNow = DateTime.UtcNow;
@@ -856,13 +856,13 @@ namespace PeaceEnablers.Services
                 }
 
                 // Step 2: Get all selected countries (even if no analytical data)
-                var selectedCities = await _context.PublicUserCountryMappings
+                var selectedCountries = await _context.PublicUserCountryMappings
                     .Include(x=>x.Country)
                     .Where(x => c.Countries.Contains(x.CountryID) && x.UserID== userId && x.IsActive && x.Country != null && x.Country.IsActive)
                     .Select(x => new { x.Country.CountryID, x.Country.CountryName })
                     .ToListAsync();
 
-                if (!selectedCities.Any())
+                if (!selectedCountries.Any())
                 {
                     return ResultResponseDto<CompareCountryResponseDto>.Failure(new List<string> { "No valid countries found." });
                 }
@@ -902,7 +902,7 @@ namespace PeaceEnablers.Services
                 };
 
                 // Initialize chart series for each country
-                foreach (var country in selectedCities)
+                foreach (var country in selectedCountries)
                 {
                     response.Series.Add(new ChartSeriesDto
                     {
@@ -926,7 +926,7 @@ namespace PeaceEnablers.Services
                     // Map KPI values for each country (0 if missing)
                     var values = new Dictionary<int, List<decimal>>();
 
-                    foreach (var country in selectedCities)
+                    foreach (var country in selectedCountries)
                     {
                         var value = analyticalResults
                             .FirstOrDefault(r => r.CountryID == country.CountryID && r.LayerID == layer.LayerID);
@@ -951,7 +951,7 @@ namespace PeaceEnablers.Services
                         LayerCode = layer.LayerCode,
                         LayerName = layer.LayerName,
                         Purpose = layer.Purpose,
-                        CountryValues = selectedCities.Select(c => new CountryValueDto
+                        CountryValues = selectedCountries.Select(c => new CountryValueDto
                         {
                             CountryID = c.CountryID,
                             CountryName = c.CountryName,

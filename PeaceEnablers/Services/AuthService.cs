@@ -59,7 +59,7 @@ namespace PeaceEnablers.Services
                 PasswordHash = hash,
                 Role = role,
                 IsEmailConfirmed = false,
-                Tier = tier 
+                Tier = tier ?? TieredAccessPlan.Pending
             };
             _context.Users.Add(user);
             _context.SaveChanges();
@@ -68,7 +68,7 @@ namespace PeaceEnablers.Services
 
         public User? GetByEmail(string email)
         {
-            return _context.Users.FirstOrDefault(u => u.Email == email);
+            return _context.Users.FirstOrDefault(u => u.Email == email && !u.IsDeleted);
         }
         public async Task<User?> GetByEmailAsync(string email)
         {
@@ -875,12 +875,12 @@ namespace PeaceEnablers.Services
                         .ToList();
 
                     var countriesToAdd = inviteUser.CountryID.Except(existingCountryIds).ToList();
-                    foreach (var cityId in countriesToAdd)
+                    foreach (var countryId in countriesToAdd)
                     {
                         newMappings.Add(new UserCountryMapping
 						{
                             UserID = user.UserID,
-                            CountryID = cityId,
+                            CountryID = countryId,
                             AssignedByUserId = inviteUser.InvitedUserID,
                             Role = user.Role
                         });
@@ -1139,7 +1139,7 @@ namespace PeaceEnablers.Services
                     ApplicationUrl = _appSettings.PublicApplicationUrl,
                     MsgText = requestDto.Message,
                     DescriptionAboutBtnText
-                        = $"This email was sent by {requestDto.Name} from {requestDto.City}, {requestDto.Country}. You can reach them at: {requestDto.Email}.",
+                        = $"This email was sent by {requestDto.Name} from {requestDto.Country}. You can reach them at: {requestDto.Email}.",
                     IsLoginBtn = false,
                     IsShowBtnText = false,
                     Mail = _appSettings.AdminMail

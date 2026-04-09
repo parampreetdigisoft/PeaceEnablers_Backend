@@ -453,7 +453,7 @@ namespace PeaceEnablers.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GetAICityPillars", ex);
+                await _appLogger.LogAsync("Error Occured in GetAICountryPillars", ex);
                 return new PaginationResponse<AIEstimatedQuestionScoreDto>();
             }
         }        
@@ -1055,7 +1055,7 @@ namespace PeaceEnablers.Services
 
             if (role == UserRole.CountryUser)
             {
-                var validCities = _context.PublicUserCountryMappings
+                var validCountries = _context.PublicUserCountryMappings
                     .Where(x => x.IsActive && x.UserID == userID)
                     .Select(x => x.CountryID);
 
@@ -1070,7 +1070,7 @@ namespace PeaceEnablers.Services
 
                 baseQuery = baseQuery
                     .Where(ar =>
-                        validCities.Contains(ar.CountryID) &&
+                        validCountries.Contains(ar.CountryID) &&
                         validLayerIds.Contains(ar.LayerID));
             }
 
@@ -1373,9 +1373,9 @@ namespace PeaceEnablers.Services
                     return ResultResponseDto<string>.Failure(new[] { "There is no ai assessment is available for this country" });
 
 
-                var userCityMapping = await _context.UserCountryMappings.FirstOrDefaultAsync(x => !x.IsDeleted && x.CountryID == r.CountryID && x.UserID == r.TransferToUserID);
+                var userCountryMapping = await _context.UserCountryMappings.FirstOrDefaultAsync(x => !x.IsDeleted && x.CountryID == r.CountryID && x.UserID == r.TransferToUserID);
 
-                if (userCityMapping == null)
+                if (userCountryMapping == null)
                     return ResultResponseDto<string>.Failure(new[] { "This assessment can’t be imported because the selected user hasn’t been assigned to this country yet." });
 
 
@@ -1383,14 +1383,14 @@ namespace PeaceEnablers.Services
                 var existingAssessment = await _context.Assessments
                     .Include(a => a.PillarAssessments)
                         .ThenInclude(p => p.Responses)
-                    .FirstOrDefaultAsync(a => a.UserCountryMappingID == userCityMapping.UserCountryMappingID &&
+                    .FirstOrDefaultAsync(a => a.UserCountryMappingID == userCountryMapping.UserCountryMappingID &&
                                               a.UpdatedAt.Year == year);
 
                 if (existingAssessment == null)
                 {
                     existingAssessment = new Assessment
                     {
-                        UserCountryMappingID = userCityMapping.UserCountryMappingID,
+                        UserCountryMappingID = userCountryMapping.UserCountryMappingID,
                         CreatedAt = currentDate,
                         UpdatedAt = currentDate,
                         IsActive = true,

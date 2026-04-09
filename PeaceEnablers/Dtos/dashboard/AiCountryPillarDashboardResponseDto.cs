@@ -3,7 +3,7 @@
     public class AiCountryPillarDashboardResponseDto
     {
         public int CountryID { get; set; }
-        public string CityName { get; set; }
+        public string CountryName { get; set; }
         public decimal EvaluationValue { get; set; }
         public decimal AiValue { get; set; }
         public List<CountryPillarDashboardPillarValueDto> Pillars { get; set; } = new List<CountryPillarDashboardPillarValueDto>();

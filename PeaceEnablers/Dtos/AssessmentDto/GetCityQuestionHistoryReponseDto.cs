@@ -44,7 +44,7 @@
         public double CurrentProgress { get; set; }
     }
 
-    public class CityPillarUserHistoryResponseDto : CountryPillarQuestionHistoryResponseDto
+    public class CountryPillarUserHistoryResponseDto : CountryPillarQuestionHistoryResponseDto
     {
         public int UserID { get; set; }
         public string FullName { get; set; }

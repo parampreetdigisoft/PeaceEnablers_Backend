@@ -251,7 +251,7 @@ namespace PeaceEnablers.Controllers
             if (!result.Succeeded)
                 return BadRequest(result.Messages);
 
-            string fileName = $"Cities_Progress_{DateTime.UtcNow:yyyyMMdd_HHmmss}.xlsx";
+            string fileName = $"Countries_Progress_{DateTime.UtcNow:yyyyMMdd_HHmmss}.xlsx";
 
             return File(
                 result.Result ?? new byte[1],
