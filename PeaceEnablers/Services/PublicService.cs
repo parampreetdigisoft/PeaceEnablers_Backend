@@ -231,7 +231,7 @@ namespace PeaceEnablers.Services
                         ImagePath = g.Key.ImagePath,
                         Countries = g
                             .OrderByDescending(x => x.AIProgress)
-                            .Take(3).OrderBy(x=>x.AIProgress)
+                            .Take(3)
                             .Select(c => new PromotedCountryResponseDto
                             {
                                 CountryID = c.CountryID,
