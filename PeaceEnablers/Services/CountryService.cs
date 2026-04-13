@@ -763,7 +763,21 @@ namespace PeaceEnablers.Services
                     .Where(x => countryIds.Contains(x.CountryID) && x.Year == year)
                     .ToListAsync();
 
-                countryHistory.TotalCountry = countryQuery.Select(x => x.CountryID).Distinct().Count();
+                if (userRole == UserRole.Admin)
+                {
+                    countryHistory.TotalCountry = countryQuery
+                        .Select(x => x.CountryID)
+                        .Distinct()
+                        .Count();
+                }
+                else
+                {
+                    countryHistory.TotalCountry = countryQuery
+                        .Where(x => x.HasMapping)
+                        .Select(x => x.CountryID)
+                        .Distinct()
+                        .Count();
+                }
                 countryHistory.ActiveCountry = countryQuery.Where(x => x.HasMapping).Select(x => x.CountryID).Distinct().Count();
                 countryHistory.CompeleteCountry = countryQuery.Where(x => x.IsCompleted).Select(x => x.CountryID).Distinct().Count();
                 countryHistory.InprocessCountry = countryHistory.ActiveCountry - countryHistory.CompeleteCountry;
