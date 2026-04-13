@@ -307,7 +307,7 @@ namespace PeaceEnablers.Common.Implementation
         {
             container
                 .Background(Colors.White)
-                .Border(1).BorderColor("#D8E8E2")
+                .Border(1).BorderColor("#afc4db")
                 .Padding(8)
                 .Column(col =>
                 {
@@ -442,7 +442,7 @@ namespace PeaceEnablers.Common.Implementation
         {
             container
                 .Background(Colors.White)
-                .Border(1).BorderColor("#D8E8E2")
+                .Border(1).BorderColor("#afc4db")
                 .Padding(8)
                 .Column(col =>
                 {
@@ -607,7 +607,7 @@ namespace PeaceEnablers.Common.Implementation
         {
             container
                 .Background(Colors.White)
-                .Border(1).BorderColor("#D8E8E2")
+                .Border(1).BorderColor("#afc4db")
                 .Padding(10)
                 .Column(col =>
                 {
@@ -659,7 +659,7 @@ namespace PeaceEnablers.Common.Implementation
 
             container
                 .Background(Colors.White)
-                .Border(1).BorderColor("#D8E8E2")
+                .Border(1).BorderColor("#afc4db")
                 .Padding(10)
                 .Column(col =>
                 {
@@ -1233,7 +1233,7 @@ namespace PeaceEnablers.Common.Implementation
                 col.Spacing(10);
 
                 // ── two-column layout: ring chart (left) + bar list (right) ──────
-                col.Item().Height(360).Row(row =>
+                col.Item().Height(500).Row(row =>
                 {
                     // Left: radial ring chart
                     row.RelativeItem(5).Element(x => DrawPillarsRadialChart(x, data));
