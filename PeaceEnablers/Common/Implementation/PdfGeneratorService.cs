@@ -1,5 +1,7 @@
 ﻿
+using Microsoft.Extensions.Options;
 using PeaceEnablers.Common.Interface;
+using PeaceEnablers.Common.Models.settings;
 using PeaceEnablers.Dtos.AiDto;
 using PeaceEnablers.IServices;
 using PeaceEnablers.Models;
@@ -17,9 +19,11 @@ namespace PeaceEnablers.Common.Implementation
         #region constructor
 
         private readonly IAppLogger _appLogger;
-        public PdfGeneratorService(IAppLogger appLogger)
+        private readonly AppSettings _appSettings;
+        public PdfGeneratorService(IAppLogger appLogger, IOptions<AppSettings> appSettings)
         {
             _appLogger = appLogger;
+            _appSettings = appSettings.Value;
         }
         #endregion
 
@@ -2110,12 +2114,7 @@ namespace PeaceEnablers.Common.Implementation
     }
 
     public partial class PdfGeneratorService
-    {
-        // ══════════════════════════════════════════════════════════════════════════
-        //  CONSTANTS  – tweak here to adjust chart sizing for 4-6 peers / 14 pillars
-        // ══════════════════════════════════════════════════════════════════════════
-
-        private const int MaxPillars = 14;
+    {   
 
         // Palette: index 0 = selected country (gold), 1-5 = peer countries
         private static readonly string[] CountryPalette =
@@ -2827,13 +2826,13 @@ namespace PeaceEnablers.Common.Implementation
 
             if (!allYears.Any()) { DrawNoDataPage(container); return; }
 
-            // Collect all unique pillars (cap at MaxPillars = 14)
+            // Collect all unique pillars (cap at MaxPillars = 23)
             var pillars = history
                 .SelectMany(h => h.Pillars ?? Enumerable.Empty<PeerCountryPillarHistoryReportDto>())
                 .GroupBy(p => p.PillarID)
                 .Select(g => g.OrderBy(p => p.DisplayOrder).First())
                 .OrderBy(p => p.DisplayOrder)
-                .Take(MaxPillars)
+                .Take(_appSettings.PillarCount)
                 .ToList();
 
             container.Padding(16).Column(col =>
@@ -3348,7 +3347,7 @@ namespace PeaceEnablers.Common.Implementation
                 .GroupBy(p => p.PillarID)
                 .Select(g => g.First())
                 .OrderBy(p => p.DisplayOrder)
-                .Take(MaxPillars)
+                .Take(_appSettings.PillarCount)
                 .ToList();
 
             if (!pillars.Any()) return;
