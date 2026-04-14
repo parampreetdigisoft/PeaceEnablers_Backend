@@ -855,8 +855,8 @@ namespace PeaceEnablers.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error in ChangedAiCityEvaluationStatus", ex);
-                return ResultResponseDto<bool>.Failure(new[] { "Error in Changed AiCity Evaluation Status" });
+                await _appLogger.LogAsync("Error in ChangedAiCountryEvaluationStatus", ex);
+                return ResultResponseDto<bool>.Failure(new[] { "Error in Changed AiCountry Evaluation Status" });
             }
         }
         public async Task<ResultResponseDto<bool>> RegenerateAiSearch(RegenerateAiSearchDto dto,int userID, UserRole userRole)

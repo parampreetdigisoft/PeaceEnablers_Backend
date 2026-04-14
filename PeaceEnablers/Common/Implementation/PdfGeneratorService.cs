@@ -318,7 +318,7 @@ namespace PeaceEnablers.Common.Implementation
                     col.Spacing(0);
 
                     col.Item().AlignCenter()
-                        .Text("Overall Country Score")
+                        .Text("Country Score")
                         .FontSize(10).Bold().FontColor("#12352f");
 
                     // Donut chart
@@ -435,7 +435,7 @@ namespace PeaceEnablers.Common.Implementation
                 IsAntialias = true,
                 TextAlign = SKTextAlign.Center
             };
-            canvas.DrawText("country progress", cx, cy + 21, subTxt);
+            canvas.DrawText("country score", cx, cy + 21, subTxt);
         }
 
         // ─────────────────────────────────────────────────────────────────────────────
@@ -1905,7 +1905,7 @@ namespace PeaceEnablers.Common.Implementation
                 .Column(column =>
                 {
                     column.Item()
-                        .Text("Progress Metrics")
+                        .Text("Total Score")
                         .FontSize(16)
                         .Bold()
                         .FontColor("#1B2F44"); // ✅ dark blue title

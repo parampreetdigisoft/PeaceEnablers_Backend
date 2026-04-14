@@ -414,7 +414,7 @@ namespace PeaceEnablers.Common.Implementation
                 new Shading { Val = ShadingPatternValues.Clear, Color = "auto", Fill = "FFFFFF" }));
 
             // ── Heading ──
-            cell.Append(CenteredBoldPara("Overall Country Score", "212529", "20"));
+            cell.Append(CenteredBoldPara("Country Score", "212529", "20"));
 
             // ── Donut image ──
             cell.Append(EmbedImage(mainPart, donutPng, imgEmuW, imgEmuH));
@@ -562,7 +562,7 @@ namespace PeaceEnablers.Common.Implementation
             // =========================
             // PROGRESS SECTION
             // =========================
-            body.AppendChild(SectionHeading("Progress Metrics", DarkBlue));
+            body.AppendChild(SectionHeading("Total Score", DarkBlue));
             body.AppendChild(CreateProgressBar("Score", (float)(data.AIProgress ?? 0), MedBlue));
             body.AppendChild(Gap(160));
 
