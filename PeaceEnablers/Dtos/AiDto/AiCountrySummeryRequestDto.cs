@@ -24,4 +24,20 @@ namespace PeaceEnablers.Dtos.AiDto
         public int CountryID { get; set; }
         public int Year { get; set; } = DateTime.UtcNow.Year;
     }
+    public class AiCountryDocumentRequestDto : PaginationRequest
+    {
+        public int? CountryID { get; set; }
+    }
+
+    public class AiCountryPillarDocumentRequestDto 
+    {
+        public int CountryID { get; set; }
+    }
+    public class DeleteCountryDocumentRequestDto 
+    {
+        public int CountryID { get; set; }
+        public int? CountryDocumentID { get; set; }
+        public bool IsAll { get; set; } = false;
+    }
+
 }

@@ -38,6 +38,7 @@ namespace PeaceEnablers.Data
         public DbSet<AIUserCountryMapping> AIUserCountryMappings { get; set; }
         public DbSet<CountryPeer> CountryPeers { get; set; } = default!;
         public DbSet<EvaluationCountryProgressHistoryResultDto> CountryProgressHistoryResults { get; set; }
+        public DbSet<CountryDocument> CountryDocuments { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -129,6 +130,11 @@ namespace PeaceEnablers.Data
                 entity.ToTable("CountryPeer");
             });
 
+            modelBuilder.Entity<CountryDocument>(entity =>
+            {
+                entity.HasKey(e => e.CountryDocumentID);
+                entity.ToTable("CountryDocuments");
+            });
             base.OnModelCreating(modelBuilder);
         }
 

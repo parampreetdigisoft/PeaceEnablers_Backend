@@ -34,6 +34,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="wwwroot\aidocuments\" />
     <Folder Include="wwwroot\assets\countries\" />
     <Folder Include="wwwroot\pdf\" />
     <Folder Include="wwwroot\uploads\" />

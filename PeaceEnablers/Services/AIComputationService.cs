@@ -1,5 +1,6 @@
 ﻿using AssessmentPlatform.Dtos.AiDto;
 using DocumentFormat.OpenXml.Spreadsheet;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using PeaceEnablers.Backgroundjob;
@@ -9,13 +10,13 @@ using PeaceEnablers.Common.Models;
 using PeaceEnablers.Common.Models.settings;
 using PeaceEnablers.Data;
 using PeaceEnablers.Dtos.AiDto;
-using PeaceEnablers.Dtos.CountryDto;
 using PeaceEnablers.Dtos.CommonDto;
 using PeaceEnablers.IServices;
 using PeaceEnablers.Models;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
+using System.Linq.Expressions;
 using System.Net;
 using System.Text.RegularExpressions;
 
@@ -32,8 +33,12 @@ namespace PeaceEnablers.Services
         private readonly IAIAnalyzeService _iAIAnalayzeService;        
         private readonly IDocumentGeneratorService _documentGeneratorService;
         private readonly AppSettings _appSettings;
-        public AIComputationService(ApplicationDbContext context, IAppLogger appLogger, ICommonService commonService, Download download, IAIAnalyzeService iAIAnalayzeService
-            ,  IDocumentGeneratorService documentGeneratorService, IOptions<AppSettings> appSettings)
+        private readonly IWebHostEnvironment _env;
+        public AIComputationService(ApplicationDbContext context, IAppLogger appLogger,
+            ICommonService commonService, 
+            Download download, IAIAnalyzeService iAIAnalayzeService
+            ,  IDocumentGeneratorService documentGeneratorService, 
+            IOptions<AppSettings> appSettings, IWebHostEnvironment env)
         {
             _context = context;
             _appLogger = appLogger;
@@ -42,6 +47,7 @@ namespace PeaceEnablers.Services
             _iAIAnalayzeService = iAIAnalayzeService;          
             _documentGeneratorService = documentGeneratorService;
             _appSettings = appSettings.Value;
+            _env = env;
         }
         #endregion
 
@@ -1535,7 +1541,279 @@ namespace PeaceEnablers.Services
             // Decode HTML entities (e.g., &mdash;)
             return WebUtility.HtmlDecode(noTags);
         }
+        public async Task<ResultResponseDto<string>> UploadAiDocuments(
+            UploadAiDocumentRequest request,
+            int userID,
+            UserRole userRole)
+        {
+            try
+            {
+                if (userRole != UserRole.Admin)
+                {
+                    return ResultResponseDto<string>.Failure(
+                        new[] { "Failed to Upload Ai Documents, You don't have access." });
+                }
 
+                var basePath = Path.Combine(_env.WebRootPath,"aidocuments");
+
+                if (!Directory.Exists(basePath))
+                    Directory.CreateDirectory(basePath);
+
+                for (int i = 0; i < request.Files.Count; i++)
+                {
+                    var file = request.Files[i];
+                    var pillarId = request.PillarIDs[i];
+
+                    var ext = Path.GetExtension(file.FileName).ToLower();
+
+                    if (ext != ".pdf" && ext != ".docx")
+                        continue;
+
+                    if (!Directory.Exists(basePath))
+                        Directory.CreateDirectory(basePath);
+
+                    var storedFileName = $"{Guid.NewGuid()}{ext}";
+                    var fullPath = Path.Combine(basePath, storedFileName);
+
+                    // ✅ Save file
+                    using (var stream = new FileStream(fullPath, FileMode.Create))
+                    {
+                        await file.CopyToAsync(stream);
+                    }
+
+                    // ✅ Save DB record
+                    var doc = new CountryDocument
+                    {
+                        FileName = file.FileName,
+                        StoredFileName = storedFileName,
+                        FilePath = fullPath,
+                        CountryID = request.CountryID,
+                        PillarID = pillarId == 0 ? null : pillarId,
+                        FileType = ext,
+                        FileSize = file.Length,
+                        ProcessingStatus = DocumentProcessingStatus.Pending,
+                        UpdatedAt = DateTime.UtcNow,
+                        UploadedByUserID = userID
+                    };
+
+                    _context.CountryDocuments.Add(doc);
+                }
+
+                await _context.SaveChangesAsync();
+
+                return ResultResponseDto<string>.Success(
+                    "",
+                    new[] { "Upload Ai Documents has been initiated successfully." });
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error in Upload Ai Documents", ex);
+
+                return ResultResponseDto<string>.Failure(
+                    new[] { "Failed to Upload Ai Documents, please try again later." });
+            }
+        }
+
+        public async Task<PaginationResponse<GetCountryDocumentResponseDto>> GetAICountryDocuments(
+            AiCountryDocumentRequestDto request,
+            int userID,
+            UserRole userRole)
+        {
+            try
+            {
+                Expression<Func<UserCountryMapping, bool>> filter = userRole switch
+                {
+                    UserRole.Admin => x => !x.IsDeleted,
+                    UserRole.Analyst => x => !x.IsDeleted && (x.UserID == userID || x.AssignedByUserId == userID),
+                    UserRole.Evaluator => x => !x.IsDeleted && x.UserID == userID,
+                    _ => x => false
+                };
+
+                var userCountryIds = await _context.UserCountryMappings
+                    .Where(filter)
+                    .Select(x => x.CountryID)
+                    .Distinct()
+                    .ToListAsync();
+
+                var query = _context.Countries
+                    .Where(c => !request.CountryID.HasValue || c.CountryID == request.CountryID 
+                        && userCountryIds.Contains(c.CountryID))                  
+                    .Select(x => new GetCountryDocumentResponseDto
+                    {
+                        CountryID = x.CountryID,
+                        CountryName = x.CountryName,
+                        FileTypes = ""
+                    });
+
+                var result = await query.ApplyPaginationAsync(request);
+
+                // 🔥 FileTypes (optimized for selected countries only)
+                var countryIds = result.Data.Select(x => x.CountryID).ToList();
+
+                var fileTypesData = await _context.CountryDocuments
+                    .Where(x => !x.IsDeleted && countryIds.Contains(x.CountryID))
+                    .GroupBy(x => x.CountryID)
+                    .Select(g => new
+                    {
+                        CountryID = g.Key,
+                        FileTypes = g.Select(x => x.FileType).Distinct().ToList(),
+
+                        NoOfFiles = g.Count(),
+                        NoOfUsers = g.Select(d => d.UploadedByUserID).Distinct().Count(),
+                        FilesSize = g.Sum(d => (long?)d.FileSize) ?? 0,
+                    })
+                    .ToListAsync();
+
+                foreach (var item in result.Data)
+                {
+                    var ft = fileTypesData.FirstOrDefault(x => x.CountryID == item.CountryID);
+                    if (ft != null)
+                    {
+                        item.FileTypes = string.Join(", ", ft.FileTypes);
+                        item.NoOfFiles = ft.NoOfFiles;
+                        item.NoOfUsers = ft.NoOfUsers;
+                        item.FilesSize = ft.FilesSize;
+                    }                   
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error Occured in GetAIDocuments", ex);
+
+                return new PaginationResponse<GetCountryDocumentResponseDto>();
+            }
+        }
+
+        public async Task<ResultResponseDto<List<GetCountryPillarDocumentResponseDto>>> GetAICountryPillarDocuments(
+             AiCountryPillarDocumentRequestDto request,
+             int userID,
+             UserRole userRole)
+        {
+            try
+            {
+                var result = await _context.CountryDocuments
+                   .Where(x => !x.IsDeleted && x.CountryID == request.CountryID)
+                   .Select(x => new GetCountryPillarDocumentResponseDto
+                   {
+                       CountryDocumentID = x.CountryDocumentID,
+                       CountryID = x.CountryID,
+                       PillarID = x.PillarID,
+
+                       PillarName = _context.Pillars
+                           .Where(p => p.PillarID == x.PillarID)
+                           .Select(p => p.PillarName)
+                           .FirstOrDefault(),
+
+                       FileName = x.FileName,
+                       FilePath = x.FilePath,
+                       FileSize = x.FileSize,
+                       FileType = x.FileType,
+                       ProcessingStatus = x.ProcessingStatus,
+                       StoredFileName = x.StoredFileName,
+
+                       UploadedBy = "",
+                       UploadedByUserID = x.UploadedByUserID ?? 0
+                   })
+                   .OrderBy(x => x.PillarID)
+                   .ToListAsync();
+
+                var users = _context.Users
+                    .Where(x => result.Select(x => x.UploadedByUserID).Contains(x.UserID) && !x.IsDeleted)
+                    .ToDictionary(x=>x.UserID , y=>y.FullName); 
+
+                foreach(var r in result)
+                {
+                    r.UploadedBy = users.TryGetValue(r.UploadedByUserID, out var userName) ? userName : "";
+                }
+
+                return ResultResponseDto<List<GetCountryPillarDocumentResponseDto>>.Success(result, new[] { "Get documents successfully" });
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error Occured in GetAIDocuments", ex);
+                return  ResultResponseDto<List<GetCountryPillarDocumentResponseDto>>.Failure(new[] { "Failed to get Documents, please try again later." });
+            }
+        }
+
+        public async Task<ResultResponseDto<string>> DeleteDocument(
+            DeleteCountryDocumentRequestDto request,
+            int userID,
+            UserRole userRole)
+        {
+            try
+            {
+                var query = _context.CountryDocuments
+                    .Where(x => !x.IsDeleted && x.CountryID == request.CountryID);
+
+                // 🔷 If not admin → only own documents
+                if (userRole != UserRole.Admin)
+                {
+                    query = query.Where(x => x.UploadedByUserID == userID && (!request.CountryDocumentID.HasValue || x.CountryDocumentID == request.CountryDocumentID));
+                }
+
+                // 🔷 If NOT delete all → filter by document id
+                if (!request.IsAll && request.CountryDocumentID.HasValue)
+                {
+                    query = query.Where(x => x.CountryDocumentID == request.CountryDocumentID.Value);
+                }                
+
+                var documents = await query.ToListAsync();
+
+                if (!documents.Any())
+                {
+                    return ResultResponseDto<string>.Failure(
+                        new[] { "No documents found or you don't have permission." });
+                }
+
+                // 🔥 Soft delete
+                foreach (var doc in documents)
+                {
+                    doc.IsDeleted = true;
+                }
+
+                await _context.SaveChangesAsync();
+
+                return ResultResponseDto<string>.Success(
+                    "",
+                    new[] { "Document(s) deleted successfully." });
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error Occured in DeleteDocument", ex);
+
+                return ResultResponseDto<string>.Failure(
+                    new[] { "Failed to delete document, please try again later." });
+            }
+        }
+        public async Task<FileResult> DownloadDocument(int countryDocumentID, int userID, UserRole userRole)
+        {
+            var doc = await _context.CountryDocuments
+                .FirstOrDefaultAsync(x => x.CountryDocumentID == countryDocumentID && !x.IsDeleted);
+
+            if (doc == null)
+                throw new Exception("Document not found.");
+
+            if (!System.IO.File.Exists(doc.FilePath))
+                throw new Exception("File not found on server.");
+
+            var ext = Path.GetExtension(doc.FileName).ToLower();
+
+            var contentType = ext switch
+            {
+                ".pdf" => "application/pdf",
+                ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                _ => "application/octet-stream"
+            };
+
+            var stream = new FileStream(doc.FilePath, FileMode.Open, FileAccess.Read);
+
+            return new FileStreamResult(stream, contentType)
+            {
+                FileDownloadName = doc.FileName
+            };
+        }
 
         #endregion
     }

@@ -102,6 +102,7 @@ namespace PeaceEnablers.Controllers
         }
 
         [HttpGet("aiCountryDetailsReport")]
+        [Authorize(Policy = "Admin")]
         public async Task<IActionResult> DownloadCountryReport([FromQuery] AiCountrySummeryRequestPdfDto request)
         {
             try
@@ -153,6 +154,7 @@ namespace PeaceEnablers.Controllers
             }
         }
         [HttpGet("aiPillarDetailsReport")]
+        [Authorize(Policy = "StaffOnly")]
         public async Task<IActionResult> DownloadPillarReport([FromQuery] AiCountrySummeryRequestPdfDto request)
         {
             try
@@ -215,6 +217,7 @@ namespace PeaceEnablers.Controllers
         }
 
         [HttpPost("getAICrossCountryPillars")]
+        [Authorize(Policy = "Admin, Analyst")]
         public async Task<IActionResult> GetAICrossCountryPillars([FromBody] AiCountryIdsDto aiCountryIdsDto)
         {
             var userId = GetUserIdFromClaims();
@@ -254,7 +257,7 @@ namespace PeaceEnablers.Controllers
         }
 
         [HttpPost("regenerateAiSearch")]
-        [Authorize(Policy = "StaffOnly")]
+        [Authorize(Policy = "Admin, Analyst")]
         public async Task<IActionResult> RegenerateAiSearch([FromBody] RegenerateAiSearchDto aiCountryIdsDto)
         {
             var userId = GetUserIdFromClaims();
@@ -293,7 +296,7 @@ namespace PeaceEnablers.Controllers
             return Ok(await _aIComputationService.AddComment(aiCountryIdsDto, userId.Value, userRole));
         }
         [HttpPost("regeneratePillarAiSearch")]
-        [Authorize(Policy = "StaffOnly")]
+        [Authorize(Policy = "Admin, Analyst")]
         public async Task<IActionResult> RegeneratePillarAiSearch([FromBody] RegeneratePillarAiSearchDto aiCountryIdsDto)
         {
             var userId = GetUserIdFromClaims();
@@ -365,7 +368,7 @@ namespace PeaceEnablers.Controllers
             }
         }
         [HttpPost("aiResultTransfer")]
-        [Authorize(Policy = "StaffOnly")]
+        [Authorize(Policy = "Admin, Analyst")]
         public async Task<IActionResult> AiResultTransfer([FromBody] AITransferAssessmentRequestDto aiCountryIdsDto)
         {
             var userId = GetUserIdFromClaims();
@@ -385,7 +388,7 @@ namespace PeaceEnablers.Controllers
         }
 
         [HttpGet("reCalculateKpis")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,Analyst")]
         public async Task<IActionResult> ReCalculateKpis()
         {
             var userId = GetUserIdFromClaims();
@@ -402,6 +405,114 @@ namespace PeaceEnablers.Controllers
             }
 
             return Ok(await _aIComputationService.ReCalculateKpis(userId.Value, userRole));
+        }
+
+        [HttpPost("uploadAiDocuments")]
+        [Authorize(Roles = "Admin,Analyst")]
+        public async Task<IActionResult> UploadAiDocuments([FromForm]  UploadAiDocumentRequest uploadAiDocumentRequest)
+        {
+            var userId = GetUserIdFromClaims();
+            if (userId == null)
+                return Unauthorized("User ID not found in token.");
+
+            if (uploadAiDocumentRequest.Files == null || !uploadAiDocumentRequest.Files.Any())
+                return BadRequest("No files uploaded.");
+
+
+            var role = GetRoleFromClaims();
+            if (role == null)
+                return Unauthorized("You Don't have access.");
+
+            if (!Enum.TryParse<UserRole>(role, true, out var userRole))
+            {
+                return Unauthorized("You Don't have access.");
+            }
+
+            return Ok(await _aIComputationService.UploadAiDocuments(uploadAiDocumentRequest ,userId.Value, userRole));
+        }
+
+        [HttpGet("getAICountryDocuments")]
+        [Authorize(Roles = "Admin,Analyst")]
+        public async Task<IActionResult> GetAICountryDocuments([FromQuery] AiCountryDocumentRequestDto uploadAiDocumentRequest)
+        {
+            var userId = GetUserIdFromClaims();
+            if (userId == null)
+                return Unauthorized("User ID not found in token.");
+
+            var role = GetRoleFromClaims();
+            if (role == null)
+                return Unauthorized("You Don't have access.");
+
+            if (!Enum.TryParse<UserRole>(role, true, out var userRole))
+            {
+                return Unauthorized("You Don't have access.");
+            }
+
+            return Ok(await _aIComputationService.GetAICountryDocuments(uploadAiDocumentRequest, userId.Value, userRole));
+        }
+
+        [HttpGet("getAICountryPillarDocuments")]
+        [Authorize(Roles = "Admin,Analyst")]
+        public async Task<IActionResult> GetAICountryPillarDocuments([FromQuery] AiCountryPillarDocumentRequestDto uploadAiDocumentRequest)
+        {
+            var userId = GetUserIdFromClaims();
+            if (userId == null)
+                return Unauthorized("User ID not found in token.");
+
+            var role = GetRoleFromClaims();
+            if (role == null)
+                return Unauthorized("You Don't have access.");
+
+            if (!Enum.TryParse<UserRole>(role, true, out var userRole))
+            {
+                return Unauthorized("You Don't have access.");
+            }
+
+            return Ok(await _aIComputationService.GetAICountryPillarDocuments(uploadAiDocumentRequest, userId.Value, userRole));
+        }
+
+        [HttpPost("deleteDocument")]
+        [Authorize(Roles = "Admin,Analyst")]
+        public async Task<IActionResult> DeleteDocument([FromBody] DeleteCountryDocumentRequestDto uploadAiDocumentRequest)
+        {
+            var userId = GetUserIdFromClaims();
+            if (userId == null)
+                return Unauthorized("User ID not found in token.");
+
+
+            var role = GetRoleFromClaims();
+            if (role == null)
+                return Unauthorized("You Don't have access.");
+
+            if (!Enum.TryParse<UserRole>(role, true, out var userRole))
+            {
+                return Unauthorized("You Don't have access.");
+            }
+
+            return Ok(await _aIComputationService.DeleteDocument(uploadAiDocumentRequest, userId.Value, userRole));
+        }
+
+        [HttpGet("downloadDocument/{Id}")]
+        [Authorize(Roles = "Admin,Analyst")]
+        public async Task<IActionResult> DownloadDocument(int Id)
+        {
+            var userId = GetUserIdFromClaims();
+            if (userId == null)
+                return Unauthorized("User ID not found in token.");
+
+
+            var role = GetRoleFromClaims();
+            if (role == null)
+                return Unauthorized("You Don't have access.");
+
+            if (!Enum.TryParse<UserRole>(role, true, out var userRole))
+            {
+                return Unauthorized("You Don't have access.");
+            }
+
+            var result = await _aIComputationService.DownloadDocument(Id, userId.GetValueOrDefault(), userRole);
+
+            return result;
         }
     }
 }

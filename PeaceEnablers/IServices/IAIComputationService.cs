@@ -1,7 +1,7 @@
 ﻿using AssessmentPlatform.Dtos.AiDto;
+using Microsoft.AspNetCore.Mvc;
 using PeaceEnablers.Common.Models;
 using PeaceEnablers.Dtos.AiDto;
-using PeaceEnablers.Dtos.CountryDto;
 using PeaceEnablers.Dtos.CommonDto;
 using PeaceEnablers.Models;
 
@@ -25,7 +25,11 @@ namespace PeaceEnablers.IServices
         Task<List<AiCountrySummeryDto>> GetAllCountryAiSummeryDetail(int userID, UserRole userRole, int year);   
         Task<byte[]> GenerateAllCountryDetailsReport(List<AiCountrySummeryDto> countriesDetails, UserRole userRole, int userID, int year, DocumentFormat format = DocumentFormat.Pdf);
         Task<ResultResponseDto<string>> AITransferAssessment(AITransferAssessmentRequestDto r, int userID, UserRole userRole);
-
         Task<ResultResponseDto<string>> ReCalculateKpis(int userID, UserRole userRole);
+        Task<ResultResponseDto<string>> UploadAiDocuments(UploadAiDocumentRequest r, int userID, UserRole userRole);
+        Task<PaginationResponse<GetCountryDocumentResponseDto>> GetAICountryDocuments(AiCountryDocumentRequestDto request,int userID, UserRole userRole);
+        Task<ResultResponseDto<List<GetCountryPillarDocumentResponseDto>>> GetAICountryPillarDocuments(AiCountryPillarDocumentRequestDto request,int userID, UserRole userRole);
+        Task<ResultResponseDto<string>> DeleteDocument(DeleteCountryDocumentRequestDto request, int userID, UserRole userRole);
+        Task<FileResult> DownloadDocument(int countryDocumentID, int userID, UserRole userRole);
     }
 }

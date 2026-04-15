@@ -28,22 +28,20 @@ namespace PeaceEnablers.Services
         {
             return _context.Users.FirstOrDefault(u => u.Email == email);
         }
-        public async Task<PaginationResponse<GetUserByRoleResponse>> GetUserByRoleWithAssignedCountry(GetUserByRoleRequestDto request)
+        public async Task<PaginationResponse<GetUserByRoleResponse>> GetUserByRoleWithAssignedCountry(GetUserByRoleRequestDto request, int userid, UserRole userRole)
         {
             try
             {
-                var currentUser = _context.Users.First(u => u.UserID == request.UserID);
-
                 var filteredMappings =
                     _context.UserCountryMappings
                         .Where(x => !x.IsDeleted &&
-                               (x.AssignedByUserId == request.UserID || currentUser.Role == UserRole.Admin));
+                               (x.AssignedByUserId == request.UserID || userRole == UserRole.Admin));
 
-                Expression<Func<User, bool>> predicate = currentUser.Role switch
+                Expression<Func<User, bool>> predicate = userRole switch
                 {
                     UserRole.Admin => x => !x.IsDeleted && (request.GetUserRole.HasValue
                                         ? x.Role == request.GetUserRole
-                                        : (x.Role == UserRole.Evaluator || x.Role == UserRole.CountryUser)),
+                                        : (x.Role == UserRole.Evaluator)),
                     _ => x => !x.IsDeleted && x.Role == UserRole.Evaluator
                 };
 
@@ -118,7 +116,7 @@ namespace PeaceEnablers.Services
                     var countryMap = await _context.UserCountryMappings
                         .Where(x => !x.IsDeleted &&
                                userIds.Contains(x.UserID) &&
-                               (x.AssignedByUserId == request.UserID || currentUser.Role == UserRole.Admin))
+                               (x.AssignedByUserId == request.UserID || userRole == UserRole.Admin))
                         .Join(_context.Countries,
                             cm => cm.CountryID,
                             c => c.CountryID,

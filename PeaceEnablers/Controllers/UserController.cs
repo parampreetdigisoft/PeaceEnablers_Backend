@@ -1,8 +1,9 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using PeaceEnablers.Dtos.UserDtos;
 using PeaceEnablers.IServices;
 using PeaceEnablers.Models;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace PeaceEnablers.Controllers
 {
@@ -31,15 +32,28 @@ namespace PeaceEnablers.Controllers
 
             return null;
         }
+        private string? GetRoleFromClaims()
+        {
+            return User.FindFirst(ClaimTypes.Role)?.Value;
+        }
         [HttpGet]
         [Route("GetUserByRoleWithAssignedCountry")]
         public async Task<IActionResult> GetUserByRoleWithAssignedCountry([FromQuery] GetUserByRoleRequestDto request)
         {
-            var claimUserId = GetUserIdFromClaims();
-            if (claimUserId == null || claimUserId != request.UserID)
-                return Unauthorized("User ID not found.");
+            var userId = GetUserIdFromClaims();
+            if (userId == null)
+                return Unauthorized("User ID not found in token.");
 
-            return Ok(await _userService.GetUserByRoleWithAssignedCountry(request));
+            var role = GetRoleFromClaims();
+            if (role == null)
+                return Unauthorized("You Don't have access.");
+
+            if (!Enum.TryParse<UserRole>(role, true, out var userRole))
+            {
+                return Unauthorized("You Don't have access.");
+            }
+
+            return Ok(await _userService.GetUserByRoleWithAssignedCountry(request, userId.GetValueOrDefault(), userRole));
         }
 
         [HttpGet]
