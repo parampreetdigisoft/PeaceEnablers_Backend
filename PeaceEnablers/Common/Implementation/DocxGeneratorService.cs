@@ -134,7 +134,7 @@ namespace PeaceEnablers.Common.Implementation
                         if (!pillarsDict.TryGetValue(country.CountryID, out var pillars) || !pillars.Any())
                             continue;
 
-                        var countryKpis = kpis?.Where(k => k.CountryID == country.CountryID).Take(109).ToList()
+                        var countryKpis = kpis?.Where(k => k.CountryID == country.CountryID).ToList()
                                        ?? new List<KpiChartItem>();
 
                         if (!first) body.AppendChild(PageBreak());
@@ -193,7 +193,7 @@ namespace PeaceEnablers.Common.Implementation
             // Reset pending header state for this document
             ResetSectionState();
 
-            var kpiChartItems = kpis.Take(109).ToList();
+            var kpiChartItems = kpis.ToList();
             var pillarChartItems = pillars.Take(23)
                 .Select(p => new PillarChartItem(
                     p.PillarName?.Length > 20 ? p.PillarName[..20] : p.PillarName ?? "—",
@@ -269,7 +269,7 @@ namespace PeaceEnablers.Common.Implementation
                     mainPart,
                     donutPng, radarPng,
                     overall,
-                    14, 109,
+                    pillars.Count, kpis.Count,
                     best, worst,
                     validPillars));
 
@@ -570,6 +570,13 @@ namespace PeaceEnablers.Common.Implementation
             // EXECUTIVE SUMMARY
             // =========================
             AppendContentSection(body, "Executive Summary", data.EvidenceSummary, "163329");
+
+            // =====================================================
+            // current situation
+            // =====================================================
+            AppendContentSection(body, "Key Developments", data.KeyDevelopments, "e6ccff");
+            AppendContentSection(body, "Critical Risks", data.CriticalRisks, "c2f0f0");
+            AppendContentSection(body, "Gaps", data.Gaps, "ffe6cc");
 
             // =====================================================
             // EVIDENCE SECTION
@@ -897,7 +904,7 @@ namespace PeaceEnablers.Common.Implementation
             int leftColW = ContentDxa - logoColW;
 
             const long logoWidthEmu = 900_000L;
-            const long logoHeightEmu = 450_000L; // ✅ slightly increased
+            const long logoHeightEmu = 300_000L; // ✅ slightly increased
 
             // ✅ MAIN TABLE
             var layoutTable = new Table(

@@ -102,7 +102,7 @@ namespace PeaceEnablers.Controllers
         }
 
         [HttpGet("aiCountryDetailsReport")]
-        [Authorize(Policy = "Admin")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> DownloadCountryReport([FromQuery] AiCountrySummeryRequestPdfDto request)
         {
             try
@@ -217,7 +217,7 @@ namespace PeaceEnablers.Controllers
         }
 
         [HttpPost("getAICrossCountryPillars")]
-        [Authorize(Policy = "Admin, Analyst")]
+        [Authorize(Roles = "Admin, Analyst")]
         public async Task<IActionResult> GetAICrossCountryPillars([FromBody] AiCountryIdsDto aiCountryIdsDto)
         {
             var userId = GetUserIdFromClaims();
@@ -257,7 +257,8 @@ namespace PeaceEnablers.Controllers
         }
 
         [HttpPost("regenerateAiSearch")]
-        [Authorize(Policy = "Admin, Analyst")]
+        [Authorize(Roles = "Admin, Analyst")]
+
         public async Task<IActionResult> RegenerateAiSearch([FromBody] RegenerateAiSearchDto aiCountryIdsDto)
         {
             var userId = GetUserIdFromClaims();
@@ -296,7 +297,7 @@ namespace PeaceEnablers.Controllers
             return Ok(await _aIComputationService.AddComment(aiCountryIdsDto, userId.Value, userRole));
         }
         [HttpPost("regeneratePillarAiSearch")]
-        [Authorize(Policy = "Admin, Analyst")]
+        [Authorize(Roles = "Admin, Analyst")]
         public async Task<IActionResult> RegeneratePillarAiSearch([FromBody] RegeneratePillarAiSearchDto aiCountryIdsDto)
         {
             var userId = GetUserIdFromClaims();
@@ -368,7 +369,7 @@ namespace PeaceEnablers.Controllers
             }
         }
         [HttpPost("aiResultTransfer")]
-        [Authorize(Policy = "Admin, Analyst")]
+        [Authorize(Roles = "Admin, Analyst")]
         public async Task<IActionResult> AiResultTransfer([FromBody] AITransferAssessmentRequestDto aiCountryIdsDto)
         {
             var userId = GetUserIdFromClaims();

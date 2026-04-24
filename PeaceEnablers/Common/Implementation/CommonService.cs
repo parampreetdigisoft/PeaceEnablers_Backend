@@ -1,9 +1,11 @@
-﻿using PeaceEnablers.Common.Interface;
+﻿using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using PeaceEnablers.Common.Interface;
+using PeaceEnablers.Common.Models.settings;
 using PeaceEnablers.Data;
 using PeaceEnablers.Dtos.CountryDto;
 using PeaceEnablers.IServices;
-using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore;
 
 namespace PeaceEnablers.Common.Implementation
 {
@@ -14,13 +16,32 @@ namespace PeaceEnablers.Common.Implementation
         private readonly ApplicationDbContext _context;
         private readonly IAppLogger _appLogger;
         private readonly IWebHostEnvironment _env;
-        public CommonService(ApplicationDbContext context, IAppLogger appLogger, IWebHostEnvironment env)
+        private readonly AppSettings _appSettings;
+        public CommonService(ApplicationDbContext context, IAppLogger appLogger, IWebHostEnvironment env, IOptions<AppSettings> appSettings)
         {
             _context = context;
             _appLogger = appLogger;
             _env = env;
+            _appSettings = appSettings.Value;
         }
         #endregion
+
+
+        public static string InitailLineOfExecutiveSummery(
+            string evidenceSummary,
+            string? immediateSituationSummary,
+            decimal? progress,
+            string? countryName = "The country")
+        {
+            int pillarCount =  23;
+            int kpiCount = 37;
+            immediateSituationSummary = immediateSituationSummary ?? "";
+
+            var evidenceSummaryStaringLine= $"{countryName ?? "The country"} records an overall PEM score of {progress ?? 0}%, reflecting performance across {pillarCount} pillars and {kpiCount} KPIs.";
+
+            return immediateSituationSummary + "\n\n " + evidenceSummaryStaringLine + " " + evidenceSummary;
+        }
+
 
         public async Task<List<EvaluationCountryProgressResultDto>> GetCountriesProgressAsync(int userId, int role, int year)
         {

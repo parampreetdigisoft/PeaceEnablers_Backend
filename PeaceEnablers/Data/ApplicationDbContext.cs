@@ -115,7 +115,10 @@ namespace PeaceEnablers.Data
             modelBuilder.Entity<CountryUserPillarMapping>().HasKey(ur => ur.CountryUserPillarMappingID);
 
             modelBuilder.Entity<AIDataSourceCitation>().HasKey(ur => ur.CitationID);
-            modelBuilder.Entity<AICountryScore>().HasKey(ur => ur.CountryScoreID);
+            modelBuilder.Entity<AICountryScore>(entity =>
+            {
+                entity.HasKey(e => e.CountryScoreID);
+            });
             modelBuilder.Entity<AIEstimatedQuestionScore>().HasKey(ur => ur.QuestionScoreID);
             modelBuilder.Entity<AIPillarScore>().HasKey(ur => ur.PillarScoreID);
             modelBuilder.Entity<AITrustLevel>().HasKey(ur => ur.TrustID);

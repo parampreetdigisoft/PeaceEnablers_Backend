@@ -4,15 +4,15 @@ using System.ComponentModel.DataAnnotations.Schema;
 namespace PeaceEnablers.Models
 {   
     public class AICountryScore
-    {       
+    { 
         public int CountryScoreID { get; set; }        
         public int CountryID { get; set; }        
         public int Year { get; set; }        
-        public decimal? AIScore { get; set; }       
+        //public decimal? AIScore { get; set; }       
         public decimal? AIProgress { get; set; }
         public decimal? EvaluatorScore { get; set; }
         public decimal? Discrepancy { get; set; }     
-        public string ConfidenceLevel { get; set; }
+        public string ConfidenceLevel { get; set; }     
         public string EvidenceSummary { get; set; }
         public string StructuralEvidence { get; set; }
         public string OperationalEvidence { get; set; }
@@ -39,7 +39,12 @@ namespace PeaceEnablers.Models
         public DateTime UpdatedAt { get; set; }
         public bool IsVerified { get; set; } = false;
         public int? VerifiedBy { get; set; }
-        public Country? Country { get; set; }
+        public Country Country { get; set; }      
+
+        public string? ImmediateSituationSummary { get; set; } // Generates structured summaries (daily, weekly, or on-demand)
+        public string? KeyDevelopments { get; set; }
+        public string? CriticalRisks { get; set; }
+        public string? Gaps { get; set; }
 
     }
 

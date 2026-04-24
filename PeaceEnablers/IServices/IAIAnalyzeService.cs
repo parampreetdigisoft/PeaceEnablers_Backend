@@ -11,6 +11,7 @@
         Task AnalyzeQuestionsOfCountryPillar(int countryId, int pillarId);
 
         Task RunEvery2HoursJob();
+        Task RunDailyJob();
         Task RunMonthlyJob();
     }
 }

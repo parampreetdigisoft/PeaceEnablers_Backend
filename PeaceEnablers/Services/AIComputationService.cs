@@ -102,6 +102,9 @@ namespace PeaceEnablers.Services
                         c.EvaluatorScore = countryScore;
                         c.Discrepancy = Math.Abs(countryScore - (c.AIProgress ?? 0));
                         c.AICompletionRate = answeredQuestions.FirstOrDefault(x=>x.CountryID== c.CountryID)?.CompletionRate;
+
+                        c.EvidenceSummary = CommonService.InitailLineOfExecutiveSummery(c.EvidenceSummary, c.ImmediateSituationSummary, c.AIProgress, c.CountryName);
+                         
                     }
                 }
 
@@ -202,7 +205,6 @@ namespace PeaceEnablers.Services
                     Image = c.Image ?? string.Empty,
 
                     Year = score != null ? score.Year : currentYear,
-                    AIScore = score != null ? score.AIScore : null,
                     AIProgress = score != null ? score.AIProgress : null,
                     EvaluatorScore = score != null ? score.EvaluatorScore : null,
                     Discrepancy = score != null ? score.Discrepancy : null,
@@ -240,7 +242,11 @@ namespace PeaceEnablers.Services
 
                     UpdatedAt = score != null ? score.UpdatedAt : default(DateTime),
 
-                    IsVerified = score != null && score.IsVerified
+                    IsVerified = score != null && score.IsVerified,
+                    ImmediateSituationSummary = score != null ? score.ImmediateSituationSummary : null,
+                    KeyDevelopments = score != null ? score.KeyDevelopments : null,
+                    CriticalRisks = score != null ? score.CriticalRisks : null,
+                    Gaps = score != null ? score.Gaps : null
                 };
             return query;
         }
@@ -654,79 +660,6 @@ namespace PeaceEnablers.Services
             }
         }
 
-        void PillarProgressBar(ColumnDescriptor column, string label, decimal? percentage, string color)
-        {
-            var per = (float)(percentage ?? 0);
-            column.Item().Row(row =>
-            {
-                row.ConstantItem(140).Text(label)                                                                                                   
-                    .FontSize(11)                                                                                                               
-                    .FontColor("#424242");
-                if (per > 0)
-                    row.RelativeItem().PaddingLeft(10).Column(col =>
-                    {
-                        col.Item().Height(20).Background("#F5F5F5").Row(barRow =>
-                        {
-                            barRow.RelativeItem(per).Background(color);
-                            barRow.RelativeItem(100 - (per==100? 99.9f: per));
-                        });
-                    });
-
-                row.ConstantItem(55).AlignRight().Text($"{percentage:F1}%")
-                    .FontSize(11)
-                    .Bold()
-                    .FontColor(color);
-            });
-        }
-        
-        void PillarComposeFooter(IContainer container)
-        {
-            container.AlignCenter().Row(row =>
-            {
-                row.RelativeItem().Column(col =>
-                {
-                    col.Item().AlignCenter().Text(text =>
-                    {
-                        text.Span("Page ");
-                        text.CurrentPageNumber();
-                        text.Span(" of ");
-                        text.TotalPages();
-
-                    });
-
-
-                    col.Item().PaddingTop(5).AlignCenter().Text("AI Power Country Assessment Platform")
-                        .FontSize(8)
-                        .FontColor("#9E9E9E");
-                });
-            });
-        }
-        static string GetConfidenceBadgeColor(string confidence) => confidence?.ToLower() switch
-        {
-            "high" => "#44826c",
-            "medium" => "#FFC107",
-            "low" => "#F44336",
-            _ => "#9E9E9E"
-        };
-        static string GetDiscrepancyColor(decimal discrepancy) => discrepancy switch
-        {
-            < 10 => "#4a754c",
-            < 25 => "#FFC107",
-            _ => "#F44336"
-        };
-        static string GetSourceTypeBadgeColor(string sourceType) => sourceType?.ToLower() switch
-        {
-            "government" => "#133328",
-            "academic" => "#172923",
-            "international" => "#4d7d6d",
-            "news/ngo" => "#1ec990",
-            _ => "#0eeba1"
-        };
-        static string TruncateText(string text, int maxLength)
-        {
-            if (string.IsNullOrEmpty(text) || text.Length <= maxLength) return text;
-            return text.Substring(0, maxLength) + "...";
-        }
         public async Task<ResultResponseDto<AiCrossCountryResponseDto>> GetAICrossCountryPillars(AiCountryIdsDto CountryIDs, int userID, UserRole userRole)
         {
             try
@@ -737,7 +670,7 @@ namespace PeaceEnablers.Services
                 var firstDate = new DateTime(currentYear, 1, 1);
 
                 var aiPillarScores = await _context.AIPillarScores
-                    .Where(x => CountryIDs.CountryIDs.Contains(x.CountryID) && x.UpdatedAt >= firstDate)
+                    .Where(x => CountryIDs.CountryIDs.Contains(x.CountryID) && x.UpdatedAt >= firstDate && x.Year== currentYear)
                     .ToListAsync();
 
                 var countries = await _context.Countries
@@ -1043,7 +976,8 @@ namespace PeaceEnablers.Services
 
                     countryDetails.EvaluatorScore = Math.Round(countryScore,2);
                     countryDetails.Discrepancy = Math.Abs(countryScore - (countryDetails.AIProgress ?? 0));
-               }
+                    countryDetails.EvidenceSummary = CommonService.InitailLineOfExecutiveSummery(countryDetails.EvidenceSummary, countryDetails.ImmediateSituationSummary, countryDetails.AIProgress, countryDetails.CountryName);
+                }
             }
             return countryDetails;
         }
@@ -1142,6 +1076,7 @@ namespace PeaceEnablers.Services
 
                         countryDetails.EvaluatorScore = Math.Round(countryScore, 2);
                         countryDetails.Discrepancy = Math.Abs(countryScore - (countryDetails.AIProgress ?? 0));
+                        countryDetails.EvidenceSummary = CommonService.InitailLineOfExecutiveSummery(countryDetails.EvidenceSummary, countryDetails.ImmediateSituationSummary, countryDetails.AIProgress, countryDetails.CountryName);
                     }
                 }
 

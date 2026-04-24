@@ -428,7 +428,6 @@ namespace PeaceEnablers.Services
                     UpdatedDate = c.UpdatedDate,
                     IsDeleted = c.IsDeleted,
                     Score = 0,
-                    AiScore = ai != null ? ai.AIScore : 0,
                     CountryPeers = c.CountryPeers,
                     Population = c.Population,
                     Income = c.Income,                    

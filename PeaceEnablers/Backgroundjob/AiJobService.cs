@@ -16,6 +16,7 @@ namespace PeaceEnablers.Backgroundjob
             // Run both schedules in parallel
             //_ = RunEvery2Hours(stoppingToken);
             //_ = RunEveryMonth(stoppingToken);
+            _ = RunDaily(stoppingToken);
 
             await Task.CompletedTask;
         }
@@ -31,7 +32,28 @@ namespace PeaceEnablers.Backgroundjob
                     using var scope = _serviceProvider.CreateScope();
                     var aiService = scope.ServiceProvider.GetRequiredService<IAIAnalyzeService>();
 
-                    //await aiService.RunEvery2HoursJob();
+                    await aiService.RunEvery2HoursJob();
+                }
+                catch (Exception ex)
+                {
+                    // log error
+                    Console.WriteLine(ex.Message);
+                }
+            } while (await timer.WaitForNextTickAsync(token));
+        }
+
+        private async Task RunDaily(CancellationToken token)
+        {
+            var timer = new PeriodicTimer(TimeSpan.FromHours(24));
+
+            do
+            {
+                try
+                {
+                    using var scope = _serviceProvider.CreateScope();
+                    var aiService = scope.ServiceProvider.GetRequiredService<IAIAnalyzeService>();
+
+                    //await aiService.RunDailyJob();
                 }
                 catch (Exception ex)
                 {

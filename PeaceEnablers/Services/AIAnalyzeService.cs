@@ -1,9 +1,9 @@
-﻿using PeaceEnablers.Common.Implementation;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using PeaceEnablers.Common.Implementation;
 using PeaceEnablers.Common.Models.settings;
 using PeaceEnablers.Data;
 using PeaceEnablers.IServices;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 
 namespace PeaceEnablers.Services
 {
@@ -35,7 +35,7 @@ namespace PeaceEnablers.Services
         {
             try
             {
-                await ImportAiScore();
+                //await ImportAiScore();
             }
             catch (Exception ex)
             {
@@ -43,7 +43,26 @@ namespace PeaceEnablers.Services
             }
 
         }
+        public async Task RunDailyJob()
+        {
+            try
+            {
+                var allCountriesIds = await _context.Countries
+                    .Where(x => x.IsActive && !x.IsDeleted)
+                    .Select(x => x.CountryID)
+                    .ToListAsync();
 
+                foreach (var id in allCountriesIds)
+                {
+                    //await AnalyzeCountryImmediateSituation(id);
+                    Task.Delay(200).Wait(); // Add a delay of 200 milliseconds between each request
+                }
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error in Running job in Every 2-hour AI ", ex);
+            }
+        }
         public async Task ImportAiScore()
         {
             // if new city added
@@ -82,7 +101,7 @@ namespace PeaceEnablers.Services
                 await AnalyzeSingleCountry(id);
             }
         }
-
+        
         public async Task AnalyzeAllCountriesFull()
         {
             var url = aiUrl + AiEndpoints.AnalyzeAllCountriesFull;
@@ -123,8 +142,11 @@ namespace PeaceEnablers.Services
             var url = aiUrl + AiEndpoints.AnalyzeCountryPillarQuestions(countryId, pillarId);
             await _httpService.SendAsync<dynamic>(HttpMethod.Post, url, null, headers);
         }
-
-
+        public async Task AnalyzeCountryImmediateSituation(int countryId)
+        {
+            var url = aiUrl + AiEndpoints.AnalyzeCountryImmediateSituation(countryId);
+            await _httpService.SendAsync<dynamic>(HttpMethod.Post, url, null, headers);
+        }
     }
 
     #region AiEndpoints
@@ -152,6 +174,8 @@ namespace PeaceEnablers.Services
 
         public static string AnalyzeCountryPillarQuestions(int countryId, int pillarId) =>
             $"{BasePath}/analyze/{countryId}/pillars/{pillarId}/questions";
+        public static string AnalyzeCountryImmediateSituation(int countryId) =>
+            $"{BasePath}/analyze/{countryId}/immediateSituation";
     }
 
     #endregion

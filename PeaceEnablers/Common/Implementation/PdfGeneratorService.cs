@@ -1,5 +1,6 @@
 ﻿
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using PeaceEnablers.Common.Interface;
 using PeaceEnablers.Common.Models.settings;
 using PeaceEnablers.Dtos.AiDto;
@@ -1668,11 +1669,26 @@ namespace PeaceEnablers.Common.Implementation
                     PillarContentSection(c, "Executive Summary", SanitizeText(data.EvidenceSummary), "#163329"));
 
                 // =====================================================
-                // EVIDENCE SECTION
+                // Current situation
                 // =====================================================
-               
-                //column.Item().PaddingTop(8).Element(c =>
-                //    PillarContentSection(c, "Evidence", "", "#e6ccff"));
+                if(!string.IsNullOrEmpty(data.KeyDevelopments))
+                column.Item().PaddingTop(8).Element(c =>
+                    PillarContentSection(c, "Key Developments", SanitizeText(data.KeyDevelopments), "#1f4e79"));
+                if (!string.IsNullOrEmpty(data.CriticalRisks))
+                    column.Item().PaddingTop(8).Element(c =>
+                    PillarContentSection(c, "Critical Risks", SanitizeText(data.CriticalRisks), "#2e75b6"));
+                if (!string.IsNullOrEmpty(data.Gaps))
+                    column.Item().PaddingTop(8).Element(c =>
+                    PillarContentSection(c, "Gaps", SanitizeText(data.Gaps), "#5b9bd5"));
+
+
+
+
+
+                // =====================================================
+                // EVIDENCE SECTION
+                // =====================================================              
+
 
                 column.Item().PaddingTop(8).Element(c =>
                     PillarContentSection(c, "Structural Evidence", SanitizeText(data.StructuralEvidence), "#e6ccff"));
@@ -1795,6 +1811,7 @@ namespace PeaceEnablers.Common.Implementation
                 column.Item().PaddingTop(10).Element(c =>
                     PillarContentSection(c, "Executive Summary", SanitizeText(data.EvidenceSummary), "#163329"));
 
+               
                 // =====================================================
                 // EVIDENCE SECTION
                 // =====================================================
