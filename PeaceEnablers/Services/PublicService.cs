@@ -1,11 +1,12 @@
-﻿using PeaceEnablers.Common.Implementation;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
+using PeaceEnablers.Common.Implementation;
 using PeaceEnablers.Common.Models;
 using PeaceEnablers.Data;
 using PeaceEnablers.Dtos.CommonDto;
 using PeaceEnablers.Dtos.PublicDto;
 using PeaceEnablers.IServices;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
 namespace PeaceEnablers.Services
@@ -16,11 +17,13 @@ namespace PeaceEnablers.Services
         private readonly ApplicationDbContext _context;
         private readonly IAppLogger _appLogger;
         private readonly IWebHostEnvironment _env;
-        public PublicService(ApplicationDbContext context, IAppLogger appLogger, IWebHostEnvironment env)
+        private readonly IMemoryCache _cache;
+        public PublicService(ApplicationDbContext context, IAppLogger appLogger, IWebHostEnvironment env, IMemoryCache cache)
         {
             _context = context;
             _appLogger = appLogger;
             _env = env;
+            _cache = cache;
         }
         public async Task<ResultResponseDto<List<PartnerCountryResponseDto>>> getAllCountries()
         {
@@ -205,8 +208,19 @@ namespace PeaceEnablers.Services
 
         public async Task<ResultResponseDto<List<PromotedPillarsResponseDto>>> GetPromotedCountries()
         {
+            const string cacheKey = "GetPromotedCountries";
+
             try
             {
+                // ✅ Try get from cache
+                if (_cache.TryGetValue(cacheKey, out List<PromotedPillarsResponseDto> cachedData))
+                {
+                    return ResultResponseDto<List<PromotedPillarsResponseDto>>.Success(
+                        cachedData,
+                        new List<string> { "Promoted cities fetched successfully" }
+                    );
+                }
+
                 int currentYear = DateTime.Now.Year;
 
                 var result = await _context.AIPillarScores
@@ -245,6 +259,14 @@ namespace PeaceEnablers.Services
                             }).ToList()
                     }).OrderBy(p => p.DisplayOrder).ToListAsync();
 
+                _cache.Set(cacheKey, result, new MemoryCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5),
+                    SlidingExpiration = TimeSpan.FromMinutes(2),
+                    Priority = CacheItemPriority.High
+                });
+
+
                 return ResultResponseDto<List<PromotedPillarsResponseDto>>.Success(
                     result,
                     new List<string> { "Promoted Countries fetched successfully" }
@@ -255,6 +277,89 @@ namespace PeaceEnablers.Services
                 await _appLogger.LogAsync("Error Occurred in GetPromotedCountries", ex);
                 return ResultResponseDto<List<PromotedPillarsResponseDto>>.Failure(
                     new[] { "Failed to get promoted Countries" }
+                );
+            }
+        }
+
+        public async Task<ResultResponseDto<List<PillarDmiResultDto>>> GetPillarsDmi()
+        {
+            const string cacheKey = "GetPillarsDmi";
+
+            try
+            {
+                // ✅ Try get from cache
+                if (_cache.TryGetValue(cacheKey, out List<PillarDmiResultDto> cachedData))
+                {
+                    return ResultResponseDto<List<PillarDmiResultDto>>.Success(
+                        cachedData,
+                        new List<string> { "Promoted cities fetched successfully" }
+                    );
+                }
+
+                int currentYear = DateTime.Now.Year;
+
+                var data = await _context.AiPillarStatsLast4MonthsView
+                     .AsNoTracking()
+                     .ToListAsync();
+
+                var pillars = await _context.Pillars
+                     .AsNoTracking()
+                     .ToDictionaryAsync(x => x.PillarID);
+
+                var result = data
+                    .GroupBy(x => new { x.PillarID })
+                    .Select(g =>
+                    {
+                        var pillar = pillars.GetValueOrDefault(g.Key.PillarID);
+
+                        var ordered = g.OrderByDescending(x => x.MonthNo).ToList();
+
+                        var m = ordered.Select(g => g.MonthNo).Distinct().ToList();
+
+                        decimal p_t = m.Count > 0 ? ordered.Where(x=>x.MonthNo == m.ElementAtOrDefault(0)).Average(x=>x.ScoreProgress) : 0m;
+                        decimal p_t1 = m.Count > 1 ? ordered.Where(x => x.MonthNo == m.ElementAtOrDefault(1)).Average(x => x.ScoreProgress) : 0m;
+                        decimal p_t2 = m.Count > 2 ? ordered.Where(x => x.MonthNo == m.ElementAtOrDefault(2)).Average(x => x.ScoreProgress) : 0m;
+                        decimal p_t3 = m.Count > 3 ? ordered.Where(x => x.MonthNo == m.ElementAtOrDefault(3)).Average(x => x.ScoreProgress) : 0m;
+
+
+                        decimal dmi =
+                        (
+                            (0.5m * (p_t - p_t1)) +
+                            (0.3m * (p_t1 - p_t2)) +
+                            (0.2m * (p_t2 - p_t3))
+                        ) / 20m;
+
+                        dmi = Math.Max(-1m, Math.Min(1m, dmi));
+
+                        return new PillarDmiResultDto
+                        {
+                            PillarID = g.Key.PillarID,
+                            PillarName = pillar?.PillarName ?? "",
+                            DisplayOrder = pillar?.DisplayOrder ?? 0,
+                            Angle = dmi * 180,
+                            PEMDM_t = dmi
+                        };
+                    })
+                    .OrderBy(x => x.PillarID)
+                    .ToList();
+
+                _cache.Set(cacheKey, result, new MemoryCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5),
+                    SlidingExpiration = TimeSpan.FromMinutes(2),
+                    Priority = CacheItemPriority.High
+                });
+
+                return ResultResponseDto<List<PillarDmiResultDto>>.Success(
+                    result,
+                    new List<string> { "Pillars Dmi fetched successfully" }
+                );
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error Occurred in GetPillarsDmi", ex);
+                return ResultResponseDto<List<PillarDmiResultDto>>.Failure(
+                    new[] { "Failed to get promoted pillars" }
                 );
             }
         }

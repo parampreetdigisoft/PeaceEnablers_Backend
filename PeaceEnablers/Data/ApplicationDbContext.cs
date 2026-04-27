@@ -1,7 +1,7 @@
 using AssessmentPlatform.Models;
 
 using Microsoft.EntityFrameworkCore;
-
+using PeaceEnablers.Common.Models;
 using PeaceEnablers.Dtos.CountryDto;
 using PeaceEnablers.Models;
 
@@ -39,6 +39,7 @@ namespace PeaceEnablers.Data
         public DbSet<CountryPeer> CountryPeers { get; set; } = default!;
         public DbSet<EvaluationCountryProgressHistoryResultDto> CountryProgressHistoryResults { get; set; }
         public DbSet<CountryDocument> CountryDocuments { get; set; }
+        public DbSet<AiPillarStatsLast4MonthsView> AiPillarStatsLast4MonthsView { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -138,6 +139,11 @@ namespace PeaceEnablers.Data
                 entity.HasKey(e => e.CountryDocumentID);
                 entity.ToTable("CountryDocuments");
             });
+
+            modelBuilder.Entity<AiPillarStatsLast4MonthsView>()
+            .HasNoKey()
+            .ToView("vw_AiGetPillarStats_Last4Months");
+
             base.OnModelCreating(modelBuilder);
         }
 

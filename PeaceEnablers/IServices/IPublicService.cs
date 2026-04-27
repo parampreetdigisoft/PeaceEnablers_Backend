@@ -12,5 +12,6 @@ namespace PeaceEnablers.IServices
         Task<PaginationResponse<PartnerCountryResponseDto>> GetPartnerCountries(PartnerCountryRequestDto r);
         Task<CountryCityResponse> GetCountriesAndCountries_WithStaleSupport();
         Task<ResultResponseDto<List<PromotedPillarsResponseDto>>> GetPromotedCountries();
+        Task<ResultResponseDto<List<PillarDmiResultDto>>> GetPillarsDmi();
     }
 }

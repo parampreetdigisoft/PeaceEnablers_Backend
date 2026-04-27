@@ -90,5 +90,12 @@ namespace PeaceEnablers.Controllers
             return Ok(data);
         }
 
+        [HttpGet("getPillarsDmi")]
+        public async Task<IActionResult> GetPillarsDmi()
+        {
+            var data = await _publicService.GetPillarsDmi();
+            return Ok(data);
+        }
+
     }
 }
