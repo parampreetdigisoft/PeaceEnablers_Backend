@@ -491,7 +491,7 @@ namespace PeaceEnablers.Services
 
                 // ── Rows 3-4 : Meta ───────────────────────────────────
                 ws.Cell(3, 1).Value = "City:";
-                ws.Cell(3, 2).Value = cityUser?.CityName?.ToString() ?? "";
+                ws.Cell(3, 2).Value = cityUser?.CountryName?.ToString() ?? "";
                 ws.Cell(3, 3).Value = "Year:";
                 ws.Cell(3, 4).Value = DateTime.Now.Year;
                 ws.Cell(4, 1).Value = "Evaluator:";

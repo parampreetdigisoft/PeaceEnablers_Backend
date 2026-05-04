@@ -217,7 +217,6 @@ namespace PeaceEnablers.Controllers
         }
 
         [HttpPost("getAICrossCountryPillars")]
-        [Authorize(Roles = "Admin, Analyst")]
         public async Task<IActionResult> GetAICrossCountryPillars([FromBody] AiCountryIdsDto aiCountryIdsDto)
         {
             var userId = GetUserIdFromClaims();
