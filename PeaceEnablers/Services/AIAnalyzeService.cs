@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using PeaceEnablers.Common.Implementation;
 using PeaceEnablers.Common.Models.settings;
 using PeaceEnablers.Data;
@@ -147,6 +148,13 @@ namespace PeaceEnablers.Services
             var url = aiUrl + AiEndpoints.AnalyzeCountryImmediateSituation(countryId);
             await _httpService.SendAsync<dynamic>(HttpMethod.Post, url, null, headers);
         }
+        public async Task<ChatCountryAskQuestionResponse> ChatCountryAsk(ChatCountryAskQuestionRequest request)
+        {
+            var url = aiUrl + AiEndpoints.ChatCountryAsk();
+            var result =  await _httpService.SendAsync<ChatCountryAskQuestionResponse>(HttpMethod.Post, url, request, headers);
+
+            return result;
+        }
     }
 
     #region AiEndpoints
@@ -154,6 +162,7 @@ namespace PeaceEnablers.Services
     public static class AiEndpoints
     {
         private const string BasePath = "/api/countries-score-analysis";
+        private const string ChatPath = "/api/chat";
 
         public static string AnalyzeAllCountriesFull =>
             $"{BasePath}/analyze/full";
@@ -176,6 +185,28 @@ namespace PeaceEnablers.Services
             $"{BasePath}/analyze/{countryId}/pillars/{pillarId}/questions";
         public static string AnalyzeCountryImmediateSituation(int countryId) =>
             $"{BasePath}/analyze/{countryId}/immediateSituation";
+        public static string ChatCountryAsk() => $"{ChatPath}/country";
+    }
+    #endregion
+
+
+
+    #region Ai Models 
+
+    public class ChatCountryAskQuestionRequest
+    {
+        public int CountryID { get; set; }
+        public string QuestionText { get; set; }
+        public string? HistoryText { get; set; }
+        public int? FAQID { get; set; }
+        public int? PillarID { get; set; }
+    }
+
+    public class ChatCountryAskQuestionResponse
+    {
+        public bool Success { get; set; }
+        public string? Message { get; set; }
+        public string? Result { get; set; }
     }
 
     #endregion

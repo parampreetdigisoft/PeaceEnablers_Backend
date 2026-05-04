@@ -292,7 +292,7 @@ namespace PeaceEnablers.Services
                 {
                     return ResultResponseDto<List<PillarDmiResultDto>>.Success(
                         cachedData,
-                        new List<string> { "Promoted cities fetched successfully" }
+                        new List<string> { "Pillars Dmi fetched successfully" }
                     );
                 }
 

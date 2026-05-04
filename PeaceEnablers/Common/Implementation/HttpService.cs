@@ -31,7 +31,7 @@ namespace PeaceEnablers.Common.Implementation
 
             if (body != null)
             {
-                var json = JsonSerializer.Serialize(body);
+                var json = JsonSerializer.Serialize(body , new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
                 request.Content = new StringContent(json, Encoding.UTF8, "application/json");
             }
 
@@ -43,7 +43,11 @@ namespace PeaceEnablers.Common.Implementation
             {
                 try
                 {
-                    var result = await response.Content.ReadFromJsonAsync<T>();
+                    var result = await response.Content.ReadFromJsonAsync<T>(
+                    new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
                     return result;
                 }
                 catch

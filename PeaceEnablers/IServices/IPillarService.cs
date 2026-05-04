@@ -10,7 +10,7 @@ namespace PeaceEnablers.IServices
 {
     public interface IPillarService
     {
-        Task<List<Pillar>> GetAllAsync();
+        Task<List<Pillar>> GetAllAsync(int userId, UserRole userRole);
         Task<Pillar> GetByIdAsync(int id);
         Task<Pillar> AddAsync(Pillar pillar);
         Task<Pillar> UpdateAsync(int id, UpdatePillarDto pillar);

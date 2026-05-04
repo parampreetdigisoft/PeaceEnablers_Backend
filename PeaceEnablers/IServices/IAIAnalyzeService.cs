@@ -1,4 +1,6 @@
-﻿namespace PeaceEnablers.IServices
+﻿using PeaceEnablers.Services;
+
+namespace PeaceEnablers.IServices
 {
     public interface IAIAnalyzeService
     {
@@ -9,6 +11,7 @@
         Task AnalyzeSinglePillar(int countryId, int pillarId);
         Task AnalyzeQuestionsOfCountry(int countryId);
         Task AnalyzeQuestionsOfCountryPillar(int countryId, int pillarId);
+        Task<ChatCountryAskQuestionResponse> ChatCountryAsk(ChatCountryAskQuestionRequest request);
 
         Task RunEvery2HoursJob();
         Task RunDailyJob();

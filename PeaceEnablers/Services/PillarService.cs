@@ -10,7 +10,6 @@ using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
 using QuestPDF.Fluent;
-using QuestPDF.Infrastructure;
 
 namespace PeaceEnablers.Services
 {
@@ -26,11 +25,25 @@ namespace PeaceEnablers.Services
             _download = download;
         }
 
-        public async Task<List<Pillar>> GetAllAsync()
+        public async Task<List<Pillar>> GetAllAsync(int userId, UserRole userRole)
         {
             try
             {
-                return await _context.Pillars.OrderBy(p => p.DisplayOrder).ToListAsync();
+                if(userRole != UserRole.CountryUser)
+                {
+                    return await _context.Pillars.OrderBy(p => p.DisplayOrder).ToListAsync();
+                }
+                else
+                {
+                    var userPillar = await _context.CountryUserPillarMappings
+                        .Where(x => x.IsActive && x.UserID == userId)
+                        .Select(x => x.Pillar)
+                        .Where(x => x != null)
+                        .Distinct()
+                        .ToListAsync();
+
+                    return userPillar ?? new List<Pillar>();
+                }                
             }
             catch (Exception ex)
             {
@@ -730,23 +743,6 @@ namespace PeaceEnablers.Services
 
                 return new PaginationResponse<PillarsHistroyResponseDto>();
             }
-        }
-        IContainer HeaderCell(IContainer container)
-        {
-            return container
-                .Padding(6)
-                .Background("#f1f5f4")
-                .Border(1)
-                .BorderColor("#dcdcdc");
-        }
-
-        IContainer BodyCell(IContainer container, bool isAI)
-        {
-            return container
-                .Padding(6)
-                .Background(isAI ? "#e6f4ef" : "#ffffff")
-                .Border(1)
-                .BorderColor("#e0e0e0");
         }
     }
 }

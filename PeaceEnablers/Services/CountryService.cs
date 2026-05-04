@@ -527,20 +527,20 @@ namespace PeaceEnablers.Services
                     var scores = await _commonService.GetCountriesProgressAsync(userId, (int)userRole, year);
 
                     var scoreMap = scores
-              .GroupBy(x => x.CountryID)
-              .ToDictionary(
-                  g => g.Key,
-                  g => Math.Round((g.Sum(x => (decimal?)x.ScoreProgress) ?? 0) / pillarCount, 2));
+                  .GroupBy(x => x.CountryID)
+                  .ToDictionary(
+                      g => g.Key,
+                      g => Math.Round((g.Sum(x => (decimal?)x.ScoreProgress) ?? 0) / pillarCount, 2));
 
-                    foreach (var country in result)
-                    {
-                        if (scoreMap.TryGetValue(country.CountryID, out var score))
+                        foreach (var country in result)
                         {
-                            country.Score = score;
+                            if (scoreMap.TryGetValue(country.CountryID, out var score))
+                            {
+                                country.Score = score;
+                            }
                         }
-                    }
 
-                }
+                    }
                 result = (userRole == UserRole.CountryUser ? result.OrderByDescending(x => x.AiScore) : result.OrderByDescending(x => x.Score)).ToList();
 
                 return ResultResponseDto<List<UserCountryMappingResponseDto>>.Success(result, new string[] { "get successfully" });

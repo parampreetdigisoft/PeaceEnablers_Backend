@@ -22,6 +22,7 @@ namespace PeaceEnablers.Common.DI
 
 
             services.AddScoped<IAIAnalyzeService, AIAnalyzeService>();
+            services.AddScoped<IChatService, ChatService>();
             services.AddScoped<IQuestionService, QuestionService>();
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IPillarService, PillarService>();

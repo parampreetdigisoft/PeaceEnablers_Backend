@@ -40,6 +40,8 @@ namespace PeaceEnablers.Data
         public DbSet<EvaluationCountryProgressHistoryResultDto> CountryProgressHistoryResults { get; set; }
         public DbSet<CountryDocument> CountryDocuments { get; set; }
         public DbSet<AiPillarStatsLast4MonthsView> AiPillarStatsLast4MonthsView { get; set; }
+        public DbSet<AssistantChatHistory> AssistantChatHistory { get; set; }
+        public DbSet<AIAssistantFAQ> AIAssistantFAQ { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -143,6 +145,18 @@ namespace PeaceEnablers.Data
             modelBuilder.Entity<AiPillarStatsLast4MonthsView>()
             .HasNoKey()
             .ToView("vw_AiGetPillarStats_Last4Months");
+
+            modelBuilder.Entity<AssistantChatHistory>(entity =>
+            {
+                entity.HasKey(e => e.ChatID);
+                entity.ToTable("AssistantChatHistory");
+            });
+
+            modelBuilder.Entity<AIAssistantFAQ>(entity =>
+            {
+                entity.HasKey(e => e.FAQID);
+                entity.ToTable("AIAssistantFAQ");
+            });
 
             base.OnModelCreating(modelBuilder);
         }
