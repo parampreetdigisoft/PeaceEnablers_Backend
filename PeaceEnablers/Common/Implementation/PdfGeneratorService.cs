@@ -232,7 +232,6 @@ namespace PeaceEnablers.Common.Implementation
             UserRole userRole)
         {
             var vPillars = pillars.ToList();
-            var vKpis = kpis.Where(k => k.Value.HasValue).ToList();
 
             doc.Page(page =>
             {
@@ -240,7 +239,7 @@ namespace PeaceEnablers.Common.Implementation
                 page.Header().Element(x =>
                     CountryComposeHeader(x, country, userRole, "Country Performance Dashboard"));
                 page.Content().Element(x =>
-                    RenderDashboardContent(x, vPillars, vKpis, country));
+                    RenderDashboardContent(x, vPillars, kpis, country));
                 PageFooter(page);
             });
         }
@@ -267,12 +266,12 @@ namespace PeaceEnablers.Common.Implementation
                 // ── Row 1 : Score Donut (left)  +  Pillar Radar (right) ──────────
                 col.Item().Height(280).Row(row =>
                 {
-                    row.RelativeItem(4).Element(x =>
-                        RenderScoreDonutCard(x, overall, pillars.Count, kpis.Count, best, worst));
+                    row.RelativeItem(5).Element(x =>
+                        RenderScoreDonutCard(x, country, pillars.Count, kpis.Count, best, worst));
 
                     row.ConstantItem(10);
 
-                    row.RelativeItem(6).Element(x =>
+                    row.RelativeItem(5).Element(x =>
                         RenderPillarRadarCard(x, pillars));
                 });
 
@@ -304,12 +303,26 @@ namespace PeaceEnablers.Common.Implementation
 
         void RenderScoreDonutCard(
             IContainer container,
-            float score,
+            AiCountrySummeryDto country,
             int pillarCount,
             int kpiCount,
             PillarChartItem? best,
             PillarChartItem? worst)
         {
+
+            float score = (float)country.AIProgress.GetValueOrDefault();
+
+            // Overall rank label
+            var globalRankLabel = country.Rank.HasValue && country.TotalCountry.HasValue && country.TotalCountry > 1
+                ? $"Global Rank: {country.Rank} / {country.TotalCountry}"
+                : "Global Rank: N/A";
+
+            // Regional rank label
+            var regionRankLabel = country.RegionRank.HasValue && country.RegionTotalCountry.HasValue && country.RegionTotalCountry >= 1
+                ? $"{country.Region} Region: {country.RegionRank} / {country.RegionTotalCountry}"
+                : $"{country.Region} Region: N/A";
+
+
             container
                 .Background(Colors.White)
                 .Border(1).BorderColor("#afc4db")
@@ -319,22 +332,39 @@ namespace PeaceEnablers.Common.Implementation
                     col.Spacing(0);
 
                     col.Item().AlignCenter()
-                        .Text("Country Score")
+                        .Text("Overall Country Score")
                         .FontSize(10).Bold().FontColor("#12352f");
 
+                    col.Item().AlignCenter().PaddingTop(3).Row(row =>
+                    {
+                        row.AutoItem()
+                            .Background("#E8F0EC")
+                            .Padding(2).PaddingLeft(4).PaddingRight(4)
+                            .Text(globalRankLabel)
+                            .FontSize(8).Bold().FontColor("#12352f");
+
+                        row.ConstantItem(4); // spacer
+
+                        row.AutoItem()
+                            .Background("#FFF3E0")
+                            .Padding(2).PaddingLeft(4).PaddingRight(4)
+                            .Text(regionRankLabel)
+                            .FontSize(8).Bold().FontColor("#5D3B00");
+                    });
+
                     // Donut chart
-                    col.Item().Height(140).Canvas((canvas, size) =>
+                    col.Item().Height(130).Canvas((canvas, size) =>
                         PaintDonut(canvas, size, score));
 
                     col.Item().Height(1).Background("#E8F0EC");
 
-                    // Pillar count + KPI count
+                    // ── Pillar count + KPI count ───────────────────────────
                     col.Item().PaddingTop(5).Row(row =>
                     {
                         row.RelativeItem().AlignCenter().Column(c =>
                         {
                             c.Item().AlignCenter().Text(pillarCount.ToString())
-                                .FontSize(18).Bold().FontColor("#336b58");
+                                .FontSize(16).Bold().FontColor("#336b58");
                             c.Item().AlignCenter().Text("Pillars")
                                 .FontSize(8).FontColor("#757575");
                         });
@@ -342,29 +372,29 @@ namespace PeaceEnablers.Common.Implementation
                         row.RelativeItem().AlignCenter().Column(c =>
                         {
                             c.Item().AlignCenter().Text(kpiCount.ToString())
-                                .FontSize(18).Bold().FontColor("#336b58");
+                                .FontSize(16).Bold().FontColor("#336b58");
                             c.Item().AlignCenter().Text("KPIs")
                                 .FontSize(8).FontColor("#757575");
                         });
                     });
 
-                    // Best / worst pillar badges
+                    // ── Best / worst pillar badges (score, no % symbol) ───
                     if (best != null && worst != null)
                     {
                         col.Item().PaddingTop(6).Column(b =>
                         {
-                            b.Item().Background("#E8F5E9").Padding(5).Row(r =>
+                            b.Item().Background("#E8F5E9").Padding(4).Row(r =>
                             {
                                 r.AutoItem().Text("▲ ").FontSize(8).FontColor("#2E7D32");
                                 r.RelativeItem()
-                                    .Text($"{Shorten(best.Name, 22)} ({best.Value:F0}%)")
+                                    .Text($"{Shorten(best.Name, 20)} ({best.Value:F0})")
                                     .FontSize(8).FontColor("#1B5E20");
                             });
-                            b.Item().PaddingTop(3).Background("#FDECEA").Padding(5).Row(r =>
+                            b.Item().PaddingTop(3).Background("#FDECEA").Padding(4).Row(r =>
                             {
                                 r.AutoItem().Text("▼ ").FontSize(8).FontColor("#C62828");
                                 r.RelativeItem()
-                                    .Text($"{Shorten(worst.Name, 22)} ({worst.Value:F0}%)")
+                                    .Text($"{Shorten(worst.Name, 20)} ({worst.Value:F0})")
                                     .FontSize(8).FontColor("#B71C1C");
                             });
                         });
@@ -426,7 +456,7 @@ namespace PeaceEnablers.Common.Implementation
                 TextAlign = SKTextAlign.Center,
                 FakeBoldText = true
             };
-            canvas.DrawText($"{score:F1}%", cx, cy + 9, bigTxt);
+            canvas.DrawText($"{score:F1}", cx, cy + 9, bigTxt);
 
             // Center: sub-label
             using var subTxt = new SKPaint
@@ -448,7 +478,7 @@ namespace PeaceEnablers.Common.Implementation
             container
                 .Background(Colors.White)
                 .Border(1).BorderColor("#afc4db")
-                .Padding(8)
+                .Padding(4)
                 .Column(col =>
                 {
                     col.Item().AlignCenter()
@@ -660,7 +690,7 @@ namespace PeaceEnablers.Common.Implementation
 
         void RenderKpiSparklineCard(IContainer container, List<KpiChartItem> kpis)
         {
-            float avg = (float)kpis.Average(k => k.Value ?? 0);
+            float avg = (float)kpis.Average(k => k.Value);
 
             container
                 .Background(Colors.White)
@@ -717,9 +747,9 @@ namespace PeaceEnablers.Common.Implementation
             // Gradient fill under line
             var fPath = new SKPath();
             fPath.MoveTo(lp, tp + h);
-            fPath.LineTo(lp, tp + h - (float)(data[0].Value ?? 0) / 100f * h);
+            fPath.LineTo(lp, tp + h - (float)(data[0].Value ) / 100f * h);
             for (int i = 1; i < n; i++)
-                fPath.LineTo(lp + i * sx, tp + h - (float)(data[i].Value ?? 0) / 100f * h);
+                fPath.LineTo(lp + i * sx, tp + h - (float)(data[i].Value) / 100f * h);
             fPath.LineTo(lp + (n - 1) * sx, tp + h);
             fPath.Close();
 
@@ -736,7 +766,7 @@ namespace PeaceEnablers.Common.Implementation
             for (int i = 0; i < n; i++)
             {
                 float x = lp + i * sx;
-                float y = tp + h - (float)(data[i].Value ?? 0) / 100f * h;
+                float y = tp + h - (float)(data[i].Value) / 100f * h;
                 if (i == 0) lPath.MoveTo(x, y); else lPath.LineTo(x, y);
             }
             using var lPaint = new SKPaint
@@ -785,8 +815,8 @@ namespace PeaceEnablers.Common.Implementation
             int total = kpis.Count;
             int green = kpis.Count(x => x.Value >= 70);
             int amber = kpis.Count(x => x.Value is >= 40 and < 70);
-            int red = kpis.Count(x => x.Value == null || x.Value < 40);
-            float avg = (float)kpis.Average(x => x.Value ?? 0);
+            int red = kpis.Count(x =>  x.Value < 40);
+            float avg = (float)kpis.Average(x => x.Value);
 
             // 18 bars per chart row — compact but legible
             var groups = kpis
@@ -944,7 +974,7 @@ namespace PeaceEnablers.Common.Implementation
                     // ── bars ──────────────────────────────────────────────────────
                     for (int i = 0; i < n; i++)
                     {
-                        float v = (float)(data[i].Value ?? 0);
+                        float v = (float)(data[i].Value);
                         float bx = lp + i * barW + barGap;
                         float bh = v / 100f * chartH;
                         float by = tp + chartH - bh;
@@ -1044,7 +1074,7 @@ namespace PeaceEnablers.Common.Implementation
         }
         void DrawKpiCard(ColumnDescriptor card, KpiChartItem kpi, int num)
         {
-            var value = kpi.Value ?? 0;
+            var value = kpi.Value;
             var v = value == 100 ? Math.Round(value, 0) : Math.Round(value, 1);
             string accent = GetBarColor((float)v);
 
@@ -1177,34 +1207,6 @@ namespace PeaceEnablers.Common.Implementation
                 });
         }
 
-
-        // ── Top tow  kpis ────────────────────────────────
-
-        void DrawTopKpiBand(IContainer container, List<KpiChartItem> kpis)
-        {
-            // ── split into rows of 2 ─────────────────────────────────────────────
-            var pairs = kpis
-                .Select((item, idx) => (item, idx))
-                .GroupBy(t => t.idx / 2)
-                .Select(g => g.ToList())
-                .ToList();
-
-            container.Column(col =>
-            {
-                foreach (var pair in pairs)
-                {
-                    col.Item().Height(130).Row(row =>
-                    {
-                        foreach (var (kpi, idx) in pair)
-                            row.RelativeItem().Column(card => DrawKpiCard(card, kpi, idx + 1));
-
-                        // pad last row if odd number of KPIs
-                        if (pair.Count == 1)
-                            row.RelativeItem().Element(_ => { });
-                    });
-                }
-            });
-        }
         static void KpiStatPill(
             IContainer container, string value, string label, string valueColor, string bg)
         {
@@ -1269,10 +1271,10 @@ namespace PeaceEnablers.Common.Implementation
                 .Column(col =>
                 {
                     col.Item().PaddingBottom(8)
-                        .Text("Pillar Scores").FontSize(11).Bold().FontColor("#12352f");
+                        .Text("Pillar Overview").FontSize(11).Bold().FontColor("#12352f");
 
                     col.Spacing(6);
-
+                    int index = 1;
                     foreach (var item in sorted)
                     {
                         float v = (float)(item.Value ?? 0);
@@ -1308,8 +1310,8 @@ namespace PeaceEnablers.Common.Implementation
                                 });
 
                             // Score badge
-                            row.ConstantItem(38).AlignMiddle().AlignRight()
-                                .Text($"{v:F1}%")
+                            row.ConstantItem(65).AlignMiddle().AlignRight()
+                                .Text($"{v:F1}, Rank {index++}/{data.Count}")
                                 .FontSize(8).Bold().FontColor(color);
                         });
                     }
@@ -1332,7 +1334,7 @@ namespace PeaceEnablers.Common.Implementation
                         c.Item().AlignCenter()
                             .Text("Average Score").FontSize(9).FontColor("#A5D6A7");
                         c.Item().AlignCenter()
-                            .Text($"{avg:F1}%")
+                            .Text($"{avg:F1}")
                             .FontSize(22).Bold()
                             .FontColor(GetBarColor(avg) == "#2E7D32" ? "#66BB6A"
                                      : GetBarColor(avg) == "#F9A825" ? "#FFD54F" : "#EF5350");
@@ -1358,7 +1360,7 @@ namespace PeaceEnablers.Common.Implementation
                                 .FontSize(9).Bold().FontColor("#1B5E20");
                         });
                         c.Item().PaddingTop(4)
-                            .Text($"{best.Value:F1}%").FontSize(16).Bold().FontColor("#2E7D32");
+                            .Text($"{best.Value:F1}").FontSize(16).Bold().FontColor("#2E7D32");
                     });
 
                 row.ConstantItem(6);
@@ -1381,7 +1383,7 @@ namespace PeaceEnablers.Common.Implementation
                                 .FontSize(9).Bold().FontColor("#B71C1C");
                         });
                         c.Item().PaddingTop(4)
-                            .Text($"{worst.Value:F1}%").FontSize(16).Bold().FontColor("#C62828");
+                            .Text($"{worst.Value:F1}").FontSize(16).Bold().FontColor("#C62828");
                     });
             });
         }
@@ -1508,7 +1510,7 @@ namespace PeaceEnablers.Common.Implementation
                         IsAntialias = true,
                         TextAlign = SKTextAlign.Center
                     };
-                    canvas.DrawText("avg%", cx, cy + avgNumPaint.TextSize * 0.36f + avgLblPaint.TextSize + 1f, avgLblPaint);
+                    canvas.DrawText("avg", cx, cy + avgNumPaint.TextSize * 0.36f + avgLblPaint.TextSize + 1f, avgLblPaint);
 
                     // ── legend on the right side ───────────────────────────────
                     float legendX = cx + Math.Min(cx, cy) + 2f;  // just outside chart — won't fit; draw below instead
@@ -1531,7 +1533,7 @@ namespace PeaceEnablers.Common.Implementation
 
             container.Column(column =>
             {
-                column.Item().Background("#003160").Padding(12).Row(row =>
+                column.Item().Background("#003160").Padding(8).Row(row =>
                 {
                     // Left content
                     row.RelativeItem().Column(col =>
@@ -1651,16 +1653,9 @@ namespace PeaceEnablers.Common.Implementation
                 // =========================
                 // PROGRESS SECTION
                 // =========================
-                var random = new AiCountryPillarResponse
-                {
-                    EvaluatorScore = data.EvaluatorScore,
-                    Discrepancy = data.Discrepancy,
-                    AIDataYear = data.Year,
-                    AIProgress = data.AIProgress
-                };
 
                 column.Item().PaddingTop(10)
-                    .Element(c => PillarProgressSection(c, random, userRole));
+                    .Element(c => CountryProgressSection(c, data, userRole));
 
                 // =========================
                 // EXECUTIVE SUMMARY
@@ -1912,51 +1907,134 @@ namespace PeaceEnablers.Common.Implementation
             });
         }
 
-        void PillarProgressSection(
-    IContainer container, AiCountryPillarResponse data, UserRole userRole)
+        void CountryProgressSection(IContainer container, AiCountrySummeryDto data, UserRole userRole)
         {
             container
                 .Background(Colors.White)
-                .Border(1).BorderColor("#D6E3F0") // ✅ light blue border
-                .Padding(15)
+                .Border(1).BorderColor("#E5E7EB")
+                .Padding(18)
                 .Column(column =>
                 {
-                    column.Item()
-                        .Text("Total Score")
+                    // Header
+                    column.Item().Text("Overview")
                         .FontSize(16)
-                        .Bold()
-                        .FontColor("#1B2F44"); // ✅ dark blue title
+                        .SemiBold()
+                        .FontColor("#1F2937");
 
-                    column.Item().PaddingTop(12).Column(col =>
+                    column.Item().PaddingTop(8).Column(col =>
                     {
-                        // ✅ Blue theme progress bar
-                        PillarProgressBar(col, "Score", data.AIProgress, "#2C6EA3");
+                        // Score Section
+                        PillarProgressBar(col, "Total Score", data.AIProgress, "#22A06B");
 
-                        col.Item().PaddingTop(10);
+                        col.Item().PaddingVertical(12);
+
+                        // Divider
+                        col.Item().Height(1).Background("#F0F0F0");
+
+                        col.Item().PaddingTop(12);
+
+                        // Ranking Section Title
+                        col.Item().Text("Rankings")
+                            .FontSize(13)
+                            .SemiBold()
+                            .FontColor("#374151");
+
+                        col.Item().PaddingTop(8);
+
+                        RankRowModern(col, "Global Rank", data.Rank, data.TotalCountry, "#16A34A");
+
+                        col.Item().PaddingTop(2);
+
+                        RankRowModern(col, $"{data.Region} Region Rank", data.RegionRank, data.RegionTotalCountry, "#2563EB");
                     });
                 });
         }
-
-        void PillarProgressBar(
-            ColumnDescriptor column, string label, decimal? percentage, string color)
+        void RankRowModern(ColumnDescriptor column, string label, int? rank, int? total, string color)
         {
-            float per = (float)(percentage ?? 0);
-            column.Item().Row(row =>
+            column.Item().PaddingVertical(4).Row(row =>
             {
-                row.ConstantItem(140).Text(label).FontSize(11).FontColor("#424242");
+                row.RelativeItem()
+                    .Text(label)
+                    .FontSize(11)
+                    .FontColor("#4B5563");
 
-                if (per > 0)
-                    row.RelativeItem().PaddingLeft(10).Column(col =>
-                    {
-                        col.Item().Height(20).Background("#F5F5F5").Row(barRow =>
-                        {
-                            barRow.RelativeItem(per).Background(color);
-                            barRow.RelativeItem(100 - (per >= 100 ? 99.9f : per));
-                        });
-                    });
+                row.AutoItem().AlignRight().Element(e =>
+                {
+                    e.PaddingHorizontal(10)
+                     .PaddingVertical(4)
+                     .Background("#F9FAFB")
+                     .Border(1)
+                     .BorderColor("#E5E7EB")
+                     .Text(txt =>
+                     {
+                         if (rank.HasValue && total.HasValue)
+                         {
+                             txt.Span($"{rank}")
+                                .Bold()
+                                .FontColor(color);
 
-                row.ConstantItem(55).AlignRight()
-                    .Text($"{percentage:F1}%").FontSize(11).Bold().FontColor(color);
+                             txt.Span($" / {total}")
+                                .FontColor("#6B7280");
+                         }
+                         else
+                         {
+                             txt.Span("-").FontColor("#9CA3AF");
+                         }
+                     });
+                });
+            });
+        }
+
+        void PillarProgressSection(
+            IContainer container, AiCountryPillarResponse data, UserRole userRole, bool isCity = false)
+        {
+            container
+                .Background(Colors.White)
+                .Border(1).BorderColor("#E5E7EB")
+                .Padding(18)
+                .Column(column =>
+                {
+                    column.Item().Text(isCity ? "Total Overview" : "Pillar Score")
+                        .FontSize(16)
+                        .SemiBold()
+                        .FontColor("#1F2937");
+
+                    column.Item().PaddingTop(15);
+
+                    PillarProgressBar(column, "Score", data.AIProgress, "#22A06B");
+                });
+        }
+        void PillarProgressBar(ColumnDescriptor column, string label, decimal? percentage, string color)
+        {
+            float per = (float)Math.Min((double)(percentage ?? 0), 100);
+
+            column.Item().Column(col =>
+            {
+                // Label + Value Row
+                col.Item().Row(row =>
+                {
+                    row.RelativeItem()
+                        .Text(label)
+                        .FontSize(11)
+                        .FontColor("#4B5563");
+
+                    row.AutoItem()
+                        .Text($"{percentage ?? 0:F1}")
+                        .FontSize(11)
+                        .Bold()
+                        .FontColor("#111827");
+                });
+
+                col.Item().PaddingTop(6);
+
+                // Progress Bar
+                col.Item().Height(8).Background("#E5E7EB").Row(barRow =>
+                {
+                    barRow.RelativeItem(per)
+                        .Background(color);
+
+                    barRow.RelativeItem(100 - per);
+                });
             });
         }
 

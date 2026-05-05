@@ -89,7 +89,7 @@ namespace PeaceEnablers.Common.Implementation
 
             for (int i = 0; i < n; i++)
             {
-                float v  = (float)(data[i].Value ?? 0);
+                float v  = (float)(data[i].Value);
                 float bx = lp + i * barW + barGap;
                 float bh = v / 100f * chartH;
                 float by = tp + chartH - bh;

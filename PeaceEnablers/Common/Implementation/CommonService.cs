@@ -31,13 +31,11 @@ namespace PeaceEnablers.Common.Implementation
             string evidenceSummary,
             string? immediateSituationSummary,
             decimal? progress,
-            string? countryName = "The country")
+            string? countryName = "The country", int pillarCount = 23, int kpiCount = 37)
         {
-            int pillarCount =  23;
-            int kpiCount = 37;
             immediateSituationSummary = immediateSituationSummary ?? "";
 
-            var evidenceSummaryStaringLine= $"{countryName ?? "The country"} records an overall PEM score of {progress ?? 0}%, reflecting performance across {pillarCount} pillars and {kpiCount} KPIs.";
+            var evidenceSummaryStaringLine= $"{countryName ?? "The country"} records an overall PEM score of {progress ?? 0}, reflecting performance across {pillarCount} pillars and {kpiCount} KPIs.";
 
             return immediateSituationSummary + "\n\n " + evidenceSummaryStaringLine + " " + evidenceSummary;
         }

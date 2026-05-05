@@ -7,6 +7,7 @@
         public string? CountryName { get; set; }        
         public string? Image { get; set; }
         public int Year { get; set; }
+        public string Region { get; set; }
         public decimal? AIScore { get; set; }
         public decimal? AIProgress { get; set; }
         public decimal? EvaluatorScore { get; set; }
@@ -44,5 +45,11 @@
         public string? KeyDevelopments { get; set; }
         public string? CriticalRisks { get; set; }
         public string? Gaps { get; set; }
+
+        public int? Rank { get; set; }
+        public int? TotalCountry { get; set; }
+        public int? RegionRank { get; set; }
+        public int? RegionTotalCountry { get; set; }
+
     }
 }

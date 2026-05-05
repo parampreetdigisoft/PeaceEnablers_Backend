@@ -11,6 +11,7 @@ using PeaceEnablers.Common.Models.settings;
 using PeaceEnablers.Data;
 using PeaceEnablers.Dtos.AiDto;
 using PeaceEnablers.Dtos.CommonDto;
+using PeaceEnablers.Dtos.CountryDto;
 using PeaceEnablers.IServices;
 using PeaceEnablers.Models;
 using QuestPDF.Fluent;
@@ -70,14 +71,40 @@ namespace PeaceEnablers.Services
                 var result = await query.ApplyPaginationAsync(request);
                 int pillarCount = _appSettings.PillarCount;
 
+                var progress = await _commonService.GetCountriesProgressAsync(userID, (int)userRole, DateTime.Now.Year);
+                var ids = result.Data.Select(x => x.CountryID);
+                var countries = progress.Where(x => ids.Contains(x.CountryID));
+
+
+                var analyticalLayers = _context.AnalyticalLayers.AsQueryable();
+
+                if (userRole == UserRole.CountryUser)
+                {
+                    analyticalLayers =
+                        from ar in _context.AnalyticalLayers
+                        join alp in _context.AnalyticalLayerPillarMappings
+                            on ar.LayerID equals alp.LayerID
+                        join cup in _context.CountryUserPillarMappings
+                            on alp.PillarID equals cup.PillarID
+                        join puc in _context.PublicUserCountryMappings
+                            on cup.UserID equals puc.UserID
+                        where cup.IsActive
+                              && puc.IsActive
+                              && cup.UserID == userID
+                              && puc.UserID == userID
+                        select ar;
+                }
+
+                var totalValidKpis = await analyticalLayers.Distinct().CountAsync();
+
+                foreach (var c in result.Data)
+                {                 
+                    c.EvidenceSummary = CommonService.InitailLineOfExecutiveSummery(c.EvidenceSummary, c.ImmediateSituationSummary, c.AIProgress, c.CountryName, pillarCount, totalValidKpis);
+                }
+
+
                 if (userRole != UserRole.CountryUser)
                 {
-                    var progress = await _commonService.GetCountriesProgressAsync(userID, (int)userRole, DateTime.Now.Year);
-
-                    var ids = result.Data.Select(x => x.CountryID);
-                    var countries = progress.Where(x => ids.Contains(x.CountryID));
-
-
                     var counts = await _context.Pillars
                         .Select(p => p.Questions.Count()).ToListAsync();
 
@@ -101,10 +128,7 @@ namespace PeaceEnablers.Services
                         var countryScore = Math.Round(pillars.Sum(x => x.ScoreProgress) / pillarCount, 2);
                         c.EvaluatorScore = countryScore;
                         c.Discrepancy = Math.Abs(countryScore - (c.AIProgress ?? 0));
-                        c.AICompletionRate = answeredQuestions.FirstOrDefault(x=>x.CountryID== c.CountryID)?.CompletionRate;
-
-                        c.EvidenceSummary = CommonService.InitailLineOfExecutiveSummery(c.EvidenceSummary, c.ImmediateSituationSummary, c.AIProgress, c.CountryName);
-                         
+                        c.AICompletionRate = answeredQuestions.FirstOrDefault(x=>x.CountryID == c.CountryID)?.CompletionRate;                         
                     }
                 }
 
@@ -203,7 +227,7 @@ namespace PeaceEnablers.Services
                     CountryName = c.CountryName ?? string.Empty,
                     //Country = c.Country ?? string.Empty,
                     Image = c.Image ?? string.Empty,
-
+                    Region = c.Region ?? string.Empty,
                     Year = score != null ? score.Year : currentYear,
                     AIProgress = score != null ? score.AIProgress : null,
                     EvaluatorScore = score != null ? score.EvaluatorScore : null,
@@ -633,7 +657,6 @@ namespace PeaceEnablers.Services
 
                 var peerCountries = await GetPeerCountries(userID, userRole, countryDetails.CountryID, countryDetails.Year, !isManual);
 
-
                 var document = await _documentGeneratorService.GenerateCountryDetails(countryDetails, pillars.Result.Pillars, kpis, peerCountries, userRole, format);
 
                 return document;
@@ -957,30 +980,129 @@ namespace PeaceEnablers.Services
 
         public async Task<AiCountrySummeryDto> GetCountryAiSummeryDetail(int userID, UserRole userRole, int? CountryID, int year)
         {
-            var query = await GetCountryAiSummeryDetails(userID, userRole, CountryID, year);
-            var countryDetails = await query.FirstAsync();
-            int pillarCount = _appSettings.PillarCount;
-            if (userRole != UserRole.CountryUser)
+            var query = await GetCountryAiSummeryDetails(userID, userRole, null, year);
+            var countresDetails = await query.ToListAsync();
+            var progress = await _commonService.GetCountriesProgressAsync(userID, (int)userRole, year);
+
+            var analyticalLayers = _context.AnalyticalLayers.AsQueryable();
+
+            if (userRole == UserRole.CountryUser)
             {
-                var progress = await _commonService.GetCountriesProgressAsync(userID, (int)userRole, DateTime.Now.Year);
+                analyticalLayers =
+                    from ar in _context.AnalyticalLayers
+                    join alp in _context.AnalyticalLayerPillarMappings
+                        on ar.LayerID equals alp.LayerID
+                    join cup in _context.CountryUserPillarMappings
+                        on alp.PillarID equals cup.PillarID
+                    join puc in _context.PublicUserCountryMappings
+                        on cup.UserID equals puc.UserID
+                    where cup.IsActive
+                          && puc.IsActive
+                          && cup.UserID == userID
+                          && puc.UserID == userID
+                    select ar;
+            }
 
-                var countries = progress.Where(x => x.CountryID == CountryID);
+            var totalValidKpis = await analyticalLayers.Distinct().CountAsync();
 
-               if(countries != null)
+            int pillarCount = _appSettings.PillarCount;
+
+            var countryRanks = CalculateCountryRanks(progress, pillarCount);
+            ApplyCountryRanking(countresDetails, countryRanks);
+
+            var countries = progress.Where(x => x.CountryID == CountryID);
+
+            var countryDetails = countresDetails.FirstOrDefault(x => x.CountryID == CountryID); 
+
+            if (userRole != UserRole.CountryUser && countryDetails !=null && countries != null)
+            {
+                var countryScore = countries
+                    .Select(x => x.ScoreProgress)
+                    .DefaultIfEmpty(0)
+                    .Sum();
+                countryScore = Math.Round(countryScore / pillarCount, 2);
+
+                countryDetails.EvaluatorScore = Math.Round(countryScore,2);
+                countryDetails.Discrepancy = Math.Abs(countryScore - (countryDetails.AIProgress ?? 0));
+                countryDetails.EvidenceSummary = CommonService.InitailLineOfExecutiveSummery(countryDetails.EvidenceSummary, countryDetails.ImmediateSituationSummary, countryDetails.AIProgress, countryDetails.CountryName,pillarCount, totalValidKpis);
+            }
+            return countryDetails ?? new AiCountrySummeryDto();
+        }
+
+        private void ApplyCountryRanking(List<AiCountrySummeryDto> countriesDetails, List<dynamic> countryRanks)
+        {
+            var totalCountryCount = countriesDetails.Count;
+
+            // Global rank lookup
+            var countryRankLookup = countryRanks.ToDictionary(x => x.CountryID);
+
+            // Region -> CountryIDs lookup
+            var regionLookup = countriesDetails
+                .GroupBy(x => x.Region)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Select(x => x.CountryID).ToList()
+                );
+
+            // Region rank lookup
+            var regionRankLookup = new Dictionary<int, (int Rank, int TotalCountry)>();
+
+            foreach (var region in regionLookup)
+            {
+                var rankedCountries = countryRanks
+                    .Where(x => region.Value.Contains(x.CountryID))
+                    .OrderByDescending(x => x.ScoreProgress)
+                    .Select((x, index) => new
+                    {
+                        x.CountryID,
+                        Rank = index + 1
+                    })
+                    .ToList();
+
+                var regionTotal = rankedCountries.Count;
+
+                foreach (var country in rankedCountries)
                 {
-                    var countryScore = countries
-                        .Select(x => x.ScoreProgress)
-                        .DefaultIfEmpty(0)
-                        .Sum();
-                    countryScore = Math.Round(countryScore / pillarCount, 2);
-
-                    countryDetails.EvaluatorScore = Math.Round(countryScore,2);
-                    countryDetails.Discrepancy = Math.Abs(countryScore - (countryDetails.AIProgress ?? 0));
-                    countryDetails.EvidenceSummary = CommonService.InitailLineOfExecutiveSummery(countryDetails.EvidenceSummary, countryDetails.ImmediateSituationSummary, countryDetails.AIProgress, countryDetails.CountryName);
+                    regionRankLookup[country.CountryID] = (country.Rank, regionTotal);
                 }
             }
-            return countryDetails;
+
+            // Final mapping
+            foreach (var country in countriesDetails)
+            {
+                if (countryRankLookup.TryGetValue(country.CountryID, out var globalRank))
+                {
+                    country.Rank = globalRank.Rank;
+                    country.TotalCountry = totalCountryCount;
+                }
+
+                if (regionRankLookup.TryGetValue(country.CountryID, out var regionRank))
+                {
+                    country.RegionRank = regionRank.Rank;
+                    country.RegionTotalCountry = regionRank.TotalCountry;
+                }
+            }
         }
+        private List<dynamic> CalculateCountryRanks(List<EvaluationCountryProgressResultDto> progress, decimal pillarCount)
+        {
+            return progress
+                .GroupBy(x => x.CountryID)
+                .Select(g => new
+                {
+                    CountryID = g.Key,
+                    ScoreProgress = Math.Round((g.Select(x => x.ScoreProgress).DefaultIfEmpty(0).Sum())  / pillarCount, 2)
+                })
+                .OrderByDescending(x => x.ScoreProgress)
+                .Select((x, index) => new
+                {
+                    x.CountryID,
+                    x.ScoreProgress,
+                    Rank = index + 1
+                })
+                .ToList<dynamic>();
+        }
+
+
         private async Task<List<KpiChartItem>> GetAccessKpis(int userID, UserRole role, int? CountryID, int year = 0, bool isAiScore = true)
         {
             var startDate = new DateTime(year, 1, 1);
@@ -1048,7 +1170,7 @@ namespace PeaceEnablers.Services
             }).OrderBy(x => x.LayerID);
 
             var kpis = await kpiRaw
-                .Select(k => new KpiChartItem(k.KpiShortName, k.KpiName, isAiScore && role == UserRole.Admin ? k.AiCalValue5 : k.CalValue5, k.Definition, k.CountryID, k.Interpretation))
+                .Select(k => new KpiChartItem(k.KpiShortName, k.KpiName, (isAiScore && role == UserRole.Admin ? k.AiCalValue5 : k.CalValue5) ?? 0, k.Definition, k.CountryID, k.Interpretation))
                 .ToListAsync();
 
             return kpis ?? new List<KpiChartItem>();
@@ -1058,12 +1180,15 @@ namespace PeaceEnablers.Services
             var query = await GetCountryAiSummeryDetails(userID, userRole, null, year);
             var countriesDetails = await query.ToListAsync();
             int pillarCount = _appSettings.PillarCount;
+
+            var progress = await _commonService.GetCountriesProgressAsync(userID, (int)userRole, DateTime.Now.Year);
+            var countryRanks = CalculateCountryRanks(progress, pillarCount);
+            ApplyCountryRanking(countriesDetails, countryRanks);
+
             if (userRole != UserRole.CountryUser)
             {
                 foreach (var countryDetails in countriesDetails)
                 {
-                    var progress = await _commonService.GetCountriesProgressAsync(userID, (int)userRole, DateTime.Now.Year);
-
                     var countries = progress.Where(x => x.CountryID == countryDetails.CountryID);
 
                     if (countries != null)
@@ -1266,7 +1391,7 @@ namespace PeaceEnablers.Services
                     .Failure(new[] { "Error in getting countries pillar details" });
             }
         }
-        public record KpiChartItem(string ShortName, string Name, decimal? Value, string? Definition, int? CountryID, List<FiveLevelInterpretationsDto> InterPretation);
+        public record KpiChartItem(string ShortName, string Name, decimal Value, string? Definition, int? CountryID, List<FiveLevelInterpretationsDto> InterPretation);
 
         public record FiveLevelInterpretationsDto(
         int InterpretationID,

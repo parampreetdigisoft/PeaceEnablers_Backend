@@ -102,7 +102,7 @@ namespace PeaceEnablers.Controllers
         }
 
         [HttpGet("aiCountryDetailsReport")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin, CountryUser")]
         public async Task<IActionResult> DownloadCountryReport([FromQuery] AiCountrySummeryRequestPdfDto request)
         {
             try
@@ -154,7 +154,7 @@ namespace PeaceEnablers.Controllers
             }
         }
         [HttpGet("aiPillarDetailsReport")]
-        [Authorize(Policy = "StaffOnly")]
+        [Authorize(Roles = "Admin, CountryUser")]
         public async Task<IActionResult> DownloadPillarReport([FromQuery] AiCountrySummeryRequestPdfDto request)
         {
             try
@@ -315,6 +315,7 @@ namespace PeaceEnablers.Controllers
             return Ok(await _aIComputationService.RegeneratePillarAiSearch(aiCountryIdsDto, userId.Value, userRole));
         }
         [HttpGet("aiAllCountryDetailsReport")]
+        [Authorize(Roles = "Admin, CountryUser")]
         public async Task<IActionResult> DownloadAllCountryPdf([FromQuery] DownloadReportDto request)
         {
             try

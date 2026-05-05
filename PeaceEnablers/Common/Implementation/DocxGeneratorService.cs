@@ -268,21 +268,10 @@ namespace PeaceEnablers.Common.Implementation
                 CreateScoreAndRadarRow(
                     mainPart,
                     donutPng, radarPng,
-                    overall,
+                    country,
                     pillars.Count, kpis.Count,
                     best, worst,
                     validPillars));
-
-            // Highlight KPIs (UDRI / PRUPS)
-            //var topKpis = kpis.Where(x =>
-            //    string.Equals(x.ShortName, "UDRI", StringComparison.OrdinalIgnoreCase) ||
-            //    string.Equals(x.ShortName, "PRUPS", StringComparison.OrdinalIgnoreCase)).ToList();
-            //if (topKpis.Any())
-            //{
-            //    body.AppendChild(Gap(20));
-            //    body.AppendChild(CreateKpiCardTable(mainPart, topKpis));
-
-            //}
 
             body.AppendChild(Gap(20));
 
@@ -298,7 +287,7 @@ namespace PeaceEnablers.Common.Implementation
 
             if (kpis.Any())
             {
-                var avg = (kpis.Average(x => x.Value) ?? 0).ToString("0.0") + "%";
+                var avg = kpis.Average(x => x.Value).ToString("0.0") + "%";
 
                 body.Append(CreateKpiOverviewHeader(avg));
 
@@ -363,14 +352,16 @@ namespace PeaceEnablers.Common.Implementation
             MainDocumentPart mainPart,
             byte[] donutPng,
             byte[] radarPng,
-            float overallScore,
+            AiCountrySummeryDto country,
             int pillarCount,
             int kpiCount,
             PillarChartItem? best,
             PillarChartItem? worst,
             List<PillarChartItem> pillars)
         {
-            var leftCell = BuildDonutCell(mainPart, donutPng, overallScore, pillarCount, kpiCount, best, worst);
+            float overallScore = (float)country.AIProgress.GetValueOrDefault();
+
+            var leftCell = BuildDonutCell(mainPart, donutPng, country, pillarCount, kpiCount, best, worst);
             var rightCell = BuildRadarCell(mainPart, radarPng, pillars);
 
             return new Table(
@@ -390,7 +381,7 @@ namespace PeaceEnablers.Common.Implementation
         private TableCell BuildDonutCell(
             MainDocumentPart mainPart,
             byte[] donutPng,
-            float score,
+            AiCountrySummeryDto country,
             int pillarCount,
             int kpiCount,
             PillarChartItem? best,
@@ -415,7 +406,33 @@ namespace PeaceEnablers.Common.Implementation
 
             // ── Heading ──
             cell.Append(CenteredBoldPara("Country Score", "212529", "20"));
+            // ── Ranking Labels ──
+            var globalRankLabel = country.Rank.HasValue && country.TotalCountry.HasValue && country.TotalCountry >=1
+                ? $"Global Rank: {country.Rank} / {country.TotalCountry}"
+                : "Global Rank: N/A";
 
+            var regionName = string.IsNullOrEmpty(country.Region) ? "Region" : country.Region;
+
+            var regionRankLabel = country.RegionRank.HasValue && country.RegionTotalCountry.HasValue && country.RegionTotalCountry >= 1
+                ? $"{regionName}: {country.RegionRank} / {country.RegionTotalCountry}"
+                : $"{regionName}: N/A";
+
+            // ✅ Safe paragraph instead of table
+            cell.Append(
+                new Paragraph(
+                    new ParagraphProperties(
+                        new Justification { Val = JustificationValues.Center }
+                    ),
+                    new Run(
+                        new RunProperties(new Bold(), new FontSize { Val = "16" }),
+                        new Text(globalRankLabel + "   |   ")
+                    ),
+                    new Run(
+                        new RunProperties(new Bold(), new Color { Val = "5D3B00" }, new FontSize { Val = "16" }),
+                        new Text(regionRankLabel)
+                    )
+                )
+            );
             // ── Donut image ──
             cell.Append(EmbedImage(mainPart, donutPng, imgEmuW, imgEmuH));
 
@@ -425,10 +442,10 @@ namespace PeaceEnablers.Common.Implementation
 
             // ── Best / Worst badges ──
             if (best != null)
-                cell.Append(BadgePara($"▲  {Shorten(best.Name, 22)}  ({best.Value:F0}%)",
+                cell.Append(BadgePara($"▲  {Shorten(best.Name, 22)}  ({best.Value:F0})",
                                       "E8F5E9", "2E7D32", "1B5E20"));
             if (worst != null)
-                cell.Append(BadgePara($"▼  {Shorten(worst.Name, 22)}  ({worst.Value:F0}%)",
+                cell.Append(BadgePara($"▼  {Shorten(worst.Name, 22)}  ({worst.Value:F0})",
                                       "FDECEA", "C62828", "B71C1C"));
 
             return cell;
@@ -564,6 +581,15 @@ namespace PeaceEnablers.Common.Implementation
             // =========================
             body.AppendChild(SectionHeading("Total Score", DarkBlue));
             body.AppendChild(CreateProgressBar("Score", (float)(data.AIProgress ?? 0), MedBlue));
+            // Rankings Section
+            body.AppendChild(CreateRankingHeader("Rankings"));
+
+            body.AppendChild(CreateRankRow("Global Rank",
+                data.Rank, data.TotalCountry, "16A34A"));
+
+            body.AppendChild(CreateRankRow("Region Rank",
+                data.RegionRank, data.RegionTotalCountry, "2563EB"));
+
             body.AppendChild(Gap(160));
 
             // =========================
@@ -642,6 +668,57 @@ namespace PeaceEnablers.Common.Implementation
             AppendContentSection(body, "Strategic Policy Priorities", data.StrategicRecommendation, "2e9975");
             AppendContentSection(body, "Why This Assessment Matters", data.DataTransparencyNote, "63a68f");
         }
+
+        private static Paragraph CreateRankingHeader(string text)
+        {
+            return new Paragraph(
+                new ParagraphProperties(new SpacingBetweenLines { Before = "120" }),
+                new Run(
+                    new RunProperties(new Bold(), new Color { Val = "374151" }, new FontSize { Val = "22" }),
+                    new Text(text)));
+        }
+        private static Table CreateRankRow(string label, int? rank, int? total, string color)
+        {
+            var noBorder = new TableCellBorders(
+                new TopBorder { Val = BorderValues.None },
+                new BottomBorder { Val = BorderValues.None },
+                new LeftBorder { Val = BorderValues.None },
+                new RightBorder { Val = BorderValues.None });
+
+            var leftCell = new TableCell(
+                new TableCellProperties(noBorder.CloneNode(true)),
+                new Paragraph(
+                    new Run(
+                        new RunProperties(new Color { Val = "4B5563" }, new FontSize { Val = "20" }),
+                        new Text(label))));
+
+            var rightPara = new Paragraph(
+                new ParagraphProperties(new Justification { Val = JustificationValues.Right }));
+
+            if (rank.HasValue && total.HasValue)
+            {
+                rightPara.Append(
+                    new Run(new RunProperties(new Bold(), new Color { Val = color }),
+                        new Text((rank ?? 0).ToString())),
+                    new Run(new RunProperties(new Color { Val = "6B7280" }),
+                        new Text($" / {total}"))
+                );
+            }
+            else
+            {
+                rightPara.Append(new Run(new Text("-")));
+            }
+
+            var rightCell = new TableCell(
+                new TableCellProperties(noBorder.CloneNode(true)),
+                rightPara);
+
+            return new Table(
+                new TableProperties(
+                    new TableWidth { Width = ContentDxa.ToString(), Type = TableWidthUnitValues.Dxa }),
+                new TableRow(leftCell, rightCell));
+        }
+
 
         // ════════════════════════════════════════════════════════════════════
         //  PILLAR OVERVIEW SECTION  (radial + horizontal bars)
@@ -791,20 +868,10 @@ namespace PeaceEnablers.Common.Implementation
             int green = kpis.Count(x => x.Value >= 70);
             int amber = kpis.Count(x => x.Value is >= 40 and < 70);
             int red   = kpis.Count(x => x.Value < 40);
-            float avg = (float)kpis.Average(x => x.Value ?? 0);
+            float avg = (float)kpis.Average(x => x.Value);
 
             body.AppendChild(CreateKpiSummaryBandTable(total, green, amber, red, avg));
             body.AppendChild(Gap(100));
-
-            // Highlight KPIs
-            //var topKpis = kpis.Where(x =>
-            //    string.Equals(x.ShortName, "UDRI",  StringComparison.OrdinalIgnoreCase) ||
-            //    string.Equals(x.ShortName, "PRUPS", StringComparison.OrdinalIgnoreCase)).ToList();
-            //if (topKpis.Any())
-            //{
-            //    body.AppendChild(CreateKpiCardTable(mainPart, topKpis));
-            //    body.AppendChild(Gap(100));
-            //}
 
             // Groups of 18 KPIs — bar chart + interpretation cards
             var groups = kpis
@@ -1198,7 +1265,7 @@ namespace PeaceEnablers.Common.Implementation
                         new ParagraphProperties(new Justification { Val = JustificationValues.Right }),
                         new Run(new RunProperties(
                             new Bold(), new Color { Val = hexColor }, new FontSize { Val = "22" }),
-                            new Text($"{percentage:F1}%")))));
+                            new Text($"{percentage:F1}")))));
 
             return new Table(
                 new TableProperties(
@@ -1488,7 +1555,7 @@ namespace PeaceEnablers.Common.Implementation
                     var (kpi, localI) = pair[pIdx];
                     int cardNum = globalIdx + localI + 1;
 
-                    decimal v = kpi.Value ?? 0;
+                    decimal v = kpi.Value;
                     v = v == 100 ? Math.Round(v, 0) : Math.Round(v, 1);
                     string accent = GetBarColor((float)v).TrimStart('#');
 
@@ -1843,7 +1910,7 @@ namespace PeaceEnablers.Common.Implementation
                 new TableProperties(
                     new TableWidth { Width = ContentDxa.ToString(), Type = TableWidthUnitValues.Dxa }),
                 new TableRow(
-                    Cell(new[] { $"{avg:F1}%", "Average Score" },
+                    Cell(new[] { $"{avg:F1}", "Average Score" },
                          new[] { GetBarColor(avg).TrimStart('#'), "A5D6A7" }, "12352F"),
                     Cell(new[] { $"▲ {Shorten(best.Name ?? "—", 22)}", $"{best.Value:F1}%" },
                          new[] { "1B5E20", "2E7D32" }, "E8F5E9"),

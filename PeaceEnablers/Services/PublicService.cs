@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using PeaceEnablers.Common.Implementation;
+using PeaceEnablers.Common.Interface;
 using PeaceEnablers.Common.Models;
 using PeaceEnablers.Data;
 using PeaceEnablers.Dtos.CommonDto;
@@ -18,12 +19,14 @@ namespace PeaceEnablers.Services
         private readonly IAppLogger _appLogger;
         private readonly IWebHostEnvironment _env;
         private readonly IMemoryCache _cache;
-        public PublicService(ApplicationDbContext context, IAppLogger appLogger, IWebHostEnvironment env, IMemoryCache cache)
+        private readonly ICommonService _commonService;
+        public PublicService(ApplicationDbContext context, IAppLogger appLogger, IWebHostEnvironment env, IMemoryCache cache, ICommonService commonService)
         {
             _context = context;
             _appLogger = appLogger;
             _env = env;
             _cache = cache;
+            _commonService = commonService;
         }
         public async Task<ResultResponseDto<List<PartnerCountryResponseDto>>> getAllCountries()
         {
@@ -86,7 +89,7 @@ namespace PeaceEnablers.Services
             {
                 await _appLogger.LogAsync("Error Occured in GetPartnerCountriesFilterRecord", ex);
                 return ResultResponseDto<PartnerCountryFilterResponse>.Failure(
-                    new string[] { "Failed to get Partner City filter data" }
+                    new string[] { "Failed to get Partner country filter data" }
                 );
             }
         }
@@ -223,6 +226,14 @@ namespace PeaceEnablers.Services
 
                 int currentYear = DateTime.Now.Year;
 
+                var admin = await _context.Users.FirstOrDefaultAsync(x => x.Role == Models.UserRole.Admin);
+
+                int role = (int)(admin?.Role ?? Models.UserRole.Admin);
+
+                var pillarScores = await _commonService.GetCountriesProgressAsync(admin?.UserID ?? 0, role, currentYear);
+
+
+
                 var result = await _context.AIPillarScores
                     .Include(x => x.Country)
                     .Include(x => x.Pillar)
@@ -258,6 +269,19 @@ namespace PeaceEnablers.Services
                                 Description = c.EvidenceSummary,
                             }).ToList()
                     }).OrderBy(p => p.DisplayOrder).ToListAsync();
+
+
+                foreach (var pillar in result)
+                {
+                    foreach (var country in pillar.Countries)
+                    {
+                        var score = pillarScores
+                            .Where(s => s.CountryID == country.CountryID && s.PillarID == pillar.PillarID)
+                            .Select(s => s.ScoreProgress)
+                            .FirstOrDefault();
+                        country.ScoreProgress = score;
+                    }
+                }
 
                 _cache.Set(cacheKey, result, new MemoryCacheEntryOptions
                 {
@@ -345,8 +369,8 @@ namespace PeaceEnablers.Services
 
                 _cache.Set(cacheKey, result, new MemoryCacheEntryOptions
                 {
-                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5),
-                    SlidingExpiration = TimeSpan.FromMinutes(2),
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10),
+                    SlidingExpiration = TimeSpan.FromMinutes(5),
                     Priority = CacheItemPriority.High
                 });
 
