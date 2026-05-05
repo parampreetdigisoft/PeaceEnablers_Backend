@@ -1012,19 +1012,23 @@ namespace PeaceEnablers.Services
 
             var countries = progress.Where(x => x.CountryID == CountryID);
 
-            var countryDetails = countresDetails.FirstOrDefault(x => x.CountryID == CountryID); 
+            var countryDetails = countresDetails.FirstOrDefault(x => x.CountryID == CountryID);
 
-            if (userRole != UserRole.CountryUser && countryDetails !=null && countries != null)
+            if (countryDetails != null)
             {
-                var countryScore = countries
-                    .Select(x => x.ScoreProgress)
-                    .DefaultIfEmpty(0)
-                    .Sum();
-                countryScore = Math.Round(countryScore / pillarCount, 2);
+                countryDetails.EvidenceSummary = CommonService.InitailLineOfExecutiveSummery(countryDetails.EvidenceSummary, countryDetails.ImmediateSituationSummary, countryDetails.AIProgress, countryDetails.CountryName, pillarCount, totalValidKpis);
 
-                countryDetails.EvaluatorScore = Math.Round(countryScore,2);
-                countryDetails.Discrepancy = Math.Abs(countryScore - (countryDetails.AIProgress ?? 0));
-                countryDetails.EvidenceSummary = CommonService.InitailLineOfExecutiveSummery(countryDetails.EvidenceSummary, countryDetails.ImmediateSituationSummary, countryDetails.AIProgress, countryDetails.CountryName,pillarCount, totalValidKpis);
+                if (userRole != UserRole.CountryUser && countries != null)
+                {
+                    var countryScore = countries
+                        .Select(x => x.ScoreProgress)
+                        .DefaultIfEmpty(0)
+                        .Sum();
+                    countryScore = Math.Round(countryScore / pillarCount, 2);
+
+                    countryDetails.EvaluatorScore = Math.Round(countryScore, 2);
+                    countryDetails.Discrepancy = Math.Abs(countryScore - (countryDetails.AIProgress ?? 0));
+                }
             }
             return countryDetails ?? new AiCountrySummeryDto();
         }
@@ -1185,9 +1189,34 @@ namespace PeaceEnablers.Services
             var countryRanks = CalculateCountryRanks(progress, pillarCount);
             ApplyCountryRanking(countriesDetails, countryRanks);
 
-            if (userRole != UserRole.CountryUser)
+            var analyticalLayers = _context.AnalyticalLayers.AsQueryable();
+
+            if (userRole == UserRole.CountryUser)
             {
-                foreach (var countryDetails in countriesDetails)
+                analyticalLayers =
+                    from ar in _context.AnalyticalLayers
+                    join alp in _context.AnalyticalLayerPillarMappings
+                        on ar.LayerID equals alp.LayerID
+                    join cup in _context.CountryUserPillarMappings
+                        on alp.PillarID equals cup.PillarID
+                    join puc in _context.PublicUserCountryMappings
+                        on cup.UserID equals puc.UserID
+                    where cup.IsActive
+                          && puc.IsActive
+                          && cup.UserID == userID
+                          && puc.UserID == userID
+                    select ar;
+            }
+
+            var totalValidKpis = await analyticalLayers.Distinct().CountAsync();
+
+
+            foreach (var countryDetails in countriesDetails)
+            {
+                countryDetails.EvidenceSummary = CommonService.InitailLineOfExecutiveSummery(countryDetails.EvidenceSummary, 
+                    countryDetails.ImmediateSituationSummary, countryDetails.AIProgress, countryDetails.CountryName, pillarCount,totalValidKpis);
+
+                if (userRole != UserRole.CountryUser)
                 {
                     var countries = progress.Where(x => x.CountryID == countryDetails.CountryID);
 
@@ -1201,7 +1230,6 @@ namespace PeaceEnablers.Services
 
                         countryDetails.EvaluatorScore = Math.Round(countryScore, 2);
                         countryDetails.Discrepancy = Math.Abs(countryScore - (countryDetails.AIProgress ?? 0));
-                        countryDetails.EvidenceSummary = CommonService.InitailLineOfExecutiveSummery(countryDetails.EvidenceSummary, countryDetails.ImmediateSituationSummary, countryDetails.AIProgress, countryDetails.CountryName);
                     }
                 }
 
