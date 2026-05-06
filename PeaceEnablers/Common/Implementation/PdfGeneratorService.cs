@@ -44,7 +44,6 @@ namespace PeaceEnablers.Common.Implementation
                         {
                             var kpiChartItems = kpis?
                             .Where(x => x.CountryID == countryDetails.CountryID)
-                            .Take(109)
                             .ToList() ?? new List<KpiChartItem>();
 
                             AddCountryDetailsPdf(container, countryDetails, pillars, kpiChartItems,new(), userRole, true);
@@ -114,7 +113,7 @@ namespace PeaceEnablers.Common.Implementation
         public void AddCountryDetailsPdf(IDocumentContainer container, AiCountrySummeryDto countryDetails, List<AiCountryPillarResponse> pillars, List<KpiChartItem> kpis,
             List<PeerCountryHistoryReportDto> peerCountries, UserRole userRole, bool isAllCountries = false)
         {
-            var kpiChartItems = kpis.Take(109).ToList();
+            var kpiChartItems = kpis.ToList();
 
             // Build pillar chart items (max 14)
             var pillarChartItems = pillars.Select(p => new PillarChartItem( SanitizeText(p.PillarName)?.Length > 20   ? SanitizeText(p.PillarName)[..20]
@@ -825,11 +824,6 @@ namespace PeaceEnablers.Common.Implementation
                 .Select(g => g.Select(x => x.k).ToList())
                 .ToList();
 
-            //var topKpis = kpis
-            //    .Where(x =>
-            //        string.Equals(x.ShortName, "UDRI", StringComparison.OrdinalIgnoreCase) ||
-            //        string.Equals(x.ShortName, "PRUPS", StringComparison.OrdinalIgnoreCase))
-            //    .ToList();
 
             container.Padding(14).Column(col =>
             {

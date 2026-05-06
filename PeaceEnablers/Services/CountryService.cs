@@ -1073,16 +1073,16 @@ namespace PeaceEnablers.Services
 
             if (isRanking)
             {
-                ws.Cell(row, 5).Value = "Evaluator - AI Country Progress (%)";
+                ws.Cell(row, 5).Value = "Evaluator - AI Country Score";
             }
             else
             {
                 ws.Cell(row, 5).Value = "Pillar Name";
                 ws.Cell(row, 6).Value = "Total Score";
                 ws.Cell(row, 7).Value = "Total Answers";
-                ws.Cell(row, 8).Value = "Evaluator Pillar Progress (%)";
-                ws.Cell(row, 9).Value = "AI Pillar Progress (%)";
-                ws.Cell(row, 10).Value = "Evaluator - AI Country Progress (%)";
+                ws.Cell(row, 8).Value = "Evaluator Pillar Score";
+                ws.Cell(row, 9).Value = "AI Pillar Score";
+                ws.Cell(row, 10).Value = "Evaluator - AI Country Score";
             }
 
             var header = ws.Range(row, 1, row, totalColumns);
@@ -1109,7 +1109,7 @@ namespace PeaceEnablers.Services
                     ws.Cell(row, 1).Value = sno++;
                     ws.Cell(row, 2).Value = cityData.CountryName;
                     ws.Cell(row, 3).Value = cityData.Continent;                    
-                    ws.Cell(row, 5).Value = $"{cityProgress:F2}% - {cityData.AICountryProgress:F2}%";
+                    ws.Cell(row, 5).Value = $"{cityProgress:F2} - {cityData.AICountryProgress:F2}";
 
                     row++;
                     continue;
@@ -1130,12 +1130,12 @@ namespace PeaceEnablers.Services
                     ws.Cell(row, 5).Value = pillar.PillarName;
                     ws.Cell(row, 6).Value = pillar.TotalScore;
                     ws.Cell(row, 7).Value = pillar.TotalAns;
-                    ws.Cell(row, 8).Value = $"{pillar.PillarProgress:F2}%";
-                    ws.Cell(row, 9).Value = $"{pillar.AIPillarProgress:F2}%";
+                    ws.Cell(row, 8).Value = $"{pillar.PillarProgress:F2}";
+                    ws.Cell(row, 9).Value = $"{pillar.AIPillarProgress:F2}";
 
                     if (first)
                     {
-                        ws.Cell(row, 10).Value = $"{cityProgress:F2}% - {cityData.AICountryProgress:F2}%";
+                        ws.Cell(row, 10).Value = $"{cityProgress:F2} - {cityData.AICountryProgress:F2}";
                         first = false;
                     }
 

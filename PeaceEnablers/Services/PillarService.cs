@@ -542,16 +542,28 @@ namespace PeaceEnablers.Services
 
                     foreach (var user in names)
                     {
-                        var score = pillar.Questions
+                        var userData = pillar.Questions
                             .SelectMany(x => x.Users)
                             .Where(x => x.Key == user.UserID)
-                            .Sum(x => x.Value.Score) ?? 0;
+                            .ToList(); // materialize once
+
+                        var count = userData.Count;
+
+                        decimal score = 0;
+
+                        if (count > 0)
+                        {
+                            var totalScore = userData.Sum(x => x.Value.Score) ?? 0;
+                            var answeredCount = userData.Count(x => x.Value.Score.HasValue);
+                            score = totalScore * 100m / (answeredCount * 4);
+                        }
 
                         var richText = ws.Cell(row, c++).GetRichText();
 
                         richText.AddText("Total Score:  ")
                             .SetBold().SetFontColor(XLColor.DarkGray);
-                        richText.AddText($"{score}\n")
+
+                        richText.AddText($"{Math.Round(score, 2)}\n")
                             .SetFontColor(XLColor.Black);
                     }
 
