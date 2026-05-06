@@ -174,13 +174,14 @@ namespace PeaceEnablers.Services
         {
             try
             {
-                // ✅ Normalize input
+                // ✅ Keep ORIGINAL values for storage, compute keys only for dedup
                 var inputCountries = request.Countries
                     .Select(c => new
-                    {                        
+                    {
+                        // ── Original values (used when creating entities) ──
                         CountryCode = c.CountryCode,
-                        CountryName = c.CountryName.Trim().ToLower(),
-                        Continent = c.Continent.Trim().ToLower(),
+                        CountryName = c.CountryName.Trim(),          // preserve casing
+                        Continent = c.Continent.Trim(),             // preserve casing
                         Region = c.Region?.Trim(),
                         Longitude = c.Longitude,
                         Latitude = c.Latitude,
@@ -189,77 +190,66 @@ namespace PeaceEnablers.Services
                         CountryAliasName = c.CountryAliasName,
                         DevelopmentCategory = c.DevelopmentCategory,
                         PeerCountries = c.PeerCountries,
-
+                        // ── Normalized keys (used only for dedup lookups) ──
+                        DedupKey = $"{c.CountryName.Trim().ToLowerInvariant()}_{c.Continent.Trim().ToLowerInvariant()}"
                     })
-                    .GroupBy(c => new { c.CountryName, c.Continent })
+                    .GroupBy(c => c.DedupKey)        // deduplicate within the request itself
                     .Select(g => g.First())
                     .ToList();
 
-                // ✅ Get existing countries (correct matching)
-                var existingCountries = await _context.Countries
-                    .Where(x => x.IsActive && !x.IsDeleted)
-                    .Select(x => new
-                    {
-                        CountryName = x.CountryName.ToLower(),
-                        State = x.Continent.ToLower()
-                    })
-                    .ToListAsync();
-
+                // ✅ Load existing countries once
                 var existingSet = new HashSet<string>(
-                    existingCountries.Select(x => $"{x.CountryName}_{x.State}")
+                    await _context.Countries
+                        .Where(x => x.IsActive && !x.IsDeleted)
+                        .Select(x => x.CountryName.ToLower() + "_" + x.Continent.ToLower())
+                        .ToListAsync(),
+                    StringComparer.OrdinalIgnoreCase
                 );
 
-                // ✅ Filter new countries
-                var newCountries = inputCountries
-                    .Where(c => !existingSet.Contains($"{c.CountryName}_{c.Continent}"))
-                    .ToList();
+                // ✅ Split into new vs already-existing
+                var newCountries = inputCountries.Where(c => !existingSet.Contains(c.DedupKey)).ToList();
+                var alreadyExisting = inputCountries.Where(c => existingSet.Contains(c.DedupKey))
+                                                      .Select(c => $"{c.CountryName}, {c.Continent}")
+                                                      .ToList();
 
-                var existingCountryNames = inputCountries
-                    .Where(c => existingSet.Contains($"{c.CountryName}_{c.Continent}"))
-                    .Select(c => $"{c.CountryName}, {c.Continent}")
-                    .ToList();
-
-                // ✅ Create country entities
-                var countryEntities = newCountries.Select(countryDto => new Country
+                // ✅ Build entities from ORIGINAL (properly-cased) values
+                var countryEntities = newCountries.Select(c => new Country
                 {
-
-                    CountryName = countryDto.CountryName,
-                    Continent = countryDto.Continent,
-                    Region = countryDto.Region,
-                    CreatedDate = DateTime.UtcNow,
-                    CountryCode = countryDto.CountryCode,
+                    CountryName = c.CountryName,   // "Algeria", not "algeria"
+                    Continent = c.Continent,      // "Africa", not "africa"
+                    Region = c.Region,
+                    CountryCode = c.CountryCode,
+                    Longitude = c.Longitude,
+                    Latitude = c.Latitude,
+                    Income = c.Income,
+                    Population = c.Population,
+                    CountryAliasName = c.CountryAliasName,
+                    DevelopmentCategory = c.DevelopmentCategory,
+                    Image = image,
                     IsActive = true,
                     IsDeleted = false,
-                    Image = image,
-                    Longitude = countryDto.Longitude,
-                    Latitude = countryDto.Latitude,
-                    Income = countryDto.Income,                    
-                    Population = countryDto.Population,
-                    CountryAliasName = countryDto.CountryAliasName,
-                    DevelopmentCategory = countryDto.DevelopmentCategory
+                    CreatedDate = DateTime.UtcNow,
                 }).ToList();
 
-                await _context.Countries.AddRangeAsync(countryEntities);
-                await _context.SaveChangesAsync();
-
-                var countryPeers = new List<CountryPeer>();
-
-                for (int i = 0; i < newCountries.Count; i++)
+                if (countryEntities.Any())
                 {
-                    var dto = newCountries[i];
-                    var country = countryEntities[i];
-
-                    if (dto.PeerCountries != null && dto.PeerCountries.Any())
-                    {
-                        countryPeers.AddRange(dto.PeerCountries.Select(peerId => new CountryPeer
-                        {
-                            CountryID = country.CountryID,
-                            PeerCountryID = peerId,
-                            IsActive = true,
-                            UpdatedDate = DateTime.UtcNow
-                        }));
-                    }
+                    await _context.Countries.AddRangeAsync(countryEntities);
+                    await _context.SaveChangesAsync();
                 }
+
+                // ✅ Peer countries (index-aligned with newCountries / countryEntities)
+                var countryPeers = newCountries
+                    .SelectMany((dto, i) =>
+                        dto.PeerCountries?.Any() == true
+                            ? dto.PeerCountries.Select(peerId => new CountryPeer
+                            {
+                                CountryID = countryEntities[i].CountryID,
+                                PeerCountryID = peerId,
+                                IsActive = true,
+                                UpdatedDate = DateTime.UtcNow
+                            })
+                            : Enumerable.Empty<CountryPeer>())
+                    .ToList();
 
                 if (countryPeers.Any())
                 {
@@ -267,27 +257,16 @@ namespace PeaceEnablers.Services
                     await _context.SaveChangesAsync();
                 }
 
-                // ✅ Response handling
-                if (existingCountryNames.Any() && newCountries.Any())
+                // ✅ Response
+                return (alreadyExisting.Any(), newCountries.Any()) switch
                 {
-                    return ResultResponseDto<string>.Success(
-                        "",
-                        new[] { $"{string.Join(", ", existingCountryNames)} already exist" }
-                    );
-                }
-                else if (existingCountryNames.Any())
-                {
-                    return ResultResponseDto<string>.Failure(
-                        new[] { $"{string.Join(", ", existingCountryNames)} already exist" }
-                    );
-                }
-                else
-                {
-                    return ResultResponseDto<string>.Success(
-                        "",
-                        new[] { "Country added successfully" }
-                    );
-                }
+                    (true, true) => ResultResponseDto<string>.Success("",
+                                        new[] { $"{string.Join(", ", alreadyExisting)} already exist" }),
+                    (true, false) => ResultResponseDto<string>.Failure(
+                                        new[] { $"{string.Join(", ", alreadyExisting)} already exist" }),
+                    _ => ResultResponseDto<string>.Success("",
+                                        new[] { "Country added successfully" })
+                };
             }
             catch (Exception ex)
             {
@@ -368,7 +347,7 @@ namespace PeaceEnablers.Services
         }
 
         #region GetCountriesAsync
-        public async Task<PaginationResponse<UserCountryMappingResponseDto>> GetCountriesAsync(PaginationRequest request, UserRole role)
+        public async Task<PaginationResponse<UserCountryMappingResponseDto>> GetCountriesAsync(CountryPaginationRequest request, UserRole role)
         {
             try
             {
@@ -385,6 +364,12 @@ namespace PeaceEnablers.Services
                     query = query.Where(x =>
                         x.CountryName.Contains(search) ||
                         x.Continent.Contains(search));
+                }
+
+                // 🔍 Filter by CountryID
+                if (request.CountryID.HasValue)
+                {
+                    query = query.Where(x => x.CountryID == request.CountryID);
                 }
 
                 // 📄 Pagination (DB level)

@@ -37,7 +37,7 @@ namespace PeaceEnablers.Controllers
         }
 
         [HttpGet("countries")]
-        public async Task<IActionResult> GetCountries([FromQuery] PaginationRequest request)
+        public async Task<IActionResult> GetCountries([FromQuery] CountryPaginationRequest request)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)

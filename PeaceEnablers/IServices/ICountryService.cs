@@ -8,7 +8,7 @@ namespace PeaceEnablers.IServices
 {
     public interface ICountryService
     {
-        Task<PaginationResponse<UserCountryMappingResponseDto>> GetCountriesAsync(PaginationRequest request, UserRole userRole);
+        Task<PaginationResponse<UserCountryMappingResponseDto>> GetCountriesAsync(CountryPaginationRequest request, UserRole userRole);
         Task<ResultResponseDto<List<UserCountryMappingResponseDto>>> getAllCountryByUserId(int userId, UserRole userRole);
         Task<ResultResponseDto<Country>> GetByIdAsync(int id);
         Task<ResultResponseDto<string>> AddBulkCountryAsync(BulkAddCountryDto q, string image = "");
