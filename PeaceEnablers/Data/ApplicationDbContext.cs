@@ -42,6 +42,8 @@ namespace PeaceEnablers.Data
         public DbSet<AiPillarStatsLast4MonthsView> AiPillarStatsLast4MonthsView { get; set; }
         public DbSet<AssistantChatHistory> AssistantChatHistory { get; set; }
         public DbSet<AIAssistantFAQ> AIAssistantFAQ { get; set; }
+        public DbSet<DocumentChunks> DocumentChunks { get; set; }
+        public DbSet<DocumentTOC> DocumentTOC { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -156,6 +158,17 @@ namespace PeaceEnablers.Data
             {
                 entity.HasKey(e => e.FAQID);
                 entity.ToTable("AIAssistantFAQ");
+            });
+
+            modelBuilder.Entity<DocumentTOC>(entity =>
+            {
+                entity.HasKey(e => e.TOCID);
+                entity.ToTable("DocumentTOC");
+            });
+            modelBuilder.Entity<DocumentChunks>(entity =>
+            {
+                entity.HasKey(e => e.ChunkID);
+                entity.ToTable("DocumentChunks");
             });
 
             base.OnModelCreating(modelBuilder);

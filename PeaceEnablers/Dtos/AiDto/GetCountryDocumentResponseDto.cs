@@ -4,7 +4,7 @@ namespace PeaceEnablers.Dtos.AiDto
 {
     public class GetCountryDocumentResponseDto
     {
-        public int CountryID { get; set; }
+        public int? CountryID { get; set; }
         public string CountryName { get; set; }
         public int NoOfUsers { get; set; }
         public int NoOfFiles { get; set; }
@@ -15,7 +15,7 @@ namespace PeaceEnablers.Dtos.AiDto
     public class GetCountryPillarDocumentResponseDto
     {
         public int CountryDocumentID { get; set; }
-        public int CountryID { get; set; }
+        public int? CountryID { get; set; }
         public int? PillarID { get; set; }
         public string? PillarName { get; set; }
         public string FileName { get; set; }

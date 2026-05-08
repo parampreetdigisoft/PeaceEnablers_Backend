@@ -12,7 +12,7 @@ namespace PeaceEnablers.Common.DI
         public static IServiceCollection AddDependencyInjection(this IServiceCollection services)
         {
             services.AddHostedService<ChannelWorker>();
-            //services.AddHostedService<AiJobService>();
+            services.AddHostedService<AiJobService>();
             services.AddScoped<Download>();
             services.AddHostedService<LogWorker>();
             // Channels

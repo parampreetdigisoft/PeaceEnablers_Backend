@@ -196,6 +196,9 @@ namespace PeaceEnablers.Backgroundjob
 
                     if (channel.CountryEnable)
                         await aiService.AnalyzeSingleCountry(channel.CountryID.Value);
+
+                    if (!channel.CountryEnable && channel.ImmediateSummaryEnable)
+                        await aiService.AnalyzeCountryImmediateSituation(channel.CountryID.Value);
                 }
 
                 
@@ -210,3 +213,4 @@ namespace PeaceEnablers.Backgroundjob
         #endregion
     }
 }
+    

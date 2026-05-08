@@ -5,7 +5,7 @@ namespace PeaceEnablers.Models
     public class CountryDocument
     {
         public int CountryDocumentID { get; set; }
-        public int CountryID { get; set; }
+        public int? CountryID { get; set; } // if country id is null then documen treated as global docx for the site 
         public int? PillarID { get; set; }
         public string FileName { get; set; }
         public string StoredFileName { get; set; }
@@ -16,6 +16,7 @@ namespace PeaceEnablers.Models
         public int? UploadedByUserID { get; set; }
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
         public bool IsDeleted { get; set; }
+        public string DocumentLevel { get; set; } // Gloabal,Country,Country_Pillar
     }
 
     public enum DocumentProcessingStatus

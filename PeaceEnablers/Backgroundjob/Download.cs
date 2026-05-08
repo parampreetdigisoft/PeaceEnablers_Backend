@@ -16,6 +16,7 @@ namespace PeaceEnablers.Backgroundjob
         public bool CountryEnable { get; set; }
         public bool PillarEnable { get; set; }
         public bool QuestionEnable { get; set; }
+        public bool ImmediateSummaryEnable { get; set; }
         public string InsertAnalyticalLayerResults(int countryID = 0)
         {
             CountryID = countryID;
@@ -24,12 +25,13 @@ namespace PeaceEnablers.Backgroundjob
             return "Execution has been started";
         }
 
-        public Task AiResearchByCountryId(int countryID , bool countryEnable,bool pillarEnable, bool questionEnable)
+        public Task AiResearchByCountryId(int countryID , bool countryEnable,bool pillarEnable, bool questionEnable,bool immediateSummaryEnable = false)
         {
             this.CountryID = countryID;
             this.CountryEnable = countryEnable;
             this.PillarEnable = pillarEnable;
             this.QuestionEnable = questionEnable;
+            this.ImmediateSummaryEnable = immediateSummaryEnable;
             Type = "AiResearchByCountryId";
             channelService.Write(this);
             return Task.CompletedTask;

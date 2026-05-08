@@ -11,8 +11,11 @@ namespace PeaceEnablers.IServices
         Task AnalyzeSinglePillar(int countryId, int pillarId);
         Task AnalyzeQuestionsOfCountry(int countryId);
         Task AnalyzeQuestionsOfCountryPillar(int countryId, int pillarId);
+        Task ProcessDocument(int documentID);
+        Task DeleteDocument(int documentID);
+        Task AnalyzeCountryImmediateSituation(int countryId);
         Task<ChatCountryAskQuestionResponse> ChatCountryAsk(ChatCountryAskQuestionRequest request);
-
+        Task<ChatCountryAskQuestionResponse> ChatGlobalAsk(ChatGlobalAskQuestionRequest request);
         Task RunEvery2HoursJob();
         Task RunDailyJob();
         Task RunMonthlyJob();

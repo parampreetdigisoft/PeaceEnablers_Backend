@@ -1,6 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
-using Newtonsoft.Json;
 using PeaceEnablers.Common.Implementation;
 using PeaceEnablers.Common.Models.settings;
 using PeaceEnablers.Data;
@@ -25,11 +24,19 @@ namespace PeaceEnablers.Services
         }
         public async Task RunMonthlyJob()
         {
-            var newCountriesIds = _context.Countries.Where(x => x.IsActive && !x.IsDeleted ).Select(x => x.CountryID).ToList();
-            foreach (var id in newCountriesIds)
+            try
             {
-                await AnalyzeSingleCountryFull(id);
+                var newCountriesIds = _context.Countries.Where(x => x.IsActive && !x.IsDeleted).Select(x => x.CountryID).ToList();
+                foreach (var id in newCountriesIds)
+                {
+                    await AnalyzeSingleCountryFull(id);
+                }
             }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error in Run Monthly Job", ex);
+            }
+            
         }
 
         public async Task RunEvery2HoursJob()
@@ -48,20 +55,14 @@ namespace PeaceEnablers.Services
         {
             try
             {
-                var allCountriesIds = await _context.Countries
-                    .Where(x => x.IsActive && !x.IsDeleted)
-                    .Select(x => x.CountryID)
-                    .ToListAsync();
+                await ImportAllCountryImmediateSummary();
+                await ImportRemainingDocumentsToVectorDB();
+                await DeleteRemainingDocumentsToVectorDB();
 
-                foreach (var id in allCountriesIds)
-                {
-                    //await AnalyzeCountryImmediateSituation(id);
-                    Task.Delay(200).Wait(); // Add a delay of 200 milliseconds between each request
-                }
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error in Running job in Every 2-hour AI ", ex);
+                await _appLogger.LogAsync("Error in Running job in Run daily job ", ex);
             }
         }
         public async Task ImportAiScore()
@@ -102,7 +103,74 @@ namespace PeaceEnablers.Services
                 await AnalyzeSingleCountry(id);
             }
         }
-        
+
+        public async Task ImportAllCountryImmediateSummary()
+        {
+            var allCountriesIds = await _context.Countries
+                     .Where(x => x.IsActive && !x.IsDeleted)
+                     .Select(x => x.CountryID)
+                     .ToListAsync();
+
+            foreach (var id in allCountriesIds)
+            {
+                await AnalyzeCountryImmediateSituation(id);
+                await Task.Delay(200);
+            }
+
+        }
+
+        public async Task ImportRemainingDocumentsToVectorDB()
+        {
+            var activeDocumentIds = _context.CountryDocuments
+                    .Where(x => !x.IsDeleted)
+                    .Select(x => x.CountryDocumentID);
+
+            var data = await _context.DocumentChunks
+                .Where(x => !activeDocumentIds.Contains(x.CountryDocumentID))
+                .Select(x => x.CountryDocumentID)
+
+                .Union(
+                    _context.DocumentTOC
+                        .Where(x => !activeDocumentIds.Contains(x.CountryDocumentID))
+                        .Select(x => x.CountryDocumentID)
+                )
+                .Distinct()
+                .ToListAsync();
+
+
+            foreach (var documentID in data)
+            {
+                await ProcessDocument(documentID);
+                await Task.Delay(200);
+            }
+        }
+        public async Task DeleteRemainingDocumentsToVectorDB()
+        {
+            var activeDocumentIds = _context.CountryDocuments
+                    .Where(x => x.IsDeleted)
+                    .Select(x => x.CountryDocumentID);
+
+            var data = await _context.DocumentChunks
+                .Where(x => activeDocumentIds.Contains(x.CountryDocumentID))
+                .Select(x => x.CountryDocumentID)
+
+                .Union(
+                    _context.DocumentTOC
+                        .Where(x => activeDocumentIds.Contains(x.CountryDocumentID))
+                        .Select(x => x.CountryDocumentID)
+                )
+                .Distinct()
+                .ToListAsync();
+
+            foreach (var documentID in data)
+            {
+                await DeleteDocument(documentID);
+                await Task.Delay(200);
+            }
+        }
+
+        #region Ai api calls       
+
         public async Task AnalyzeAllCountriesFull()
         {
             var url = aiUrl + AiEndpoints.AnalyzeAllCountriesFull;
@@ -148,6 +216,16 @@ namespace PeaceEnablers.Services
             var url = aiUrl + AiEndpoints.AnalyzeCountryImmediateSituation(countryId);
             await _httpService.SendAsync<dynamic>(HttpMethod.Post, url, null, headers);
         }
+        public async Task ProcessDocument(int documentID)
+        {
+            var url = aiUrl + AiEndpoints.ProcessDocument(documentID);
+            await _httpService.SendAsync<dynamic>(HttpMethod.Post, url, null, headers);
+        }
+        public async Task DeleteDocument(int documentID)
+        {
+            var url = aiUrl + AiEndpoints.DeleteDocument(documentID);
+            await _httpService.SendAsync<dynamic>(HttpMethod.Post, url, null, headers);
+        }
         public async Task<ChatCountryAskQuestionResponse> ChatCountryAsk(ChatCountryAskQuestionRequest request)
         {
             var url = aiUrl + AiEndpoints.ChatCountryAsk();
@@ -155,6 +233,15 @@ namespace PeaceEnablers.Services
 
             return result;
         }
+        public async Task<ChatCountryAskQuestionResponse> ChatGlobalAsk(ChatGlobalAskQuestionRequest request)
+        {
+                var url = aiUrl + AiEndpoints.ChatGlobalAsk();
+                var result = await _httpService.SendAsync<ChatCountryAskQuestionResponse>(HttpMethod.Post, url, request, headers);
+    
+                return result;
+        }
+
+        #endregion Ai api calls 
     }
 
     #region AiEndpoints
@@ -162,6 +249,7 @@ namespace PeaceEnablers.Services
     public static class AiEndpoints
     {
         private const string BasePath = "/api/countries-score-analysis";
+        private const string DocumentPath = "/api/rag";
         private const string ChatPath = "/api/chat";
 
         public static string AnalyzeAllCountriesFull =>
@@ -185,23 +273,31 @@ namespace PeaceEnablers.Services
             $"{BasePath}/analyze/{countryId}/pillars/{pillarId}/questions";
         public static string AnalyzeCountryImmediateSituation(int countryId) =>
             $"{BasePath}/analyze/{countryId}/immediateSituation";
+
+        public static string ProcessDocument(int documentId) =>
+            $"{DocumentPath}/process-document/{documentId}";
+        public static string DeleteDocument(int documentId) =>
+            $"{DocumentPath}/delete-document/{documentId}";
+
         public static string ChatCountryAsk() => $"{ChatPath}/country";
+        public static string ChatGlobalAsk() => $"{ChatPath}/global";
     }
     #endregion
 
 
-
     #region Ai Models 
 
-    public class ChatCountryAskQuestionRequest
+    public class ChatCountryAskQuestionRequest : ChatGlobalAskQuestionRequest
     {
         public int CountryID { get; set; }
+        public int? PillarID { get; set; }
+    }
+    public class ChatGlobalAskQuestionRequest
+    {
         public string QuestionText { get; set; }
         public string? HistoryText { get; set; }
         public int? FAQID { get; set; }
-        public int? PillarID { get; set; }
     }
-
     public class ChatCountryAskQuestionResponse
     {
         public bool Success { get; set; }

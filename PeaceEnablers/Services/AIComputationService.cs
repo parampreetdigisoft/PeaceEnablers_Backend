@@ -1,5 +1,4 @@
 ﻿using AssessmentPlatform.Dtos.AiDto;
-using DocumentFormat.OpenXml.Spreadsheet;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -14,9 +13,6 @@ using PeaceEnablers.Dtos.CommonDto;
 using PeaceEnablers.Dtos.CountryDto;
 using PeaceEnablers.IServices;
 using PeaceEnablers.Models;
-using QuestPDF.Fluent;
-using QuestPDF.Helpers;
-using QuestPDF.Infrastructure;
 using System.Linq.Expressions;
 using System.Net;
 using System.Text.RegularExpressions;
@@ -841,7 +837,7 @@ namespace PeaceEnablers.Services
                 }
 
 
-                await _download.AiResearchByCountryId(dto.CountryID, dto.CountryEnable, dto.PillarEnable, dto.QuestionEnable);
+                await _download.AiResearchByCountryId(dto.CountryID, dto.CountryEnable, dto.PillarEnable, dto.QuestionEnable,dto.ImmediateSummaryEnable);
                 var aiResponse = await _context.AICountryScores.FirstOrDefaultAsync(x => x.CountryID == dto.CountryID);
                 if(aiResponse != null)
                 {
@@ -1629,6 +1625,10 @@ namespace PeaceEnablers.Services
             // Decode HTML entities (e.g., &mdash;)
             return WebUtility.HtmlDecode(noTags);
         }
+
+
+        #region ai document for local context
+
         public async Task<ResultResponseDto<string>> UploadAiDocuments(
             UploadAiDocumentRequest request,
             int userID,
@@ -1676,22 +1676,23 @@ namespace PeaceEnablers.Services
                         StoredFileName = storedFileName,
                         FilePath = fullPath,
                         CountryID = request.CountryID,
-                        PillarID = pillarId == 0 ? null : pillarId,
+                        PillarID = pillarId == 0 || request.CountryID == null ? null : pillarId,
                         FileType = ext,
-                        FileSize = file.Length,
+                        FileSize = file.Length / 1024,//kb file will be store now
                         ProcessingStatus = DocumentProcessingStatus.Pending,
                         UpdatedAt = DateTime.UtcNow,
-                        UploadedByUserID = userID
+                        UploadedByUserID = userID,
+                        DocumentLevel = GetDocumentLevel(request.CountryID, pillarId)
                     };
 
                     _context.CountryDocuments.Add(doc);
+                    await _context.SaveChangesAsync();
+                    await _iAIAnalayzeService.ProcessDocument(doc.CountryDocumentID);
                 }
 
-                await _context.SaveChangesAsync();
-
-                return ResultResponseDto<string>.Success(
-                    "",
-                    new[] { "Upload Ai Documents has been initiated successfully." });
+               return ResultResponseDto<string>.Success(
+                   "",
+                   new[] { "Upload Ai Documents has been initiated successfully." });            
             }
             catch (Exception ex)
             {
@@ -1699,6 +1700,22 @@ namespace PeaceEnablers.Services
 
                 return ResultResponseDto<string>.Failure(
                     new[] { "Failed to Upload Ai Documents, please try again later." });
+            }
+        }
+
+        static string GetDocumentLevel(int? countryID,int? pillarID)
+        {
+            if (countryID == null)
+            {
+                return "Global";
+            }
+            else if(countryID > 0 && (pillarID == null || pillarID == 0))
+            {
+                return "Country_Pillar";
+            }
+            else
+            {
+                return "Country";
             }
         }
 
@@ -1782,17 +1799,17 @@ namespace PeaceEnablers.Services
             try
             {
                 var result = await _context.CountryDocuments
-                   .Where(x => !x.IsDeleted && x.CountryID == request.CountryID)
+                   .Where(x => !x.IsDeleted && (x.CountryID == request.CountryID || x.CountryID == null))
                    .Select(x => new GetCountryPillarDocumentResponseDto
                    {
                        CountryDocumentID = x.CountryDocumentID,
                        CountryID = x.CountryID,
                        PillarID = x.PillarID,
 
-                       PillarName = _context.Pillars
+                       PillarName = x.CountryID.HasValue ? _context.Pillars
                            .Where(p => p.PillarID == x.PillarID)
                            .Select(p => p.PillarName)
-                           .FirstOrDefault(),
+                           .FirstOrDefault() : x.DocumentLevel,
 
                        FileName = x.FileName,
                        FilePath = x.FilePath,
@@ -1808,7 +1825,8 @@ namespace PeaceEnablers.Services
                    .ToListAsync();
 
                 var users = _context.Users
-                    .Where(x => result.Select(x => x.UploadedByUserID).Contains(x.UserID) && !x.IsDeleted)
+                    .Where(x => result.Select(x => x.UploadedByUserID)
+                    .Contains(x.UserID) && !x.IsDeleted)
                     .ToDictionary(x=>x.UserID , y=>y.FullName); 
 
                 foreach(var r in result)
@@ -1833,19 +1851,13 @@ namespace PeaceEnablers.Services
             try
             {
                 var query = _context.CountryDocuments
-                    .Where(x => !x.IsDeleted && x.CountryID == request.CountryID);
+                    .Where(x => !x.IsDeleted && x.CountryID == request.CountryID || (!request.CountryDocumentID.HasValue || x.CountryDocumentID == request.CountryDocumentID));
 
                 // 🔷 If not admin → only own documents
                 if (userRole != UserRole.Admin)
                 {
-                    query = query.Where(x => x.UploadedByUserID == userID && (!request.CountryDocumentID.HasValue || x.CountryDocumentID == request.CountryDocumentID));
-                }
-
-                // 🔷 If NOT delete all → filter by document id
-                if (!request.IsAll && request.CountryDocumentID.HasValue)
-                {
-                    query = query.Where(x => x.CountryDocumentID == request.CountryDocumentID.Value);
-                }                
+                    query = query.Where(x => x.UploadedByUserID == userID );
+                }              
 
                 var documents = await query.ToListAsync();
 
@@ -1859,6 +1871,7 @@ namespace PeaceEnablers.Services
                 foreach (var doc in documents)
                 {
                     doc.IsDeleted = true;
+                    await _iAIAnalayzeService.DeleteDocument(doc.CountryDocumentID);
                 }
 
                 await _context.SaveChangesAsync();
@@ -1877,31 +1890,47 @@ namespace PeaceEnablers.Services
         }
         public async Task<FileResult> DownloadDocument(int countryDocumentID, int userID, UserRole userRole)
         {
-            var doc = await _context.CountryDocuments
+            try
+            {
+                var doc = await _context.CountryDocuments
                 .FirstOrDefaultAsync(x => x.CountryDocumentID == countryDocumentID && !x.IsDeleted);
 
-            if (doc == null)
-                throw new Exception("Document not found.");
+                if (doc == null)
+                    throw new Exception("Document not found.");
 
-            if (!System.IO.File.Exists(doc.FilePath))
-                throw new Exception("File not found on server.");
+                if (!System.IO.File.Exists(doc.FilePath))
+                    throw new Exception("File not found on server.");
 
-            var ext = Path.GetExtension(doc.FileName).ToLower();
+                var ext = Path.GetExtension(doc.FileName).ToLower();
 
-            var contentType = ext switch
+                var contentType = ext switch
+                {
+                    ".pdf" => "application/pdf",
+                    ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    _ => "application/octet-stream"
+                };
+
+                var stream = new FileStream(doc.FilePath, FileMode.Open, FileAccess.Read);
+
+                return new FileStreamResult(stream, contentType)
+                {
+                    FileDownloadName = doc.FileName
+                };
+            }
+            catch(Exception ex)
             {
-                ".pdf" => "application/pdf",
-                ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                _ => "application/octet-stream"
-            };
+                await _appLogger.LogAsync("Error Occured in getDocument", ex);
 
-            var stream = new FileStream(doc.FilePath, FileMode.Open, FileAccess.Read);
+                var emptyStream = new MemoryStream();
 
-            return new FileStreamResult(stream, contentType)
-            {
-                FileDownloadName = doc.FileName
-            };
+                return new FileStreamResult(emptyStream, "application/pdf")
+                {
+                    FileDownloadName ="file.txt"
+                };
+            }
         }
+
+        #endregion ai document
 
         #endregion
     }

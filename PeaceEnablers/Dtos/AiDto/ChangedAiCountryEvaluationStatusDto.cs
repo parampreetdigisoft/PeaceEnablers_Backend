@@ -12,6 +12,7 @@
         public bool CountryEnable { get; set; }
         public bool PillarEnable { get; set; }
         public bool QuestionEnable { get; set; }
+        public bool ImmediateSummaryEnable { get; set; }
         public List<int> ViewerUserIDs { get; set; } = new();
     }
     public class RegeneratePillarAiSearchDto : RegenerateAiSearchDto

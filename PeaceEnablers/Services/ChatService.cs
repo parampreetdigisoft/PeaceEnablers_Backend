@@ -83,6 +83,41 @@ namespace PeaceEnablers.Services
             }
         }
 
+        public async Task<ResultResponseDto<ChatResponseDto>> AskAboutGlobal(ChatGlobalAskQuestionRequestDto request)
+        {
+            try
+            {
+                var r = new ChatGlobalAskQuestionRequest
+                {  
+                    QuestionText = request.QuestionText,
+                    FAQID = request.FAQID,
+                    HistoryText = request.HistoryText
+                };
+
+                var resutl = await _aIAnalyzeService.ChatGlobalAsk(r);
+
+                if (resutl == null || resutl.Success != true)
+                {
+                    return ResultResponseDto<ChatResponseDto>.Failure(
+                        new[] { resutl?.Message ?? "Failed to query request from PEM Aevum." }
+                    );
+                }
+
+                return ResultResponseDto<ChatResponseDto>.Success(new ChatResponseDto
+                {       
+                    QuestionText = request.QuestionText,
+                    FAQID = request.FAQID,
+                    ResponseText = resutl.Result ?? "An error occurred or we do not have an answer for that."
+                });
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("An error occurred while processing the AskAboutGlobal request.", ex);
+                return ResultResponseDto<ChatResponseDto>.Failure(new[] { "An error occurred while processing your request. Please try again later." });
+            }
+        }
+
+
         #endregion
     }
 }
