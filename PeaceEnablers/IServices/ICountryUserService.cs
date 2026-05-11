@@ -13,6 +13,7 @@ namespace PeaceEnablers.IServices
 {
     public interface ICountryUserService
     {
+        Task<List<Pillar>> GetAllAsync(int userId, UserRole userRole);
         Task<ResultResponseDto<List<PartnerCountryResponseDto>>> GetCountryUserCountries(int userID);
         Task<ResultResponseDto<CountryHistoryDto>> GetCountryHistory(int userId, TieredAccessPlan tier);
         Task<ResultResponseDto<List<GetCountriesSubmitionHistoryResponseDto>>> GetCountriesProgressByUserId(int userID);

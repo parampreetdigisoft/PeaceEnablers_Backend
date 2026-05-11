@@ -35,6 +35,29 @@ namespace PeaceEnablers.Controllers
         {
             return User.FindFirst("Tier")?.Value;
         }
+        private string? GetRoleFromClaims()
+        {
+            return User.FindFirst(ClaimTypes.Role)?.Value;
+        }
+        [HttpGet]
+        [Route("Pillars")]
+        public async Task<IActionResult> GetAll()
+        {
+            var userId = GetUserIdFromClaims();
+            if (userId == null)
+                return Unauthorized("User ID not found in token.");
+
+            var role = GetRoleFromClaims();
+            if (role == null)
+                return Unauthorized("You Don't have access.");
+
+            if (!Enum.TryParse<UserRole>(role, true, out var userRole))
+            {
+                return Unauthorized("You Don't have access.");
+            }
+
+            return Ok(await _countryUserService.GetAllAsync(userId.GetValueOrDefault(), userRole));
+        }
 
         [HttpGet("getCountryHistory")]
         public async Task<IActionResult> GetCountryHistory()
@@ -249,11 +272,6 @@ namespace PeaceEnablers.Controllers
             return File(content.Item2,
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 content.Item1);
-        }
-
-        private string? GetRoleFromClaims()
-        {
-            return User.FindFirst(ClaimTypes.Role)?.Value;
         }
 
     }

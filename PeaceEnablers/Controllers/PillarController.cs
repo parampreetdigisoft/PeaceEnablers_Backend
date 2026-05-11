@@ -38,6 +38,7 @@ namespace PeaceEnablers.Controllers
         [HttpGet]
         [Authorize]
         [Route("Pillars")]
+        [Authorize]
         public async Task<IActionResult> GetAll()
         {
             var userId = GetUserIdFromClaims();

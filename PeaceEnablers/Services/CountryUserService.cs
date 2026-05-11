@@ -28,6 +28,27 @@ namespace PeaceEnablers.Services
             _context = context;
             _appLogger = appLogger;
         }
+
+        public async Task<List<Pillar>> GetAllAsync(int userId, UserRole userRole)
+        {
+            try
+            {
+                var userPillar = await _context.CountryUserPillarMappings
+                      .Where(x => x.IsActive && x.UserID == userId)
+                      .Select(x => x.Pillar)
+                      .Where(x => x != null)
+                      .Distinct()
+                      .ToListAsync();
+
+                return userPillar!.Where(x => x != null).ToList()!;
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error Occure in GetAllAsync", ex);
+                return new List<Pillar>();
+            }
+
+        }
         public async Task<ResultResponseDto<CountryHistoryDto>> GetCountryHistory(int userId, TieredAccessPlan tier)
         {
             try
