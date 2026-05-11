@@ -944,7 +944,7 @@ namespace PeaceEnablers.Services
                 if (channel.QuestionEnable)
                 {
                     var currentYear = DateTime.Now.Year;
-                    var aiQuestionList = await _context.AIEstimatedQuestionScores.Where(x => x.CountryID == channel.CountryID && x.PillarID== channel.PillarID && x.Year == currentYear).ToListAsync();
+                    var aiQuestionList = await _context.AIEstimatedQuestionScores.Where(x => x.CountryID == channel.CountryID && x.PillarID == channel.PillarID && x.Year == currentYear).ToListAsync();
                     if (aiQuestionList.Count > 0)
                     {
                         _context.AIEstimatedQuestionScores.RemoveRange(aiQuestionList);
