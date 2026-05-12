@@ -120,7 +120,7 @@ namespace PeaceEnablers.Controllers
                     return Unauthorized("You Don't have access.");
                 }
 
-                var countryDetails = await _aIComputationService.GetCountryAiSummeryDetail(userId ?? 0, userRole, request.CountryID,request.Year);
+                var countryDetails = await _aIComputationService.GetCountryAiSummeryDetail(userId ?? 0, userRole, request.CountryID,request.Year, request.ReportType);
 
                 // Generate PDF               
 

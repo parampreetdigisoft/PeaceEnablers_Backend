@@ -21,7 +21,7 @@ namespace PeaceEnablers.IServices
         Task<ResultResponseDto<bool>> RegenerateAiSearch(RegenerateAiSearchDto aiCountryIdsDto, int userID, UserRole userRole);
         Task<ResultResponseDto<bool>> AddComment(AddCommentDto aiCountryIdsDto, int userID, UserRole userRole);
         Task<ResultResponseDto<bool>> RegeneratePillarAiSearch(RegeneratePillarAiSearchDto aiCountryIdsDto, int userID, UserRole userRole);
-        Task<AiCountrySummeryDto> GetCountryAiSummeryDetail(int userID, UserRole userRole, int? countryID, int year);
+        Task<AiCountrySummeryDto> GetCountryAiSummeryDetail(int userID, UserRole userRole, int? countryID, int year, string reportType = "AI");
         Task<List<AiCountrySummeryDto>> GetAllCountryAiSummeryDetail(int userID, UserRole userRole, int year);   
         Task<byte[]> GenerateAllCountryDetailsReport(List<AiCountrySummeryDto> countriesDetails, UserRole userRole, int userID, int year, DocumentFormat format = DocumentFormat.Pdf);
         Task<ResultResponseDto<string>> AITransferAssessment(AITransferAssessmentRequestDto r, int userID, UserRole userRole);

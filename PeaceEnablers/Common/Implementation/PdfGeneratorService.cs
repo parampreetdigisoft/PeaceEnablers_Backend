@@ -338,7 +338,7 @@ namespace PeaceEnablers.Common.Implementation
                     {
                         row.AutoItem()
                             .Background("#E8F0EC")
-                            .Padding(2).PaddingLeft(4).PaddingRight(4)
+                            //.Padding(2).PaddingLeft(4).PaddingRight(4)
                             .Text(globalRankLabel)
                             .FontSize(8).Bold().FontColor("#12352f");
 
@@ -346,7 +346,7 @@ namespace PeaceEnablers.Common.Implementation
 
                         row.AutoItem()
                             .Background("#FFF3E0")
-                            .Padding(2).PaddingLeft(4).PaddingRight(4)
+                            //.Padding(2).PaddingLeft(4).PaddingRight(4)
                             .Text(regionRankLabel)
                             .FontSize(8).Bold().FontColor("#5D3B00");
                     });
@@ -1956,6 +1956,7 @@ namespace PeaceEnablers.Common.Implementation
                 {
                     e.PaddingHorizontal(10)
                      .PaddingVertical(4)
+                     .Padding(2)
                      .Background("#F9FAFB")
                      .Border(1)
                      .BorderColor("#E5E7EB")

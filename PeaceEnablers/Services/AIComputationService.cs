@@ -974,8 +974,9 @@ namespace PeaceEnablers.Services
             }
         }
 
-        public async Task<AiCountrySummeryDto> GetCountryAiSummeryDetail(int userID, UserRole userRole, int? CountryID, int year)
+        public async Task<AiCountrySummeryDto> GetCountryAiSummeryDetail(int userID, UserRole userRole, int? CountryID, int year, string reportType = "AI")
         {
+            reportType = reportType.ToUpper();
             var query = await GetCountryAiSummeryDetails(userID, userRole, null, year);
             var countresDetails = await query.ToListAsync();
             var progress = await _commonService.GetCountriesProgressAsync(userID, (int)userRole, year);
@@ -1003,8 +1004,8 @@ namespace PeaceEnablers.Services
 
             int pillarCount = _appSettings.PillarCount;
 
-            var countryRanks = CalculateCountryRanks(progress, pillarCount);
-            ApplyCountryRanking(countresDetails, countryRanks);
+            var countryRanks = CalculateCountryRanks(progress, pillarCount, reportType);
+            ApplyCountryRanking(countresDetails, countryRanks , reportType);
 
             var countries = progress.Where(x => x.CountryID == CountryID);
 
@@ -1029,7 +1030,7 @@ namespace PeaceEnablers.Services
             return countryDetails ?? new AiCountrySummeryDto();
         }
 
-        private void ApplyCountryRanking(List<AiCountrySummeryDto> countriesDetails, List<dynamic> countryRanks)
+        private void ApplyCountryRanking(List<AiCountrySummeryDto> countriesDetails, List<dynamic> countryRanks, string reportType = "AI")
         {
             var totalCountryCount = countriesDetails.Count;
 
@@ -1051,7 +1052,10 @@ namespace PeaceEnablers.Services
             {
                 var rankedCountries = countryRanks
                     .Where(x => region.Value.Contains(x.CountryID))
-                    .OrderByDescending(x => x.ScoreProgress)
+                    .OrderByDescending(x => reportType == "AI"
+                        ? (x.AiProgress ?? 0)
+                        : (x.ScoreProgress ?? 0))
+
                     .Select((x, index) => new
                     {
                         x.CountryID,
@@ -1083,23 +1087,27 @@ namespace PeaceEnablers.Services
                 }
             }
         }
-        private List<dynamic> CalculateCountryRanks(List<EvaluationCountryProgressResultDto> progress, decimal pillarCount)
+        private List<dynamic> CalculateCountryRanks(List<EvaluationCountryProgressResultDto> progress, decimal pillarCount, string reportType = "AI")
         {
-            return progress
+            var groupedProgress = progress
                 .GroupBy(x => x.CountryID)
                 .Select(g => new
                 {
                     CountryID = g.Key,
-                    ScoreProgress = Math.Round((g.Select(x => x.ScoreProgress).DefaultIfEmpty(0).Sum())  / pillarCount, 2)
-                })
-                .OrderByDescending(x => x.ScoreProgress)
-                .Select((x, index) => new
-                {
-                    x.CountryID,
-                    x.ScoreProgress,
-                    Rank = index + 1
-                })
-                .ToList<dynamic>();
+                    ScoreProgress = Math.Round((g.Select(x => x.ScoreProgress).DefaultIfEmpty(0).Sum()) / pillarCount, 2),
+                    AiProgress = g.Select(x => x.AIProgress).DefaultIfEmpty(0).Average()
+                });
+
+            return groupedProgress
+                    .OrderByDescending(x => reportType == "AI" ? x.AiProgress : x.ScoreProgress)
+                    .Select((x, index) => new
+                    {
+                        x.CountryID,
+                        x.ScoreProgress,
+                        x.AiProgress,
+                        Rank = index + 1
+                    })
+                    .ToList<dynamic>();
         }
 
 
@@ -1741,8 +1749,15 @@ namespace PeaceEnablers.Services
                     .ToListAsync();
 
                 var query = _context.Countries
-                    .Where(c => !request.CountryID.HasValue || c.CountryID == request.CountryID 
-                        && userCountryIds.Contains(c.CountryID))                  
+                    .Where(c =>
+                        (
+                            !request.CountryID.HasValue
+                            || c.CountryID == request.CountryID
+                        )
+                        && (userCountryIds.Contains(c.CountryID) || userRole == UserRole.Admin)
+                        && c.IsActive
+                        && !c.IsDeleted
+                    )
                     .Select(x => new GetCountryDocumentResponseDto
                     {
                         CountryID = x.CountryID,

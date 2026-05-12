@@ -281,6 +281,7 @@ namespace PeaceEnablers.Services
                             .FirstOrDefault();
                         country.ScoreProgress = score;
                     }
+                    pillar.Countries = pillar.Countries.OrderByDescending(c => c.ScoreProgress).ToList();
                 }
 
                 _cache.Set(cacheKey, result, new MemoryCacheEntryOptions
