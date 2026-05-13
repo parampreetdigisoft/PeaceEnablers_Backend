@@ -405,7 +405,7 @@ namespace PeaceEnablers.Common.Implementation
                 new Shading { Val = ShadingPatternValues.Clear, Color = "auto", Fill = "FFFFFF" }));
 
             // ── Heading ──
-            cell.Append(CenteredBoldPara("Country Score", "212529", "20"));
+            cell.Append(CenteredBoldPara("Overall Country Score", "212529", "20"));
             // ── Ranking Labels ──
             var globalRankLabel = country.Rank.HasValue && country.TotalCountry.HasValue && country.TotalCountry >=1
                 ? $"Global Rank: {country.Rank} / {country.TotalCountry}"
@@ -417,38 +417,151 @@ namespace PeaceEnablers.Common.Implementation
                 ? $"{regionName}: {country.RegionRank} / {country.RegionTotalCountry}"
                 : $"{regionName}: N/A";
 
-            // ✅ Safe paragraph instead of table
-            cell.Append(
-                new Paragraph(
-                    new ParagraphProperties(
-                        new Justification { Val = JustificationValues.Center }
-                    ),
-                    new Run(
-                        new RunProperties(new Bold(), new FontSize { Val = "16" }),
-                        new Text(globalRankLabel + "   |   ")
-                    ),
-                    new Run(
-                        new RunProperties(new Bold(), new Color { Val = "5D3B00" }, new FontSize { Val = "16" }),
-                        new Text(regionRankLabel)
-                    )
-                )
-            );
+           
             // ── Donut image ──
             cell.Append(EmbedImage(mainPart, donutPng, imgEmuW, imgEmuH));
+ 
 
-            
             // ── Pillars | KPIs row ──
             cell.Append(BuildPillarKpiTable(pillarCount, kpiCount, leftDxa));
 
-            // ── Best / Worst badges ──
-            if (best != null)
-                cell.Append(BadgePara($"▲  {Shorten(best.Name, 22)}  ({best.Value:F0})",
-                                      "E8F5E9", "2E7D32", "1B5E20"));
-            if (worst != null)
-                cell.Append(BadgePara($"▼  {Shorten(worst.Name, 22)}  ({worst.Value:F0})",
-                                      "FDECEA", "C62828", "B71C1C"));
 
+            if (best != null)
+            {
+                cell.Append(
+                    BuildDualBadgeRow(
+                        $"▲ {Shorten(best.Name, 16)} ({best.Value:F0})",
+                        "E8F5E9",
+                        "1B5E20",
+
+                        globalRankLabel,
+                        "E8F0EC",
+                        "12352f"
+                    ));
+            }
+
+            // ─────────────────────────────────────────────
+            // Worst Pillar + Region Rank
+            // ─────────────────────────────────────────────
+            if (worst != null)
+            {
+                cell.Append(
+                    BuildDualBadgeRow(
+                        $"▼ {Shorten(worst.Name, 16)} ({worst.Value:F0})",
+                        "FDECEA",
+                        "B71C1C",
+
+                        regionRankLabel,
+                        "FFF3E0",
+                        "5D3B00"
+                    ));
+            }
             return cell;
+        }
+        private Table BuildDualBadgeRow(
+            string leftText,
+            string leftBg,
+            string leftColor,
+            string rightText,
+            string rightBg,
+            string rightColor)
+        {
+            var table = new Table(
+                new TableProperties(
+                    new TableWidth
+                    {
+                        Width = "5000", // 100%
+                        Type = TableWidthUnitValues.Pct
+                    },
+                    new TableBorders(
+                        new TopBorder { Val = BorderValues.None },
+                        new BottomBorder { Val = BorderValues.None },
+                        new LeftBorder { Val = BorderValues.None },
+                        new RightBorder { Val = BorderValues.None },
+                        new InsideHorizontalBorder { Val = BorderValues.None },
+                        new InsideVerticalBorder { Val = BorderValues.None }
+                    )
+                )
+            );
+
+            var row = new TableRow();
+
+            // Left badge
+            row.Append(
+                new TableCell(
+                    new TableCellProperties(
+                        new TableCellWidth
+                        {
+                            Width = "3250", // 65%
+                            Type = TableWidthUnitValues.Pct
+                        },
+                        new Shading
+                        {
+                            Val = ShadingPatternValues.Clear,
+                            Fill = leftBg
+                        },
+                        CellNoBorder()
+                    ),
+                    new Paragraph(
+                        new ParagraphProperties(
+                            new SpacingBetweenLines
+                            {
+                                Before = "40",
+                                After = "40"
+                            }),
+                        new Run(
+                            new RunProperties(
+                                new Color { Val = leftColor },
+                                new FontSize { Val = "14" }
+                            ),
+                            new Text(leftText)
+                        )
+                    )
+                )
+            );
+
+            // Right badge
+            row.Append(
+                new TableCell(
+                    new TableCellProperties(
+                        new TableCellWidth
+                        {
+                            Width = "1750", // 35%
+                            Type = TableWidthUnitValues.Pct
+                        },
+                        new Shading
+                        {
+                            Val = ShadingPatternValues.Clear,
+                            Fill = rightBg
+                        },
+                        CellNoBorder()
+                    ),
+                    new Paragraph(
+                        new ParagraphProperties(
+                            new Justification
+                            {
+                                Val = JustificationValues.Center
+                            },
+                            new SpacingBetweenLines
+                            {
+                                Before = "40",
+                                After = "40"
+                            }),
+                        new Run(
+                            new RunProperties(
+                                new Bold(),
+                                new Color { Val = rightColor },
+                                new FontSize { Val = "14" }
+                            ),
+                            new Text(rightText)
+                        )
+                    )
+                )
+            );
+
+            table.Append(row);
+
+            return table;
         }
 
         // ── RIGHT: Radar card (60 % width) ───────────────────────────────────────────

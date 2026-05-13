@@ -324,79 +324,150 @@ namespace PeaceEnablers.Common.Implementation
 
             container
                 .Background(Colors.White)
-                .Border(1).BorderColor("#afc4db")
+                .Border(1)
+                .BorderColor("#D8E8E2")
                 .Padding(8)
                 .Column(col =>
                 {
                     col.Spacing(0);
 
-                    col.Item().AlignCenter()
+                    // ─────────────────────────────────────────────
+                    // Title
+                    // ─────────────────────────────────────────────
+                    col.Item()
+                        .AlignCenter()
                         .Text("Overall Country Score")
-                        .FontSize(10).Bold().FontColor("#12352f");
+                        .FontSize(10)
+                        .Bold()
+                        .FontColor("#12352f");
 
-                    col.Item().AlignCenter().PaddingTop(3).Row(row =>
-                    {
-                        row.AutoItem()
-                            .Background("#E8F0EC")
-                            //.Padding(2).PaddingLeft(4).PaddingRight(4)
-                            .Text(globalRankLabel)
-                            .FontSize(8).Bold().FontColor("#12352f");
-
-                        row.ConstantItem(4); // spacer
-
-                        row.AutoItem()
-                            .Background("#FFF3E0")
-                            //.Padding(2).PaddingLeft(4).PaddingRight(4)
-                            .Text(regionRankLabel)
-                            .FontSize(8).Bold().FontColor("#5D3B00");
-                    });
-
+                    // ─────────────────────────────────────────────
                     // Donut chart
-                    col.Item().Height(130).Canvas((canvas, size) =>
-                        PaintDonut(canvas, size, score));
+                    // ─────────────────────────────────────────────
+                    col.Item()
+                        .Height(130)
+                        .Canvas((canvas, size) =>
+                            PaintDonut(canvas, size, score));
 
-                    col.Item().Height(1).Background("#E8F0EC");
+                    // Divider
+                    col.Item()
+                        .Height(1)
+                        .Background("#E8F0EC");
 
-                    // ── Pillar count + KPI count ───────────────────────────
-                    col.Item().PaddingTop(5).Row(row =>
+                    // ─────────────────────────────────────────────
+                    // Pillars + KPI Counts
+                    // ─────────────────────────────────────────────
+                    col.Item()
+                        .PaddingTop(5)
+                        .Row(row =>
+                        {
+                            // Pillars
+                            row.RelativeItem()
+                                .AlignCenter()
+                                .Column(c =>
+                                {
+                                    c.Item()
+                                        .AlignCenter()
+                                        .Text(pillarCount.ToString())
+                                        .FontSize(16)
+                                        .Bold()
+                                        .FontColor("#336b58");
+
+                                    c.Item()
+                                        .AlignCenter()
+                                        .Text("Pillars")
+                                        .FontSize(8)
+                                        .FontColor("#757575");
+                                });
+
+                            // Divider
+                            row.ConstantItem(1)
+                                .Background("#E0E0E0");
+
+                            // KPIs
+                            row.RelativeItem()
+                                .AlignCenter()
+                                .Column(c =>
+                                {
+                                    c.Item()
+                                        .AlignCenter()
+                                        .Text(kpiCount.ToString())
+                                        .FontSize(16)
+                                        .Bold()
+                                        .FontColor("#336b58");
+
+                                    c.Item()
+                                        .AlignCenter()
+                                        .Text("KPIs")
+                                        .FontSize(8)
+                                        .FontColor("#757575");
+                                });
+                        });
+
+                    // ─────────────────────────────────────────────
+                    // Best Pillar + Global Rank
+                    // ─────────────────────────────────────────────
+                    if (best != null)
                     {
-                        row.RelativeItem().AlignCenter().Column(c =>
-                        {
-                            c.Item().AlignCenter().Text(pillarCount.ToString())
-                                .FontSize(16).Bold().FontColor("#336b58");
-                            c.Item().AlignCenter().Text("Pillars")
-                                .FontSize(8).FontColor("#757575");
-                        });
-                        row.ConstantItem(1).Background("#E0E0E0");
-                        row.RelativeItem().AlignCenter().Column(c =>
-                        {
-                            c.Item().AlignCenter().Text(kpiCount.ToString())
-                                .FontSize(16).Bold().FontColor("#336b58");
-                            c.Item().AlignCenter().Text("KPIs")
-                                .FontSize(8).FontColor("#757575");
-                        });
-                    });
+                        col.Item()
+                            .PaddingTop(6)
+                            .Row(row =>
+                            {
+                                // Best pillar
+                                row.RelativeItem()
+                                    .Background("#E8F5E9")
+                                    .PaddingVertical(3)
+                                    .PaddingHorizontal(5)
+                                    .Text(
+                                        $"▲ {Shorten(best.Name, 16)} ({best.Value:F0})")
+                                    .FontSize(7)
+                                    .FontColor("#1B5E20");
 
-                    // ── Best / worst pillar badges (score, no % symbol) ───
-                    if (best != null && worst != null)
+                                row.ConstantItem(4);
+
+                                // Global rank
+                                row.AutoItem()
+                                    .Background("#E8F0EC")
+                                    .PaddingVertical(3)
+                                    .PaddingHorizontal(5)
+                                    .Text(globalRankLabel)
+                                    .FontSize(7)
+                                    .Bold()
+                                    .FontColor("#12352f");
+                            });
+                    }
+
+                    // ─────────────────────────────────────────────
+                    // Worst Pillar + Region Rank
+                    // ─────────────────────────────────────────────
+                    if (worst != null)
                     {
-                        col.Item().PaddingTop(6).Column(b =>
-                        {
-                            b.Item().Background("#E8F5E9").Padding(4).Row(r =>
+                        col.Item()
+                            .PaddingTop(3)
+                            .Row(row =>
                             {
-                                r.AutoItem().Text("▲ ").FontSize(8).FontColor("#2E7D32");
-                                r.RelativeItem()
-                                    .Text($"{Shorten(best.Name, 20)} ({best.Value:F0})")
-                                    .FontSize(8).FontColor("#1B5E20");
+                                // Worst pillar
+                                row.RelativeItem()
+                                    .Background("#FDECEA")
+                                    .PaddingVertical(3)
+                                    .PaddingHorizontal(5)
+                                    .Text(
+                                        $"▼ {Shorten(worst.Name, 16)} ({worst.Value:F0})")
+                                    .FontSize(7)
+                                    .FontColor("#B71C1C");
+
+                                row.ConstantItem(4);
+
+                                // Region rank
+                                row.AutoItem()
+                                    .Background("#FFF3E0")
+                                    .PaddingVertical(3)
+                                    .PaddingHorizontal(5)
+                                    .Text(regionRankLabel)
+                                    .FontSize(7)
+                                    .Bold()
+                                    .FontColor("#5D3B00");
                             });
-                            b.Item().PaddingTop(3).Background("#FDECEA").Padding(4).Row(r =>
-                            {
-                                r.AutoItem().Text("▼ ").FontSize(8).FontColor("#C62828");
-                                r.RelativeItem()
-                                    .Text($"{Shorten(worst.Name, 20)} ({worst.Value:F0})")
-                                    .FontSize(8).FontColor("#B71C1C");
-                            });
-                        });
                     }
                 });
         }

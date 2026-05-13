@@ -215,30 +215,57 @@ namespace PeaceEnablers.Services
 
             try
             {
-                // ✅ Try get from cache
                 if (_cache.TryGetValue(cacheKey, out List<PromotedPillarsResponseDto> cachedData))
                 {
                     return ResultResponseDto<List<PromotedPillarsResponseDto>>.Success(
                         cachedData,
-                        new List<string> { "Promoted cities fetched successfully" }
-                    );
+                        new List<string> { "Promoted Countries fetched successfully" });
                 }
 
-                int currentYear = DateTime.Now.Year;
+                int currentYear = DateTime.UtcNow.Year;
 
-                var admin = await _context.Users.FirstOrDefaultAsync(x => x.Role == Models.UserRole.Admin);
+                var admin = await _context.Users
+                    .AsNoTracking()
+                    .Where(x => x.Role == Models.UserRole.Admin)
+                    .Select(x => new
+                    {
+                        x.UserID,
+                        x.Role
+                    })
+                    .FirstOrDefaultAsync();
 
+                int userId = admin?.UserID ?? 0;
                 int role = (int)(admin?.Role ?? Models.UserRole.Admin);
 
-                var pillarScores = await _commonService.GetCountriesProgressAsync(admin?.UserID ?? 0, role, currentYear);
+                var pillarScores = await _commonService.GetCountriesProgressAsync(userId, role, currentYear);
 
+                var topCountriesByPillar = pillarScores
+                    .GroupBy(x => x.PillarID)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.OrderByDescending(y => y.ScoreProgress)
+                              .Take(3)
+                              .ToList()
+                    );
 
+                var countryIds = topCountriesByPillar
+                    .SelectMany(x => x.Value)
+                    .Select(x => x.CountryID)
+                    .Distinct()
+                    .ToList();
+
+                var scoreLookup = pillarScores
+                    .GroupBy(x => new { x.CountryID, x.PillarID })
+                    .ToDictionary(
+                        g => (g.Key.CountryID, g.Key.PillarID),
+                        g => g.First().ScoreProgress
+                    );
 
                 var result = await _context.AIPillarScores
-                    .Include(x => x.Country)
-                    .Include(x => x.Pillar)
+                    .AsNoTracking()
                     .Where(x =>
                         x.Year == currentYear &&
+                        countryIds.Contains(x.CountryID) &&
                         x.Country.IsActive &&
                         !x.Country.IsDeleted)
                     .GroupBy(x => new
@@ -254,9 +281,9 @@ namespace PeaceEnablers.Services
                         PillarName = g.Key.PillarName,
                         DisplayOrder = g.Key.DisplayOrder,
                         ImagePath = g.Key.ImagePath,
+
                         Countries = g
                             .OrderByDescending(x => x.AIProgress)
-                            .Take(3)
                             .Select(c => new PromotedCountryResponseDto
                             {
                                 CountryID = c.CountryID,
@@ -265,23 +292,30 @@ namespace PeaceEnablers.Services
                                 Continent = c.Country.Continent,
                                 Region = c.Country.Region,
                                 Image = c.Country.Image,
-                                ScoreProgress = c.AIProgress,
                                 Description = c.EvidenceSummary,
-                            }).ToList()
-                    }).OrderBy(p => p.DisplayOrder).ToListAsync();
-
+                                ScoreProgress = 0 
+                            })
+                            .ToList()
+                    })
+                    .OrderBy(x => x.DisplayOrder)
+                    .ToListAsync();
 
                 foreach (var pillar in result)
                 {
                     foreach (var country in pillar.Countries)
                     {
-                        var score = pillarScores
-                            .Where(s => s.CountryID == country.CountryID && s.PillarID == pillar.PillarID)
-                            .Select(s => s.ScoreProgress)
-                            .FirstOrDefault();
-                        country.ScoreProgress = score;
+                        if (scoreLookup.TryGetValue(
+                            (country.CountryID, pillar.PillarID),
+                            out var score))
+                        {
+                            country.ScoreProgress = score;
+                        }
                     }
-                    pillar.Countries = pillar.Countries.OrderByDescending(c => c.ScoreProgress).ToList();
+
+                    pillar.Countries = pillar.Countries
+                        .OrderByDescending(x => x.ScoreProgress)
+                        .Take(3)
+                        .ToList();
                 }
 
                 _cache.Set(cacheKey, result, new MemoryCacheEntryOptions
@@ -291,18 +325,16 @@ namespace PeaceEnablers.Services
                     Priority = CacheItemPriority.High
                 });
 
-
                 return ResultResponseDto<List<PromotedPillarsResponseDto>>.Success(
                     result,
-                    new List<string> { "Promoted Countries fetched successfully" }
-                );
+                    new List<string> { "Promoted Countries fetched successfully" });
             }
             catch (Exception ex)
             {
                 await _appLogger.LogAsync("Error Occurred in GetPromotedCountries", ex);
+
                 return ResultResponseDto<List<PromotedPillarsResponseDto>>.Failure(
-                    new[] { "Failed to get promoted Countries" }
-                );
+                    new[] { "Failed to get promoted Countries" });
             }
         }
 
