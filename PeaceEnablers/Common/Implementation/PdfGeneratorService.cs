@@ -2236,15 +2236,19 @@ namespace PeaceEnablers.Common.Implementation
 
         static SKColor GetColor(float value)
         {
-            if (value >= 70) return SKColor.Parse("#2E7D32");
-            if (value >= 40) return SKColor.Parse("#F9A825");
-            return SKColor.Parse("#C62828");
+            if (value >= 80) return SKColor.Parse("#C62828");
+            else if (value >= 60) return SKColor.Parse("#c66528");
+            else if(value >= 40) return SKColor.Parse("#F9A825");
+            else if(value >= 20) return SKColor.Parse("#469449");
+            return SKColor.Parse("#2E7D32");
         }
         static string GetBarColor(float value)
         {
-            if (value >= 70) return "#2E7D32";
-            if (value >= 40) return "#F9A825";
-            return "#C62828";
+            if (value >= 80) return "#C62828";
+            else if (value >= 60) return "#c66528";
+            else if (value >= 40) return "#F9A825";
+            else if (value >= 20) return "#469449";
+            return "#2E7D32";
         }
 
         static string GetSourceTypeBadgeColor(string sourceType) => sourceType?.ToLower() switch
@@ -3495,67 +3499,6 @@ namespace PeaceEnablers.Common.Implementation
                     PathEffect = SKPathEffect.CreateDash(new[] { 4f, 3f }, 0)
                 });
             DrawCanvasText(canvas, $"^{markerValue:F1}", mx - 12, padT - 1, 7, CountryPalette[0], bold: true);
-        }
-
-        void DrawRolePillarHeatmap(
-            IContainer container,
-            List<(string Role, List<PeerCountryHistoryReportDto> countries)> roles)
-        {
-            var pillars = roles
-                .SelectMany(r => r.countries)
-                .SelectMany(c => c.CountryHistory ?? new())
-                .SelectMany(h => h.Pillars ?? new())
-                .GroupBy(p => p.PillarID)
-                .Select(g => g.First())
-                .OrderBy(p => p.DisplayOrder)
-                .Take(_appSettings.PillarCount)
-                .ToList();
-
-            if (!pillars.Any()) return;
-
-            container.Table(table =>
-            {
-                table.ColumnsDefinition(cols =>
-                {
-                    cols.ConstantColumn(90);
-                    foreach (var _ in pillars) cols.RelativeColumn();
-                });
-
-                table.Cell().Background("#12352f").Padding(5)
-                    .Text("Role / Pillar").FontSize(7).Bold().FontColor(Colors.White);
-                foreach (var p in pillars)
-                    table.Cell().Background("#12352f").Padding(4).AlignCenter()
-                        .Text(Shorten(p.PillarName, 8))
-                        .FontSize(7).Bold().FontColor(Colors.White);
-
-                foreach (var (role, countries) in roles)
-                {
-                    table.Cell().Background("#f4f7f5").BorderBottom(0.5f).BorderColor("#e0e0e0")
-                        .Padding(5).Text(role).FontSize(7).FontColor("#333333");
-
-                    foreach (var pillar in pillars)
-                    {
-                        // include 0-score entries
-                        var validScores = countries
-                            .SelectMany(c => c.CountryHistory ?? new())
-                            .SelectMany(h => h.Pillars ?? new())
-                            .Where(p => p.PillarID == pillar.PillarID)
-                            .Select(p => (float)p.ScoreProgress)
-                            .ToList();
-
-                        bool hasData = validScores.Any();
-                        float avg = hasData ? validScores.Average() : -1f;
-
-                        string bg = !hasData ? "#f0f0f0"
-                            : InterpolateColor("#ffffff", "#12352f", avg / 100f);
-
-                        table.Cell().Background(bg).BorderBottom(0.5f).BorderColor("#e0e0e0")
-                            .Padding(3).AlignCenter()
-                            .Text(!hasData ? "—" : $"{avg:F0}")
-                            .FontSize(7).FontColor(avg >= 50 ? Colors.White : "#333333");
-                    }
-                }
-            });
         }
 
         // ══════════════════════════════════════════════════════════════════════════

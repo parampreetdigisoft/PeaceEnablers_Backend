@@ -2863,8 +2863,14 @@ namespace PeaceEnablers.Common.Implementation
         //  COLOUR / FORMAT UTILITIES  (mirrors PdfGeneratorService statics)
         // ════════════════════════════════════════════════════════════════════
 
-        private static string GetBarColor(float value) =>
-            value >= 70 ? "#2E7D32" : value >= 40 ? "#F9A825" : "#C62828";
+        static string GetBarColor(float value)
+        {
+            if (value >= 80) return "#C62828";
+            else if (value >= 60) return "#c66528";
+            else if (value >= 40) return "#F9A825";
+            else if (value >= 20) return "#469449";
+            return "#2E7D32";
+        }
 
         private static string Shorten(string text, int max) =>
             string.IsNullOrWhiteSpace(text) ? "" :
