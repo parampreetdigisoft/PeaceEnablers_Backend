@@ -843,65 +843,107 @@ namespace PeaceEnablers.Services
         {
             try
             {
+                var year = requestDto.UpdatedAt.Year;
+
                 var user = await _context.Users
                     .AsNoTracking()
                     .FirstOrDefaultAsync(x => x.UserID == requestDto.UserID);
 
                 if (!requestDto.PillarID.HasValue || user == null)
                 {
-                    return ResultResponseDto<List<QuestionsByUserPillarsResponsetDto>>.Failure(new[] { "Invalid request" });
+                    return ResultResponseDto<List<QuestionsByUserPillarsResponsetDto>>
+                        .Failure(new[] { "Invalid request" });
                 }
 
-                // Fetch pillar + questions
+                // =========================
+                // 1. PILLAR + QUESTIONS
+                // =========================
                 var pillar = await _context.Pillars
                     .Include(x => x.Questions)
-                    .ThenInclude(x=>x.QuestionOptions)
+                        .ThenInclude(x => x.QuestionOptions)
                     .AsNoTracking()
                     .FirstOrDefaultAsync(x => x.PillarID == requestDto.PillarID.Value);
 
                 if (pillar == null)
                 {
-                    return ResultResponseDto<List<QuestionsByUserPillarsResponsetDto>>.Failure(new[] { "Pillar not found" });
+                    return ResultResponseDto<List<QuestionsByUserPillarsResponsetDto>>
+                        .Failure(new[] { "Pillar not found" });
                 }
 
-                // User mappings (admins can see all in country)
+                // =========================
+                // 2. USER MAPPINGS
+                // =========================
                 var userMappings = await _context.UserCountryMappings
                     .Where(x => x.CountryID == requestDto.CountryID
                                 && !x.IsDeleted
-                                && (x.AssignedByUserId == requestDto.UserID || user.Role == UserRole.Admin))
+                                && (x.AssignedByUserId == requestDto.UserID
+                                    || x.UserID == requestDto.UserID
+                                    || user.Role == UserRole.Admin))
                     .AsNoTracking()
                     .ToListAsync();
 
                 var mappingIds = userMappings.Select(x => x.UserCountryMappingID).ToList();
 
+                // =========================
+                // 3. ASSESSMENTS
+                // =========================
                 var assessments = await _context.Assessments
-                    .Include(x=>x.UserCountryMapping)
+                    .Include(x => x.UserCountryMapping)
                     .Include(a => a.PillarAssessments
-                        .Where(pa => pa.PillarID == requestDto.PillarID)) // allowed
-                    .ThenInclude(pa => pa.Responses) // proper navigation include
-                    .Where(a => mappingIds.Contains(a.UserCountryMappingID) && a.IsActive && a.UpdatedAt.Year == requestDto.UpdatedAt.Year)
+                        .Where(pa => pa.PillarID == requestDto.PillarID))
+                    .ThenInclude(pa => pa.Responses)
+                    .Where(a => mappingIds.Contains(a.UserCountryMappingID)
+                                && a.IsActive
+                                && a.UpdatedAt.Year == year)
                     .AsNoTracking()
                     .ToListAsync();
 
-                var userIds = assessments.Select(x => x.UserCountryMapping.UserID);
-                // Fetch users dictionary
+                var userIds = assessments.Select(x => x.UserCountryMapping.UserID).Distinct().ToList();
+
+                // =========================
+                // 4. USERS DICTIONARY
+                // =========================
                 var users = await _context.Users
                     .Where(x => userIds.Contains(x.UserID))
                     .AsNoTracking()
                     .ToDictionaryAsync(x => x.UserID);
 
-                // Build responses by user
+                // =========================
+                // 5. USER RESPONSES
+                // =========================
                 var responsesByUser = assessments
                     .GroupBy(a => a.UserCountryMapping.UserID)
                     .ToDictionary(
                         g => g.Key,
                         g => g.SelectMany(a => a.PillarAssessments)
-                              .Where(pa => pa.PillarID == requestDto.PillarID)
                               .SelectMany(pa => pa.Responses)
                               .ToDictionary(r => r.QuestionID)
                     );
 
-                // Build final DTO list
+                // =========================
+                // 6. AI DATA (NEW)
+                // =========================
+                var aiRaw = await _context.AIEstimatedQuestionScores
+                    .Where(x => x.CountryID == requestDto.CountryID
+                                && x.PillarID == requestDto.PillarID
+                                && x.Year == year)
+                    .ToListAsync();
+
+                var aiDict = aiRaw
+                    .GroupBy(x => x.QuestionID)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => new
+                        {
+                            Score = Math.Round(g.Average(x => x.AIScore ?? 0), 0),
+                            Progress = g.Average(x => x.AIProgress ?? 0),
+                            EvidenceSummary = g.FirstOrDefault()?.EvidenceSummary ?? ""
+                        }
+                    );
+
+                // =========================
+                // 7. FINAL RESULT
+                // =========================
                 var pillarResponses = pillar.Questions
                     .OrderBy(q => q.DisplayOrder)
                     .Select(q =>
@@ -911,20 +953,48 @@ namespace PeaceEnablers.Services
                             users.TryGetValue(uid, out var u);
                             responsesByUser.TryGetValue(uid, out var userResponseDict);
 
-                            (userResponseDict ?? new() ).TryGetValue(q.QuestionID, out var response);
+                            (userResponseDict ?? new()).TryGetValue(q.QuestionID, out var response);
 
-                            var optionID= (response ?? new()).QuestionOptionID;
+                            var optionID = response?.QuestionOptionID;
                             var option = q.QuestionOptions.FirstOrDefault(x => x.OptionID == optionID);
 
                             return new QuestionsByUserInfo
                             {
                                 UserID = uid,
                                 FullName = u?.FullName ?? string.Empty,
-                                Score = response !=null ? (int?)response.Score:null,
+                                Score = response != null ? (int?)response.Score : null,
                                 OptionText = option?.OptionText ?? "",
                                 Justification = response?.Justification ?? string.Empty
                             };
                         }).ToList();
+
+                        // ? ADD AI RESULT ROW
+                        if (aiDict.TryGetValue(q.QuestionID, out var ai))
+                        {
+                            var option = q.QuestionOptions.FirstOrDefault(x => x.ScoreValue == ai.Score);
+
+
+                            userInfos.Insert(0, new QuestionsByUserInfo
+                            {
+                                UserID = int.MaxValue,
+                                FullName = "AI_Result",
+                                Score = (int?)ai.Score,
+                                OptionText = option?.OptionText ?? "OptionText",
+                                Justification = ai.EvidenceSummary
+                            });
+                        }
+                        else
+                        {
+                            // default AI row
+                            userInfos.Insert(0, new QuestionsByUserInfo
+                            {
+                                UserID = int.MaxValue,
+                                FullName = "AI_Result",
+                                Score = null,
+                                OptionText = "",
+                                Justification = ""
+                            });
+                        }
 
                         return new QuestionsByUserPillarsResponsetDto
                         {
@@ -937,15 +1007,15 @@ namespace PeaceEnablers.Services
                     })
                     .ToList();
 
-                return ResultResponseDto<List<QuestionsByUserPillarsResponsetDto>>.Success(
-                    pillarResponses,
-                    Array.Empty<string>() // no error message on success
-                );
+                return ResultResponseDto<List<QuestionsByUserPillarsResponsetDto>>
+                    .Success(pillarResponses, Array.Empty<string>());
             }
             catch (Exception ex)
             {
                 await _appLogger.LogAsync("Error occurred in GetQuestionsHistoryByPillar", ex);
-                return ResultResponseDto<List<QuestionsByUserPillarsResponsetDto>>.Failure(new[] { "There was an error, please try again later" });
+
+                return ResultResponseDto<List<QuestionsByUserPillarsResponsetDto>>
+                    .Failure(new[] { "There was an error, please try again later" });
             }
         }
 
