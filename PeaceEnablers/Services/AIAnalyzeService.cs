@@ -3,7 +3,9 @@ using Microsoft.Extensions.Options;
 using PeaceEnablers.Common.Implementation;
 using PeaceEnablers.Common.Models.settings;
 using PeaceEnablers.Data;
+using PeaceEnablers.Dtos.chatDto;
 using PeaceEnablers.IServices;
+using PeaceEnablers.Models;
 
 namespace PeaceEnablers.Services
 {
@@ -240,7 +242,27 @@ namespace PeaceEnablers.Services
     
                 return result;
         }
+        public async Task<ChatCountryAskQuestionResponse> CrossComparision(CrossComparisionRequest request)
+        {
+            var url = aiUrl + AiEndpoints.CrossComparision();
+            var result = await _httpService.SendAsync<ChatCountryAskQuestionResponse>(HttpMethod.Post, url, request, headers);
 
+            return result;
+        }
+        public async Task<ChatCountryExecutiveSlidesResponse?> GetCountrySlides(int countryId)
+        {
+            var url = aiUrl + AiEndpoints.CountrySlides();
+
+            return await _httpService.SendAsync<ChatCountryExecutiveSlidesResponse>(
+                HttpMethod.Post,
+                url,
+                new CountrySlidesRequest
+                {
+                    CountryId = countryId
+                },
+                headers
+            );
+        }
         #endregion Ai api calls 
     }
 
@@ -281,6 +303,9 @@ namespace PeaceEnablers.Services
 
         public static string ChatCountryAsk() => $"{ChatPath}/country";
         public static string ChatGlobalAsk() => $"{ChatPath}/global";
+        public static string CrossComparision() => $"{ChatPath}/cross-comparision";
+        public static string CountrySlides() => $"{ChatPath}/executive-slides";
+
     }
     #endregion
 
@@ -297,6 +322,13 @@ namespace PeaceEnablers.Services
         public string QuestionText { get; set; }
         public string? HistoryText { get; set; }
         public int? FAQID { get; set; }
+    }
+
+    public class CrossComparisionRequest
+    {
+        public List<int> CountryIDs { get; set; }
+        public string QuestionText { get; set; }
+        public string? HistoryText { get; set; }
     }
     public class ChatCountryAskQuestionResponse
     {

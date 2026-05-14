@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using PeaceEnablers.Dtos.AiDto;
 using PeaceEnablers.Dtos.chatDto;
@@ -96,5 +97,44 @@ namespace PeaceEnablers.Controllers
             return Ok(await _chatService.AskAboutGlobal(request));
         }
 
+
+        [HttpPost("crossComparision")]
+        [AllowAnonymous]
+        public async Task<IActionResult> CrossComparision([FromBody] CrossComparisionRequestDto request)
+        {
+            var userId = GetUserIdFromClaims();
+            if (userId == null)
+                return Unauthorized("User ID not found in token.");
+
+            var role = GetRoleFromClaims();
+            if (role == null)
+                return Unauthorized("You Don't have access.");
+
+            if (!Enum.TryParse<UserRole>(role, true, out var userRole))
+            {
+                return Unauthorized("You Don't have access.");
+            }
+
+            return Ok(await _chatService.CrossComparision(request));
+        }
+
+        [HttpPost("countrySlides")]
+        public async Task<IActionResult> GetCountrySlides([FromBody] int countryId)
+        {
+            var userId = GetUserIdFromClaims();
+            if (userId == null)
+                return Unauthorized("User ID not found in token.");
+
+            var role = GetRoleFromClaims();
+            if (role == null)
+                return Unauthorized("You Don't have access.");
+
+            if (!Enum.TryParse<UserRole>(role, true, out var userRole))
+            {
+                return Unauthorized("You Don't have access.");
+            }
+
+            return Ok(await _chatService.GetCountrySlides(countryId));
+        }
     }
 }

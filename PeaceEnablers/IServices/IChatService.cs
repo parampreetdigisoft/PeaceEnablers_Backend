@@ -9,5 +9,8 @@ namespace PeaceEnablers.IServices
         Task<ResultResponseDto<List<AIAssistantFAQDto>>> GetAssistantFAQDs(int userId, UserRole userRole);
         Task<ResultResponseDto<ChatResponseDto>> AskAboutCountry(CountryChatRequestDto request);
         Task<ResultResponseDto<ChatResponseDto>> AskAboutGlobal(ChatGlobalAskQuestionRequestDto request);
+        Task<ResultResponseDto<ChatResponseDto>> CrossComparision(CrossComparisionRequestDto request);
+        Task<ResultResponseDto<ChatCountryExecutiveSlidesResponse>> GetCountrySlides(int countryId);
+
     }
 }

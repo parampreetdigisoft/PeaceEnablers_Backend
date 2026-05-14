@@ -1,9 +1,10 @@
 ﻿
-using PeaceEnablers.Data;
-using PeaceEnablers.Models;
-using PeaceEnablers.IServices;
-using PeaceEnablers.Dtos.chatDto;
+using Microsoft.Extensions.Caching.Memory;
 using PeaceEnablers.Common.Models;
+using PeaceEnablers.Data;
+using PeaceEnablers.Dtos.chatDto;
+using PeaceEnablers.IServices;
+using PeaceEnablers.Models;
 
 namespace PeaceEnablers.Services
 {
@@ -13,12 +14,14 @@ namespace PeaceEnablers.Services
         private readonly ApplicationDbContext _context;
         private readonly IAppLogger _appLogger;
         private readonly IAIAnalyzeService _aIAnalyzeService;
-        public ChatService(ApplicationDbContext context,
+        private readonly IMemoryCache _cache;
+        public ChatService(ApplicationDbContext context, IMemoryCache cache,
             IAppLogger appLogger, IAIAnalyzeService aIAnalyzeService)
         {
             _context = context;
             _appLogger = appLogger;
             _aIAnalyzeService = aIAnalyzeService;
+            _cache = cache;
         }
         public async Task<ResultResponseDto<List<AIAssistantFAQDto>>> GetAssistantFAQDs(int userId, UserRole userRole)
         {
@@ -114,6 +117,109 @@ namespace PeaceEnablers.Services
             {
                 await _appLogger.LogAsync("An error occurred while processing the AskAboutGlobal request.", ex);
                 return ResultResponseDto<ChatResponseDto>.Failure(new[] { "An error occurred while processing your request. Please try again later." });
+            }
+        }
+
+        public async Task<ResultResponseDto<ChatResponseDto>> CrossComparision(CrossComparisionRequestDto request)
+        {
+            try
+            {
+                var r = new CrossComparisionRequest
+                {  
+                    CountryIDs = request.CountryIDs,
+                    QuestionText = request.QuestionText,
+                    HistoryText = request.HistoryText
+                };
+
+                var resutl = await _aIAnalyzeService.CrossComparision(r);
+
+                if (resutl == null || resutl.Success != true)
+                {
+                    return ResultResponseDto<ChatResponseDto>.Failure(
+                        new[] { resutl?.Message ?? "Failed to query request from PEM Aevum." }
+                    );
+                }
+
+                return ResultResponseDto<ChatResponseDto>.Success(new ChatResponseDto
+                {       
+                    QuestionText = request.QuestionText,
+                    FAQID = null,
+                    ResponseText = resutl.Result ?? "An error occurred or we do not have an answer for that."
+                });
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("An error occurred while processing the AskAboutGlobal request.", ex);
+                return ResultResponseDto<ChatResponseDto>.Failure(new[] { "An error occurred while processing your request. Please try again later." });
+            }
+        }
+        public async Task<ResultResponseDto<ChatCountryExecutiveSlidesResponse>> GetCountrySlides(int CountryId)
+        {
+            string cacheKey = $"CountrySlides_{CountryId}";
+
+            try
+            {
+                // ✅ Try cache first
+                if (_cache.TryGetValue(
+                    cacheKey,
+                    out ChatCountryExecutiveSlidesResponse cachedResult))
+                {
+                    return ResultResponseDto<ChatCountryExecutiveSlidesResponse>.Success(
+                        cachedResult,
+                        new List<string>
+                        {
+                    "Country executive slides fetched successfully from cache."
+                        }
+                    );
+                }
+
+                // ✅ Fetch from AI service
+                var result = await _aIAnalyzeService.GetCountrySlides(CountryId);
+
+                if (result == null || result.Success != true)
+                {
+                    return ResultResponseDto<ChatCountryExecutiveSlidesResponse>.Failure(
+                        new[]
+                        {
+                    result?.Message ??
+                    "Failed to fetch Country executive slides from VUI Aevum."
+                        }
+                    );
+                }
+
+                // ✅ Store in cache
+                _cache.Set(
+                    cacheKey,
+                    result,
+                    new MemoryCacheEntryOptions
+                    {
+                        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10),
+                        SlidingExpiration = TimeSpan.FromMinutes(5),
+                        Priority = CacheItemPriority.High
+                    });
+
+                // ✅ Return response
+                return ResultResponseDto<ChatCountryExecutiveSlidesResponse>.Success(
+                    result,
+                    new List<string>
+                    {
+                "Country executive slides fetched successfully."
+                    }
+                );
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync(
+                    "An error occurred while processing the GetCountrySlides request.",
+                    ex
+                );
+
+                return ResultResponseDto<ChatCountryExecutiveSlidesResponse>.Failure(
+                    new[]
+                    {
+                "An error occurred while processing your request. Please try again later."
+                    }
+                );
             }
         }
 

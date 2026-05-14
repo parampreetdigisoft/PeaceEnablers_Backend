@@ -1,4 +1,5 @@
-﻿using PeaceEnablers.Services;
+﻿using PeaceEnablers.Dtos.chatDto;
+using PeaceEnablers.Services;
 
 namespace PeaceEnablers.IServices
 {
@@ -16,6 +17,9 @@ namespace PeaceEnablers.IServices
         Task AnalyzeCountryImmediateSituation(int countryId);
         Task<ChatCountryAskQuestionResponse> ChatCountryAsk(ChatCountryAskQuestionRequest request);
         Task<ChatCountryAskQuestionResponse> ChatGlobalAsk(ChatGlobalAskQuestionRequest request);
+        Task<ChatCountryAskQuestionResponse> CrossComparision(CrossComparisionRequest request);
+        Task<ChatCountryExecutiveSlidesResponse?> GetCountrySlides(int countryId);
+
         Task RunEvery2HoursJob();
         Task RunDailyJob();
         Task RunMonthlyJob();
