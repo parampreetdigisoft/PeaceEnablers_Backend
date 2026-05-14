@@ -182,7 +182,7 @@ namespace PeaceEnablers.Services
                         new[]
                         {
                     result?.Message ??
-                    "Failed to fetch Country executive slides from VUI Aevum."
+                    "Failed to fetch Country executive slides from PEM Aevum."
                         }
                     );
                 }
