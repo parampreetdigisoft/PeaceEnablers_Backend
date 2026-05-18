@@ -194,7 +194,7 @@ namespace PeaceEnablers.Services
                     new MemoryCacheEntryOptions
                     {
                         AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(12),
-                        SlidingExpiration = TimeSpan.FromMinutes(10),
+                        SlidingExpiration = TimeSpan.FromHours(10),
                         Priority = CacheItemPriority.High
                     });
 
