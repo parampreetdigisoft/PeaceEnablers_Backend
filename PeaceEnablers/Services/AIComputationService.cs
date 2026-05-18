@@ -121,7 +121,7 @@ namespace PeaceEnablers.Services
                     foreach (var c in result.Data)
                     {
                         var pillars = countries.Where(x => x.CountryID == c.CountryID);
-                        var countryScore = Math.Round(pillars.Sum(x => x.ScoreProgress) / pillarCount, 2);
+                        var countryScore = Math.Round(pillars.Sum(x => x.ScoreProgress) / (decimal)pillarCount, 2);
                         c.EvaluatorScore = countryScore;
                         c.Discrepancy = Math.Abs(countryScore - (c.AIProgress ?? 0));
                         c.AICompletionRate = answeredQuestions.FirstOrDefault(x=>x.CountryID == c.CountryID)?.CompletionRate;                         
@@ -1021,7 +1021,7 @@ namespace PeaceEnablers.Services
                         .Select(x => x.ScoreProgress)
                         .DefaultIfEmpty(0)
                         .Sum();
-                    countryScore = Math.Round(countryScore / pillarCount, 2);
+                    countryScore = Math.Round(countryScore / (decimal)pillarCount, 2);
 
                     countryDetails.EvaluatorScore = Math.Round(countryScore, 2);
                     countryDetails.Discrepancy = Math.Abs(countryScore - (countryDetails.AIProgress ?? 0));
@@ -1094,7 +1094,7 @@ namespace PeaceEnablers.Services
                 .Select(g => new
                 {
                     CountryID = g.Key,
-                    ScoreProgress = Math.Round((g.Select(x => x.ScoreProgress).DefaultIfEmpty(0).Sum()) / pillarCount, 2),
+                    ScoreProgress = Math.Round((g.Select(x => x.ScoreProgress).DefaultIfEmpty(0).Sum()) / (decimal)pillarCount, 2),
                     AiProgress = g.Select(x => x.AIProgress).DefaultIfEmpty(0).Average()
                 });
 
@@ -1230,7 +1230,7 @@ namespace PeaceEnablers.Services
                             .Select(x => x.ScoreProgress)
                             .DefaultIfEmpty(0)
                             .Sum();
-                        countryScore = Math.Round(countryScore / pillarCount, 2);
+                        countryScore = Math.Round(countryScore / (decimal)pillarCount, 2);
 
                         countryDetails.EvaluatorScore = Math.Round(countryScore, 2);
                         countryDetails.Discrepancy = Math.Abs(countryScore - (countryDetails.AIProgress ?? 0));
@@ -1402,7 +1402,7 @@ namespace PeaceEnablers.Services
                             .DefaultIfEmpty(0)
                             .Sum();
 
-                        countryScore = Math.Round(countryScore / pillarCount, 2);
+                        countryScore = Math.Round(countryScore / (decimal)pillarCount, 2);
 
                         c.EvaluatorScore = countryScore;
                         c.Discrepancy = Math.Abs(countryScore - (c.AIProgress ?? 0));

@@ -468,7 +468,7 @@ namespace PeaceEnablers.Services
                 .GroupBy(x => x.CountryID)
                 .ToDictionary(
                     g => g.Key,
-                    g => Math.Round((g.Sum(x => (decimal?)x.ScoreProgress) ?? 0) / pillarCount, 2));
+                    g => Math.Round((g.Sum(x => (decimal?)x.ScoreProgress) ?? 0) / (decimal)pillarCount, 2));
 
             foreach (var country in response.Data)
             {
@@ -515,7 +515,7 @@ namespace PeaceEnablers.Services
                   .GroupBy(x => x.CountryID)
                   .ToDictionary(
                       g => g.Key,
-                      g => Math.Round((g.Sum(x => (decimal?)x.ScoreProgress) ?? 0) / pillarCount, 2));
+                      g => Math.Round((g.Sum(x => (decimal?)x.ScoreProgress) ?? 0) / (decimal)pillarCount, 2));
 
                         foreach (var country in result)
                         {
