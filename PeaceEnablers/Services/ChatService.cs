@@ -193,8 +193,8 @@ namespace PeaceEnablers.Services
                     result,
                     new MemoryCacheEntryOptions
                     {
-                        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10),
-                        SlidingExpiration = TimeSpan.FromMinutes(5),
+                        AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(12),
+                        SlidingExpiration = TimeSpan.FromMinutes(10),
                         Priority = CacheItemPriority.High
                     });
 
@@ -203,7 +203,7 @@ namespace PeaceEnablers.Services
                     result,
                     new List<string>
                     {
-                "Country executive slides fetched successfully."
+                         "Country executive slides fetched successfully."
                     }
                 );
             }
