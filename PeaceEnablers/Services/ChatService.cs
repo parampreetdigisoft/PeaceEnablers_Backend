@@ -217,7 +217,7 @@ namespace PeaceEnablers.Services
                 return ResultResponseDto<ChatCountryExecutiveSlidesResponse>.Failure(
                     new[]
                     {
-                "An error occurred while processing your request. Please try again later."
+                        "An error occurred while processing your request. Please try again later."
                     }
                 );
             }

@@ -41,11 +41,7 @@
 
         public string CountryName { get; set; } = string.Empty;
 
-        public PerformanceSummary DailyPerformance { get; set; } = new();
-
-        public PerformanceSummary WeeklyPerformance { get; set; } = new();
-
-        public PerformanceSummary MonthlyPerformance { get; set; } = new();
+        public PerformanceSummary RecentPerformance { get; set; } = new();
 
         public List<CombinedRiskItem> CombinedRisks { get; set; } = new();
 
