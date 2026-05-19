@@ -1013,7 +1013,7 @@ namespace PeaceEnablers.Services
 
             if (countryDetails != null)
             {
-                countryDetails.EvidenceSummary = CommonService.InitailLineOfExecutiveSummery(countryDetails.EvidenceSummary, countryDetails.ImmediateSituationSummary, countryDetails.AIProgress, countryDetails.CountryName, pillarCount, totalValidKpis);
+                var score =  countryDetails.AIProgress;
 
                 if (userRole != UserRole.CountryUser && countries != null)
                 {
@@ -1025,7 +1025,14 @@ namespace PeaceEnablers.Services
 
                     countryDetails.EvaluatorScore = Math.Round(countryScore, 2);
                     countryDetails.Discrepancy = Math.Abs(countryScore - (countryDetails.AIProgress ?? 0));
+
+                    if(reportType != "AI")
+                    {
+                        score = countryDetails.EvaluatorScore;
+                    }
                 }
+                countryDetails.EvidenceSummary = CommonService.InitailLineOfExecutiveSummery(countryDetails.EvidenceSummary, countryDetails.ImmediateSituationSummary, score, countryDetails.CountryName, pillarCount, totalValidKpis);
+
             }
             return countryDetails ?? new AiCountrySummeryDto();
         }
