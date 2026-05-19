@@ -75,7 +75,7 @@ namespace PeaceEnablers.Controllers
                 return Unauthorized("You Don't have access.");
             }
 
-            return Ok(await _chatService.AskAboutCountry(request));
+            return Ok(await _chatService.AskAboutCountry(request, userId.GetValueOrDefault(), userRole));
         }
 
         [HttpPost("askGlobalQuestion")]
@@ -94,7 +94,7 @@ namespace PeaceEnablers.Controllers
                 return Unauthorized("You Don't have access.");
             }
 
-            return Ok(await _chatService.AskAboutGlobal(request));
+            return Ok(await _chatService.AskAboutGlobal(request, userId.GetValueOrDefault(), userRole));
         }
 
 
@@ -115,7 +115,7 @@ namespace PeaceEnablers.Controllers
                 return Unauthorized("You Don't have access.");
             }
 
-            return Ok(await _chatService.CrossComparision(request));
+            return Ok(await _chatService.CrossComparision(request, userId.GetValueOrDefault(), userRole));
         }
 
         [HttpPost("countrySlides")]
@@ -134,7 +134,7 @@ namespace PeaceEnablers.Controllers
                 return Unauthorized("You Don't have access.");
             }
 
-            return Ok(await _chatService.GetCountrySlides(countryId));
+            return Ok(await _chatService.GetCountrySlides(countryId, userId.GetValueOrDefault(), userRole));
         }
     }
 }

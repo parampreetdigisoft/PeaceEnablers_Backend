@@ -48,10 +48,19 @@ namespace PeaceEnablers.Services
             }
         }
 
-        public async Task<ResultResponseDto<ChatResponseDto>> AskAboutCountry(CountryChatRequestDto request)
+        public async Task<ResultResponseDto<ChatResponseDto>> AskAboutCountry(CountryChatRequestDto request, int userId, UserRole userRole)
         {
             try
             {
+                if(userRole == UserRole.CountryUser)
+                {
+                    var isValidCountry = _context.PublicUserCountryMappings.Where(x => x.UserID == userId).Any(c => c.CountryID == request.CountryID);
+                    if (!isValidCountry)
+                    {
+                        return ResultResponseDto<ChatResponseDto>.Failure(new[] { "You don't have access to this country data." });
+                    }
+                }
+
                 var r = new ChatCountryAskQuestionRequest
                 {
                     CountryID = request.CountryID,
@@ -86,7 +95,7 @@ namespace PeaceEnablers.Services
             }
         }
 
-        public async Task<ResultResponseDto<ChatResponseDto>> AskAboutGlobal(ChatGlobalAskQuestionRequestDto request)
+        public async Task<ResultResponseDto<ChatResponseDto>> AskAboutGlobal(ChatGlobalAskQuestionRequestDto request, int userId, UserRole userRole)
         {
             try
             {
@@ -120,10 +129,26 @@ namespace PeaceEnablers.Services
             }
         }
 
-        public async Task<ResultResponseDto<ChatResponseDto>> CrossComparision(CrossComparisionRequestDto request)
+        public async Task<ResultResponseDto<ChatResponseDto>> CrossComparision(CrossComparisionRequestDto request, int userId, UserRole userRole)
         {
             try
             {
+                if (userRole == UserRole.CountryUser)
+                {
+                    var userCountryIds = _context.PublicUserCountryMappings
+                        .Where(x=>x.UserID == userId)
+                        .Select(x => x.CountryID)
+                        .ToList();
+
+                    var isValidCountry = request.CountryIDs
+                        .All(id => userCountryIds.Contains(id));
+
+                    if (!isValidCountry)
+                    {
+                        return ResultResponseDto<ChatResponseDto>
+                            .Failure(new[] { "You don't have access to this country data." });
+                    }
+                }
                 var r = new CrossComparisionRequest
                 {  
                     CountryIDs = request.CountryIDs,
@@ -153,13 +178,21 @@ namespace PeaceEnablers.Services
                 return ResultResponseDto<ChatResponseDto>.Failure(new[] { "An error occurred while processing your request. Please try again later." });
             }
         }
-        public async Task<ResultResponseDto<ChatCountryExecutiveSlidesResponse>> GetCountrySlides(int CountryId)
+        public async Task<ResultResponseDto<ChatCountryExecutiveSlidesResponse>> GetCountrySlides(int CountryId, int userId, UserRole userRole)
         {
             string cacheKey = $"CountrySlides_{CountryId}";
 
             try
             {
-                // ✅ Try cache first
+                if (userRole == UserRole.CountryUser)
+                {
+                    var isValidCountry = _context.PublicUserCountryMappings.Where(x => x.UserID == userId).Any(c => c.CountryID == CountryId);
+                    if (!isValidCountry)
+                    {
+                        return ResultResponseDto<ChatCountryExecutiveSlidesResponse>.Failure(new[] { "You don't have access to this country data." });
+                    }
+                }
+
                 if (_cache.TryGetValue(
                     cacheKey,
                     out ChatCountryExecutiveSlidesResponse cachedResult))
