@@ -34,6 +34,7 @@ namespace PeaceEnablers.Data
         public DbSet<AITrustLevel> AITrustLevels { get; set; } = default!;
         public DbSet<AnalyticalLayerPillarMapping> AnalyticalLayerPillarMappings { get; set; } = default!;
         public DbSet<EvaluationCountryProgressResultDto> CountryProgressResults { get; set; }
+        public DbSet<CountryRankingResultDto> CountryRankingResults { get; set; }
         public DbSet<GetCountriesProgressAdminDto> GetCountriesProgressAdminDto { get; set; }
         public DbSet<AIUserCountryMapping> AIUserCountryMappings { get; set; }
         public DbSet<CountryPeer> CountryPeers { get; set; } = default!;
@@ -130,6 +131,7 @@ namespace PeaceEnablers.Data
             modelBuilder.Entity<AnalyticalLayerPillarMapping>().HasKey(ur => ur.AnalyticalLayerPillarMappingID);
             modelBuilder.Entity<AIUserCountryMapping>().HasKey(ur => ur.AIUserCountryMappingID);
             modelBuilder.Entity<EvaluationCountryProgressResultDto>().HasNoKey().ToView(null); 
+            modelBuilder.Entity<CountryRankingResultDto>().HasNoKey().ToView(null); 
             modelBuilder.Entity<GetCountriesProgressAdminDto>().HasNoKey().ToView(null);
             modelBuilder.Entity<EvaluationCountryProgressHistoryResultDto>().HasNoKey().ToView(null);
             modelBuilder.Entity<CountryPeer>(entity =>

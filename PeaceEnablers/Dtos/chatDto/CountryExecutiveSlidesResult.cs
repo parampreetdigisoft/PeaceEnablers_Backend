@@ -37,9 +37,7 @@
 
     public class CountryExecutiveSlidesResult
     {
-        public int CountryId { get; set; }
-
-        public string CountryName { get; set; } = string.Empty;
+        public CountryRankingResponseDto Country { get; set; }
 
         public PerformanceSummary RecentPerformance { get; set; } = new();
 
@@ -61,4 +59,27 @@
     {
         public int CountryId { get; set; }
     }
+
+    public class CountryRankingResponseDto
+    {
+        public int CountryID { get; set; }
+        public string CountryName { get; set; }
+        public string Region { get; set; }
+        public string Continent { get; set; }
+        public int TotalCountry { get; set; }
+        public int CountryRank { get; set; }
+        public int TotalCountryInRegion { get; set; }
+        public int RegionRank { get; set; }
+        public decimal CountryAIScore { get; set; }
+        public int? DataYear { get; set; }
+        public List<PillarsUserHistroyResponseDto> Pillars { get; set; }
+    }
+    public class PillarsUserHistroyResponseDto
+    {
+        public int PillarID { get; set; }
+        public string PillarName { get; set; }
+        public decimal PillarScore { get; set; }
+        public int DisplayOrder { get; set; }
+    }
+
 }

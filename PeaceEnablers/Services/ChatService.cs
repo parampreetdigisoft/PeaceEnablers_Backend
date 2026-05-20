@@ -1,5 +1,6 @@
 ﻿
 using Microsoft.Extensions.Caching.Memory;
+using PeaceEnablers.Common.Interface;
 using PeaceEnablers.Common.Models;
 using PeaceEnablers.Data;
 using PeaceEnablers.Dtos.chatDto;
@@ -15,13 +16,15 @@ namespace PeaceEnablers.Services
         private readonly IAppLogger _appLogger;
         private readonly IAIAnalyzeService _aIAnalyzeService;
         private readonly IMemoryCache _cache;
+        private readonly ICommonService _commonService;
         public ChatService(ApplicationDbContext context, IMemoryCache cache,
-            IAppLogger appLogger, IAIAnalyzeService aIAnalyzeService)
+            IAppLogger appLogger, IAIAnalyzeService aIAnalyzeService, ICommonService commonService)
         {
             _context = context;
             _appLogger = appLogger;
             _aIAnalyzeService = aIAnalyzeService;
             _cache = cache;
+            _commonService = commonService;
         }
         public async Task<ResultResponseDto<List<AIAssistantFAQDto>>> GetAssistantFAQDs(int userId, UserRole userRole)
         {
@@ -193,15 +196,56 @@ namespace PeaceEnablers.Services
                     }
                 }
 
-                if (_cache.TryGetValue(
-                    cacheKey,
-                    out ChatCountryExecutiveSlidesResponse cachedResult))
+                var year = DateTime.UtcNow.Year;
+
+                var countryExists = await _commonService.GetCountriesRankings(CountryId, year);
+
+                var country = countryExists.FirstOrDefault(x=>x.CountryID == CountryId);
+
+                if (country == null)
                 {
+                   return ResultResponseDto<ChatCountryExecutiveSlidesResponse>.Failure(new[] { "Country not found." });
+                }
+
+                var pillars = (
+                            from x in _context.AIPillarScores
+                            join p in _context.Pillars
+                                on x.PillarID equals p.PillarID
+                            where x.CountryID == country.CountryID
+                                  && x.Year == country.DataYear
+                            select new PillarsUserHistroyResponseDto
+                            {
+                                PillarID = x.PillarID,
+                                PillarName = p.PillarName ?? "",
+                                DisplayOrder = p.DisplayOrder,
+                                PillarScore = x.AIProgress ?? 0
+                            }
+                        ).ToList();
+
+                var countryResult = new CountryRankingResponseDto
+                {
+                    Continent = country.Continent,
+                    CountryID = country.CountryID,
+                    CountryName = country.CountryName,
+                    CountryRank = country.CountryRank,
+                    CountryAIScore = country.CountryAIScore,
+                    DataYear = country.DataYear,
+                    Region = country.Region,
+                    RegionRank= country.RegionRank,
+                    TotalCountry = country.TotalCountry,
+                    TotalCountryInRegion = country.TotalCountryInRegion,
+                    Pillars = pillars.OrderBy(p => p.DisplayOrder).ToList()
+                };
+
+                if (_cache.TryGetValue(cacheKey, out ChatCountryExecutiveSlidesResponse cachedResult))
+                {
+                    cachedResult.Result.Country = countryResult;
+
                     return ResultResponseDto<ChatCountryExecutiveSlidesResponse>.Success(
                         cachedResult,
                         new List<string>
                         {
-                    "Country executive slides fetched successfully from cache."
+                            "Country executive slides fetched successfully from cache."
                         }
                     );
                 }
@@ -214,24 +258,22 @@ namespace PeaceEnablers.Services
                     return ResultResponseDto<ChatCountryExecutiveSlidesResponse>.Failure(
                         new[]
                         {
-                    result?.Message ??
-                    "Failed to fetch Country executive slides from PEM Aevum."
+                            result?.Message ??
+                            "Failed to fetch Country executive slides from PEM Aevum."
                         }
                     );
                 }
 
                 // ✅ Store in cache
-                _cache.Set(
-                    cacheKey,
-                    result,
+                _cache.Set(cacheKey,  result,
                     new MemoryCacheEntryOptions
-                    {
+                    { 
                         AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(12),
                         SlidingExpiration = TimeSpan.FromHours(10),
                         Priority = CacheItemPriority.High
                     });
 
-                // ✅ Return response
+                result.Result.Country = countryResult;
                 return ResultResponseDto<ChatCountryExecutiveSlidesResponse>.Success(
                     result,
                     new List<string>

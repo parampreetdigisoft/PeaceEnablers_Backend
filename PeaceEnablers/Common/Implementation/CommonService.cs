@@ -61,6 +61,27 @@ namespace PeaceEnablers.Common.Implementation
                 return new List<EvaluationCountryProgressResultDto>();
             }
         }
+
+        public async Task<List<CountryRankingResultDto>> GetCountriesRankings(int countryId, int year)
+        {
+            try
+            {
+                return await _context.CountryRankingResults
+                 .FromSqlRaw(
+                     "EXEC usp_getCountryRanking @countryId, @year",
+                     new SqlParameter("@countryId", countryId),
+                     new SqlParameter("@year", year)
+                 )
+                 .AsNoTracking()
+                 .ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error in Executing usp_getCountryRanking", ex);
+                return new List<CountryRankingResultDto>();
+            }
+        }
+
         public async Task<List<EvaluationCountryProgressHistoryResultDto>> GetCountriesProgressHistoryAsync(int userId, int role, int fromYear, int toYear)
         {
             try
