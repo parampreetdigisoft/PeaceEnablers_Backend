@@ -12,6 +12,7 @@ namespace PeaceEnablers.IServices
         Task AnalyzeSinglePillar(int countryId, int pillarId);
         Task AnalyzeQuestionsOfCountry(int countryId);
         Task AnalyzeQuestionsOfCountryPillar(int countryId, int pillarId);
+        Task AnalyzeCountryMissingQuestions(MissingCountryQuestionRequest r);
         Task ProcessDocument(int documentID);
         Task DeleteDocument(int documentID);
         Task AnalyzeCountryImmediateSituation(int countryId);

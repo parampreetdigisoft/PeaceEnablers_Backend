@@ -837,7 +837,8 @@ namespace PeaceEnablers.Services
                 }
 
 
-                await _download.AiResearchByCountryId(dto.CountryID, dto.CountryEnable, dto.PillarEnable, dto.QuestionEnable,dto.ImmediateSummaryEnable);
+                await _download.AiResearchByCountryId(dto.CountryID, dto.CountryEnable, dto.PillarEnable,
+                    dto.QuestionEnable,dto.ImmediateSummaryEnable, dto.RegenerateMissingQuestionsEnable);
                 var aiResponse = await _context.AICountryScores.FirstOrDefaultAsync(x => x.CountryID == dto.CountryID);
                 if(aiResponse != null)
                 {
@@ -957,6 +958,15 @@ namespace PeaceEnablers.Services
                 if (channel.PillarEnable)
                     await _iAIAnalayzeService.AnalyzeSinglePillar(channel.CountryID,channel.PillarID);
 
+                if (!channel.QuestionEnable && channel.RegenerateMissingQuestionsEnable)
+                {
+                    var payload = new MissingCountryQuestionRequest
+                    {
+                        PillarID = channel.PillarID,
+                        CountryID = channel.CountryID
+                    };
+                    await _iAIAnalayzeService.AnalyzeCountryMissingQuestions(payload);
+                }
 
                 var msglist = new List<string>
                 {

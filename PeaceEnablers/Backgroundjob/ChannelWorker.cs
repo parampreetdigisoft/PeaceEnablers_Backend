@@ -1,8 +1,9 @@
-﻿using PeaceEnablers.Data;
+﻿using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
+using PeaceEnablers.Data;
 using PeaceEnablers.IServices;
 using PeaceEnablers.Models;
-using Microsoft.Data.SqlClient;
-using Microsoft.EntityFrameworkCore;
+using PeaceEnablers.Services;
 using System.Collections.Concurrent;
 
 namespace PeaceEnablers.Backgroundjob
@@ -199,6 +200,14 @@ namespace PeaceEnablers.Backgroundjob
 
                     if (!channel.CountryEnable && channel.ImmediateSummaryEnable)
                         await aiService.AnalyzeCountryImmediateSituation(channel.CountryID.Value);
+
+                    if (channel.RegenerateMissingQuestionsEnable && !channel.QuestionEnable)
+                    {
+                        var p = new MissingCountryQuestionRequest { CountryID = channel.CountryID.Value };
+
+                        await aiService.AnalyzeCountryMissingQuestions(p);
+                    }
+
                 }
 
                 
