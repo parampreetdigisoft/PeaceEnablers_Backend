@@ -205,22 +205,35 @@ namespace PeaceEnablers.Services
                 if (country == null)
                 {
                    return ResultResponseDto<ChatCountryExecutiveSlidesResponse>.Failure(new[] { "Country not found." });
-                }
+                }                
 
                 var pillars = (
-                            from x in _context.AIPillarScores
-                            join p in _context.Pillars
-                                on x.PillarID equals p.PillarID
-                            where x.CountryID == country.CountryID
-                                  && x.Year == country.DataYear
-                            select new PillarsUserHistroyResponseDto
-                            {
-                                PillarID = x.PillarID,
-                                PillarName = p.PillarName ?? "",
-                                DisplayOrder = p.DisplayOrder,
-                                PillarScore = x.AIProgress ?? 0
-                            }
-                        ).ToList();
+                    from p in _context.Pillars
+
+                    join x in _context.AIPillarScores
+                        .Where(a => a.CountryID == country.CountryID
+                                 && a.Year == country.DataYear)
+                    on p.PillarID equals x.PillarID into pillarScores
+
+                    from score in pillarScores.DefaultIfEmpty()
+
+                    select new PillarsUserHistroyResponseDto
+                    {
+                        PillarID = p.PillarID,
+                        PillarName = p.PillarName ?? "",
+                        DisplayOrder = p.DisplayOrder,
+                        PillarScore = score != null ? score.AIProgress ?? 0 : 0,
+                        ImagePath = p.ImagePath
+                    }
+                ).ToList();
+
+                if (userRole == UserRole.CountryUser)
+                {
+                    var validPillars = _context.CountryUserPillarMappings.Where(x => x.UserID == userId).Select(x => x.PillarID);
+                    pillars = pillars.Where(x => validPillars.Contains(x.PillarID)).ToList();
+                }
+                
+
 
                 var countryResult = new CountryRankingResponseDto
                 {
