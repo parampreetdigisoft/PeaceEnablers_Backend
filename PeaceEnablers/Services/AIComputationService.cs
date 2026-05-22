@@ -725,9 +725,10 @@ namespace PeaceEnablers.Services
                     .Select(g => new
                     {
                         CountryID = g.Key,
+                        UpdatedAt = g.Max(x=>x.UpdatedAt),
                         AIProgress = g.Max(x => x.AIProgress)
                     })
-                    .ToDictionaryAsync(x => x.CountryID, x => x.AIProgress);
+                    .ToDictionaryAsync(x => x.CountryID, x => new { x.AIProgress ,x.UpdatedAt });
 
 
                 foreach (var country in countries)
@@ -766,7 +767,9 @@ namespace PeaceEnablers.Services
                     };
                     if (aiCountries?.TryGetValue(country.CountryID,out var aiCountryValue) ?? false)
                     {
-                        chartRow.Value = aiCountryValue ?? 0;
+                        chartRow.Value = aiCountryValue.AIProgress ?? 0;
+                        chartRow.UpdatedAt = aiCountryValue.UpdatedAt;
+
                     }
                     response.TableData.Add(chartRow);
 

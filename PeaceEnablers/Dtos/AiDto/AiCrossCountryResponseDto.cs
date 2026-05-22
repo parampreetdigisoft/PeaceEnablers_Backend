@@ -18,6 +18,7 @@
         public int CountryID { get; set; }
         public string CountryName { get; set; }
         public decimal Value { get; set; }
+        public DateTime? UpdatedAt { get; set; }
         public List<CrossCountryPillarValueDto> PillarValues { get; set; } = new List<CrossCountryPillarValueDto>();
     }
 
