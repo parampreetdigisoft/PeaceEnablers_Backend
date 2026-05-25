@@ -263,6 +263,18 @@ namespace PeaceEnablers.Services
                 headers
             );
         }
+
+        public async Task<ChatEmergingTrendsResponse?> GetEmergingTrendsAndIssues(int countryCount)
+        {
+            var url = aiUrl + AiEndpoints.EmergingTrendsAndIssues(countryCount);
+
+            return await _httpService.SendAsync<ChatEmergingTrendsResponse>(
+                HttpMethod.Get,
+                url,
+                null,
+                headers
+            );
+        }
         public async Task AnalyzeCountryMissingQuestions(MissingCountryQuestionRequest r)
         {
             var url = aiUrl + AiEndpoints.AnalyzeCityMissingQuestions();
@@ -311,6 +323,8 @@ namespace PeaceEnablers.Services
         public static string ChatGlobalAsk() => $"{ChatPath}/global";
         public static string CrossComparision() => $"{ChatPath}/cross-comparision";
         public static string CountrySlides() => $"{ChatPath}/executive-slides";
+        public static string EmergingTrendsAndIssues(int countryCount) =>
+            $"{ChatPath}/emerging-trends-and-issues?countryCount={countryCount}";
         public static string AnalyzeCityMissingQuestions() =>
           $"{BasePath}/analyze/missing-pillar-questions";
 

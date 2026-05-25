@@ -5,6 +5,7 @@ using PeaceEnablers.Common.Implementation;
 using PeaceEnablers.Common.Interface;
 using PeaceEnablers.Common.Models;
 using PeaceEnablers.Data;
+using PeaceEnablers.Dtos.chatDto;
 using PeaceEnablers.Dtos.CommonDto;
 using PeaceEnablers.Dtos.PublicDto;
 using PeaceEnablers.IServices;
@@ -20,13 +21,22 @@ namespace PeaceEnablers.Services
         private readonly IWebHostEnvironment _env;
         private readonly IMemoryCache _cache;
         private readonly ICommonService _commonService;
-        public PublicService(ApplicationDbContext context, IAppLogger appLogger, IWebHostEnvironment env, IMemoryCache cache, ICommonService commonService)
+        private readonly IAIAnalyzeService _aIAnalyzeService;
+
+        public PublicService(
+            ApplicationDbContext context,
+            IAppLogger appLogger,
+            IWebHostEnvironment env,
+            IMemoryCache cache,
+            ICommonService commonService,
+            IAIAnalyzeService aIAnalyzeService)
         {
             _context = context;
             _appLogger = appLogger;
             _env = env;
             _cache = cache;
             _commonService = commonService;
+            _aIAnalyzeService = aIAnalyzeService;
         }
         public async Task<ResultResponseDto<List<PartnerCountryResponseDto>>> getAllCountries()
         {
@@ -417,6 +427,71 @@ namespace PeaceEnablers.Services
                 await _appLogger.LogAsync("Error Occurred in GetPillarsDmi", ex);
                 return ResultResponseDto<List<PillarDmiResultDto>>.Failure(
                     new[] { "Failed to get promoted pillars" }
+                );
+            }
+        }
+
+        public async Task<ResultResponseDto<EmergingTrendsResult>> GetEmergingTrendsAndIssues(int countryCount)
+        {
+            string cacheKey = $"EmergingTrendsAndIssues_{countryCount}";
+
+            try
+            {
+                if (_cache.TryGetValue(cacheKey, out EmergingTrendsResult cachedResult))
+                {
+                    return ResultResponseDto<EmergingTrendsResult>.Success(
+                        cachedResult,
+                        new List<string>
+                        {
+                            "Emerging trends and issues fetched successfully from cache."
+                        }
+                    );
+                }
+
+                var result = await _aIAnalyzeService.GetEmergingTrendsAndIssues(countryCount);
+
+                if (result == null || result.Success != true)
+                {
+                    return ResultResponseDto<EmergingTrendsResult>.Failure(
+                        new[]
+                        {
+                            result?.Message ??
+                            "Failed to fetch emerging trends and issues."
+                        }
+                    );
+                }
+
+                _cache.Set(
+                    cacheKey,
+                    result,
+                    new MemoryCacheEntryOptions
+                    {
+                        AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(5),
+                        SlidingExpiration = TimeSpan.FromHours(4),
+                        Priority = CacheItemPriority.High
+                    }
+                );
+
+                return ResultResponseDto<EmergingTrendsResult>.Success(
+                    result.Result,
+                    new List<string>
+                    {
+                        "Emerging trends and issues fetched successfully."
+                    }
+                );
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync(
+                    "An error occurred while processing the GetEmergingTrendsAndIssues request.",
+                    ex
+                );
+
+                return ResultResponseDto<EmergingTrendsResult>.Failure(
+                    new[]
+                    {
+                        "An error occurred while processing your request. Please try again later."
+                    }
                 );
             }
         }

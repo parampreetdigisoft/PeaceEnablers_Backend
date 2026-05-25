@@ -20,6 +20,7 @@ namespace PeaceEnablers.IServices
         Task<ChatCountryAskQuestionResponse> ChatGlobalAsk(ChatGlobalAskQuestionRequest request);
         Task<ChatCountryAskQuestionResponse> CrossComparision(CrossComparisionRequest request);
         Task<ChatCountryExecutiveSlidesResponse?> GetCountrySlides(int countryId);
+        Task<ChatEmergingTrendsResponse?> GetEmergingTrendsAndIssues(int countryCount);
 
         Task RunEvery2HoursJob();
         Task RunDailyJob();

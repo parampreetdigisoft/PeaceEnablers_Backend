@@ -1,4 +1,5 @@
 ﻿using PeaceEnablers.Common.Models;
+using PeaceEnablers.Dtos.chatDto;
 using PeaceEnablers.Dtos.CommonDto;
 using PeaceEnablers.Dtos.PublicDto;
 
@@ -13,5 +14,6 @@ namespace PeaceEnablers.IServices
         Task<CountryCityResponse> GetCountriesAndCountries_WithStaleSupport();
         Task<ResultResponseDto<List<PromotedPillarsResponseDto>>> GetPromotedCountries();
         Task<ResultResponseDto<List<PillarDmiResultDto>>> GetPillarsDmi();
+        Task<ResultResponseDto<EmergingTrendsResult>> GetEmergingTrendsAndIssues(int countryCount);
     }
 }
