@@ -460,6 +460,47 @@ namespace PeaceEnablers.Services
                         }
                     );
                 }
+                var countryCodes = result.Result.Countries
+                    .Select(c => c.CountryCode?.Trim().ToLower())
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .ToList();
+
+                var countries = result.Result.Countries
+                    .Select(c => c.Country?.Trim().ToLower())
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .ToList();
+
+                var countryLookup = await _context.Countries
+                    .AsNoTracking()
+                    .Where(c =>
+                        c.IsActive &&
+                        !c.IsDeleted &&
+                        (
+                            countryCodes.Contains(c.CountryCode.ToLower()) ||
+                            countries.Contains(c.CountryName.ToLower())
+                        ))
+                    .Select(c => new
+                    {
+                        CountryCode = c.CountryCode.ToLower(),
+                        CountryName = c.CountryName.ToLower(),
+                        c.Image,
+                        c.Region,
+                        c.Continent,
+                        c.CountryID
+                    })
+                    .ToListAsync();
+
+                foreach (var trendCountry in result.Result.Countries)
+                {
+                    var countryCode = trendCountry.CountryCode?.Trim().ToLower();
+                    var countryName = trendCountry.Country?.Trim().ToLower();
+
+                    var matchedCountry = countryLookup.FirstOrDefault(x =>
+                        x.CountryCode == countryCode ||
+                        x.CountryName == countryName);
+
+                    trendCountry.ImagePath = matchedCountry?.Image ?? "";
+                }
 
                 _cache.Set(
                     cacheKey,

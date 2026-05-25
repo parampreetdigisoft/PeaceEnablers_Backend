@@ -2,6 +2,7 @@ namespace PeaceEnablers.Dtos.chatDto
 {
     public class EmergingTrendCountryCard
     {
+        public string ImagePath { get; set; } = string.Empty;
         public string Country { get; set; } = string.Empty;
 
         public string CountryCode { get; set; } = string.Empty;
