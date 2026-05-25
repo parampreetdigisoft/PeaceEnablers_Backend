@@ -463,7 +463,7 @@ namespace PeaceEnablers.Services
 
                 _cache.Set(
                     cacheKey,
-                    result,
+                    result.Result,
                     new MemoryCacheEntryOptions
                     {
                         AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(5),
