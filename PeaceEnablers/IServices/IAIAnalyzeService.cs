@@ -21,6 +21,7 @@ namespace PeaceEnablers.IServices
         Task<ChatCountryAskQuestionResponse> CrossComparision(CrossComparisionRequest request);
         Task<ChatCountryExecutiveSlidesResponse?> GetCountrySlides(int countryId);
         Task<ChatEmergingTrendsResponse?> GetEmergingTrendsAndIssues(int countryCount);
+        Task<ChatPillarLiveSignalsResponse?> GetPillarLiveSignals();
 
         Task RunEvery2HoursJob();
         Task RunDailyJob();

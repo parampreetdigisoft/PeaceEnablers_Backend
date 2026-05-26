@@ -15,5 +15,6 @@ namespace PeaceEnablers.IServices
         Task<ResultResponseDto<List<PromotedPillarsResponseDto>>> GetPromotedCountries();
         Task<ResultResponseDto<List<PillarDmiResultDto>>> GetPillarsDmi();
         Task<ResultResponseDto<EmergingTrendsResult>> GetEmergingTrendsAndIssues(int countryCount);
+        Task<ResultResponseDto<PillarLiveSignalsResult>> GetPillarLiveSignals();
     }
 }

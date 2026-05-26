@@ -275,6 +275,19 @@ namespace PeaceEnablers.Services
                 headers
             );
         }
+
+        public async Task<ChatPillarLiveSignalsResponse?> GetPillarLiveSignals()
+        {
+            var url = aiUrl + AiEndpoints.PillarLiveSignals();
+
+            return await _httpService.SendAsync<ChatPillarLiveSignalsResponse>(
+                HttpMethod.Get,
+                url,
+                null,
+                headers
+            );
+        }
+
         public async Task AnalyzeCountryMissingQuestions(MissingCountryQuestionRequest r)
         {
             var url = aiUrl + AiEndpoints.AnalyzeCityMissingQuestions();
@@ -325,6 +338,7 @@ namespace PeaceEnablers.Services
         public static string CountrySlides() => $"{ChatPath}/executive-slides";
         public static string EmergingTrendsAndIssues(int countryCount) =>
             $"{ChatPath}/emerging-trends-and-issues?countryCount={countryCount}";
+        public static string PillarLiveSignals() => $"{ChatPath}/pillar-live-signals";
         public static string AnalyzeCityMissingQuestions() =>
           $"{BasePath}/analyze/missing-pillar-questions";
 

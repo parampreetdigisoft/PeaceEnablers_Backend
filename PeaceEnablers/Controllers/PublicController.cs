@@ -103,5 +103,11 @@ namespace PeaceEnablers.Controllers
             return Ok(await _publicService.GetEmergingTrendsAndIssues(countryCount));
         }
 
+        [HttpGet("pillarLiveSignals")]
+        public async Task<IActionResult> GetPillarLiveSignals()
+        {
+            return Ok(await _publicService.GetPillarLiveSignals());
+        }
+
     }
 }

@@ -536,6 +536,97 @@ namespace PeaceEnablers.Services
                 );
             }
         }
+
+        public async Task<ResultResponseDto<PillarLiveSignalsResult>> GetPillarLiveSignals()
+        {
+            const string cacheKey = "PillarLiveSignals";
+
+            try
+            {
+                if (_cache.TryGetValue(cacheKey, out PillarLiveSignalsResult cachedResult))
+                {
+                    return ResultResponseDto<PillarLiveSignalsResult>.Success(
+                        cachedResult,
+                        new List<string>
+                        {
+                            "Pillar live signals fetched successfully from cache."
+                        }
+                    );
+                }
+
+                var result = await _aIAnalyzeService.GetPillarLiveSignals();
+
+                if (result == null || result.Success != true)
+                {
+                    return ResultResponseDto<PillarLiveSignalsResult>.Failure(
+                        new[]
+                        {
+                            result?.Message ??
+                            "Failed to fetch pillar live signals."
+                        }
+                    );
+                }
+
+                var pillarLookup = await _context.Pillars
+                    .AsNoTracking()
+                    .Select(p => new
+                    {
+                        p.PillarID,
+                        p.PillarName,
+                        p.ImagePath,
+                        p.DisplayOrder
+                    })
+                    .ToListAsync();
+
+                foreach (var pillarCard in result.Result.Pillars)
+                {
+                    var matched = pillarLookup.FirstOrDefault(p => p.PillarID == pillarCard.PillarId);
+                    pillarCard.PillarName = matched?.PillarName ?? $"Pillar {pillarCard.PillarId}";
+                    pillarCard.ImagePath = matched?.ImagePath ?? "";
+                }
+
+                result.Result.Pillars = result.Result.Pillars
+                    .OrderBy(p =>
+                    {
+                        var order = pillarLookup.FirstOrDefault(x => x.PillarID == p.PillarId)?.DisplayOrder;
+                        return order ?? p.PillarId;
+                    })
+                    .ToList();
+
+                _cache.Set(
+                    cacheKey,
+                    result.Result,
+                    new MemoryCacheEntryOptions
+                    {
+                        AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(12),
+                        SlidingExpiration = TimeSpan.FromHours(10),
+                        Priority = CacheItemPriority.High
+                    }
+                );
+
+                return ResultResponseDto<PillarLiveSignalsResult>.Success(
+                    result.Result,
+                    new List<string>
+                    {
+                        "Pillar live signals fetched successfully."
+                    }
+                );
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync(
+                    "An error occurred while processing the GetPillarLiveSignals request.",
+                    ex
+                );
+
+                return ResultResponseDto<PillarLiveSignalsResult>.Failure(
+                    new[]
+                    {
+                        "An error occurred while processing your request. Please try again later."
+                    }
+                );
+            }
+        }
     }
 }
 
