@@ -25,7 +25,7 @@
         public int CountryRank { get; set; }
         public int TotalCountryInRegion { get; set; }
         public int RegionRank { get; set; }
-        public decimal CountryAIScore { get; set; }
+        public decimal? CountryAIScore { get; set; }
         public int? DataYear { get; set; }
     }
 
