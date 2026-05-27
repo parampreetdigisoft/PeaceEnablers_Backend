@@ -15,6 +15,10 @@ namespace PeaceEnablers.IServices
         Task<ResultResponseDto<List<PromotedPillarsResponseDto>>> GetPromotedCountries();
         Task<ResultResponseDto<List<PillarDmiResultDto>>> GetPillarsDmi();
         Task<ResultResponseDto<EmergingTrendsResult>> GetEmergingTrendsAndIssues(int countryCount);
+        /// <summary>
+        /// Fetches emerging trends from AI, enriches countries, and caches on success only.
+        /// </summary>
+        Task<bool> RefreshEmergingTrendsCacheAsync(int countryCount, CancellationToken cancellationToken = default);
         Task<ResultResponseDto<PillarLiveSignalsResult>> GetPillarLiveSignals();
     }
 }

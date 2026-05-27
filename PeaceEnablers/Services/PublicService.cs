@@ -431,13 +431,17 @@ namespace PeaceEnablers.Services
             }
         }
 
+        private static string EmergingTrendsCacheKey(int countryCount) =>
+            $"EmergingTrendsAndIssues_{countryCount}";
+
         public async Task<ResultResponseDto<EmergingTrendsResult>> GetEmergingTrendsAndIssues(int countryCount)
         {
-            string cacheKey = $"EmergingTrendsAndIssues_{countryCount}";
-
             try
             {
-                if (_cache.TryGetValue(cacheKey, out EmergingTrendsResult cachedResult))
+                var cacheKey = EmergingTrendsCacheKey(countryCount);
+
+                if (_cache.TryGetValue(cacheKey, out EmergingTrendsResult cachedResult)
+                    && cachedResult?.Countries?.Count > 0)
                 {
                     return ResultResponseDto<EmergingTrendsResult>.Success(
                         cachedResult,
@@ -448,76 +452,10 @@ namespace PeaceEnablers.Services
                     );
                 }
 
-                var result = await _aIAnalyzeService.GetEmergingTrendsAndIssues(countryCount);
-
-                if (result == null || result.Success != true)
-                {
-                    return ResultResponseDto<EmergingTrendsResult>.Failure(
-                        new[]
-                        {
-                            result?.Message ??
-                            "Failed to fetch emerging trends and issues."
-                        }
-                    );
-                }
-                var countryCodes = result.Result.Countries
-                    .Select(c => c.CountryCode?.Trim().ToLower())
-                    .Where(x => !string.IsNullOrWhiteSpace(x))
-                    .ToList();
-
-                var countries = result.Result.Countries
-                    .Select(c => c.Country?.Trim().ToLower())
-                    .Where(x => !string.IsNullOrWhiteSpace(x))
-                    .ToList();
-
-                var countryLookup = await _context.Countries
-                    .AsNoTracking()
-                    .Where(c =>
-                        c.IsActive &&
-                        !c.IsDeleted &&
-                        (
-                            countryCodes.Contains(c.CountryCode.ToLower()) ||
-                            countries.Contains(c.CountryName.ToLower())
-                        ))
-                    .Select(c => new
+                return ResultResponseDto<EmergingTrendsResult>.Failure(
+                    new[]
                     {
-                        CountryCode = c.CountryCode.ToLower(),
-                        CountryName = c.CountryName.ToLower(),
-                        c.Image,
-                        c.Region,
-                        c.Continent,
-                        c.CountryID
-                    })
-                    .ToListAsync();
-
-                foreach (var trendCountry in result.Result.Countries)
-                {
-                    var countryCode = trendCountry.CountryCode?.Trim().ToLower();
-                    var countryName = trendCountry.Country?.Trim().ToLower();
-
-                    var matchedCountry = countryLookup.FirstOrDefault(x =>
-                        x.CountryCode == countryCode ||
-                        x.CountryName == countryName);
-
-                    trendCountry.ImagePath = matchedCountry?.Image ?? "";
-                }
-
-                _cache.Set(
-                    cacheKey,
-                    result.Result,
-                    new MemoryCacheEntryOptions
-                    {
-                        AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(5),
-                        SlidingExpiration = TimeSpan.FromHours(4),
-                        Priority = CacheItemPriority.High
-                    }
-                );
-
-                return ResultResponseDto<EmergingTrendsResult>.Success(
-                    result.Result,
-                    new List<string>
-                    {
-                        "Emerging trends and issues fetched successfully."
+                        "Emerging trends feed is being updated. Please try again shortly."
                     }
                 );
             }
@@ -535,6 +473,103 @@ namespace PeaceEnablers.Services
                     }
                 );
             }
+        }
+
+        public async Task<bool> RefreshEmergingTrendsCacheAsync(
+            int countryCount,
+            CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var enriched = await FetchAndEnrichEmergingTrendsAsync(countryCount, cancellationToken);
+
+                if (enriched == null || enriched.Countries == null || enriched.Countries.Count == 0)
+                {
+                    return false;
+                }
+
+                var cacheKey = EmergingTrendsCacheKey(countryCount);
+                _cache.Set(
+                    cacheKey,
+                    enriched,
+                    new MemoryCacheEntryOptions
+                    {
+                        AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(12),
+                        Priority = CacheItemPriority.High
+                    }
+                );
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync(
+                    "An error occurred while refreshing the emerging trends cache.",
+                    ex
+                );
+                return false;
+            }
+        }
+
+        private async Task<EmergingTrendsResult?> FetchAndEnrichEmergingTrendsAsync(
+            int countryCount,
+            CancellationToken cancellationToken = default)
+        {
+            var result = await _aIAnalyzeService.GetEmergingTrendsAndIssues(countryCount);
+
+            if (result == null || result.Success != true || result.Result == null)
+            {
+                return null;
+            }
+
+            if (result.Result.Countries == null || result.Result.Countries.Count == 0)
+            {
+                return null;
+            }
+
+            var countryCodes = result.Result.Countries
+                .Select(c => c.CountryCode?.Trim().ToLower())
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToList();
+
+            var countries = result.Result.Countries
+                .Select(c => c.Country?.Trim().ToLower())
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToList();
+
+            var countryLookup = await _context.Countries
+                .AsNoTracking()
+                .Where(c =>
+                    c.IsActive &&
+                    !c.IsDeleted &&
+                    (
+                        countryCodes.Contains(c.CountryCode.ToLower()) ||
+                        countries.Contains(c.CountryName.ToLower())
+                    ))
+                .Select(c => new
+                {
+                    CountryCode = c.CountryCode.ToLower(),
+                    CountryName = c.CountryName.ToLower(),
+                    c.Image,
+                    c.Region,
+                    c.Continent,
+                    c.CountryID
+                })
+                .ToListAsync(cancellationToken);
+
+            foreach (var trendCountry in result.Result.Countries)
+            {
+                var countryCode = trendCountry.CountryCode?.Trim().ToLower();
+                var countryName = trendCountry.Country?.Trim().ToLower();
+
+                var matchedCountry = countryLookup.FirstOrDefault(x =>
+                    x.CountryCode == countryCode ||
+                    x.CountryName == countryName);
+
+                trendCountry.ImagePath = matchedCountry?.Image ?? "";
+            }
+
+            return result.Result;
         }
 
         public async Task<ResultResponseDto<PillarLiveSignalsResult>> GetPillarLiveSignals()
