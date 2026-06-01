@@ -22,14 +22,15 @@ namespace PeaceEnablers.Services
         private readonly IMemoryCache _cache;
         private readonly ICommonService _commonService;
         private readonly IAIAnalyzeService _aIAnalyzeService;
-
+        private readonly IConfiguration _configuration;
         public PublicService(
             ApplicationDbContext context,
             IAppLogger appLogger,
             IWebHostEnvironment env,
             IMemoryCache cache,
             ICommonService commonService,
-            IAIAnalyzeService aIAnalyzeService)
+            IAIAnalyzeService aIAnalyzeService,
+            IConfiguration configuration)
         {
             _context = context;
             _appLogger = appLogger;
@@ -37,6 +38,7 @@ namespace PeaceEnablers.Services
             _cache = cache;
             _commonService = commonService;
             _aIAnalyzeService = aIAnalyzeService;
+            _configuration = configuration;
         }
         public async Task<ResultResponseDto<List<PartnerCountryResponseDto>>> getAllCountries()
         {
@@ -438,6 +440,8 @@ namespace PeaceEnablers.Services
         {
             try
             {
+                countryCount = _configuration.GetValue("EmergingTrendsCache:CountryCount", 8);
+
                 var cacheKey = EmergingTrendsCacheKey(countryCount);
 
                 if (_cache.TryGetValue(cacheKey, out EmergingTrendsResult cachedResult)
