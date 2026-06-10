@@ -498,7 +498,7 @@ namespace PeaceEnablers.Common.Implementation
             {
                 Style = SKPaintStyle.Stroke,
                 StrokeWidth = thick,
-                Color = GetColor(score),
+                Color = SKColor.Parse("#003160"),
                 IsAntialias = true,
                 StrokeCap = SKStrokeCap.Round
             };
