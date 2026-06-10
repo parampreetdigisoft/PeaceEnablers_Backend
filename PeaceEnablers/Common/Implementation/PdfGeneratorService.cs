@@ -520,7 +520,7 @@ namespace PeaceEnablers.Common.Implementation
             // Center: score value
             using var bigTxt = new SKPaint
             {
-                Color = GetColor(score),
+                Color = SKColor.Parse("#003160"),
                 TextSize = 26,
                 IsAntialias = true,
                 TextAlign = SKTextAlign.Center,
