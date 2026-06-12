@@ -251,6 +251,9 @@ namespace PeaceEnablers.Services
 
                 var pillarScores = await _commonService.GetCountriesProgressAsync(userId, role, currentYear);
 
+                int[] selectedPillars = { 1, 4, 7, 15, 22 };
+                pillarScores = pillarScores.Where(x => selectedPillars.Contains(x.PillarID)).ToList();
+
                 var topCountriesByPillar = pillarScores
                     .GroupBy(x => x.PillarID)
                     .ToDictionary(
@@ -278,6 +281,7 @@ namespace PeaceEnablers.Services
                     .Where(x =>
                         x.Year == currentYear &&
                         countryIds.Contains(x.CountryID) &&
+                        selectedPillars.Contains(x.PillarID) &&
                         x.Country.IsActive &&
                         !x.Country.IsDeleted)
                     .GroupBy(x => new
