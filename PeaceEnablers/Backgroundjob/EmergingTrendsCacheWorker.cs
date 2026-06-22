@@ -4,12 +4,13 @@ using PeaceEnablers.IServices;
 namespace PeaceEnablers.Backgroundjob
 {
     /// <summary>
-    /// Refreshes emerging trends in memory on a schedule. Retries every 10s until success (no cache on failure).
+    /// Refreshes emerging trends in memory on a schedule. Failed refreshes keep serving the last good snapshot.
     /// </summary>
     public class EmergingTrendsCacheWorker : BackgroundService
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly IConfiguration _configuration;
+        private readonly ILogger<EmergingTrendsCacheWorker> _logger;
 
         public EmergingTrendsCacheWorker(
             IServiceProvider serviceProvider,
@@ -18,6 +19,7 @@ namespace PeaceEnablers.Backgroundjob
         {
             _serviceProvider = serviceProvider;
             _configuration = configuration;
+            _logger = logger;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -28,10 +30,10 @@ namespace PeaceEnablers.Backgroundjob
             var retryDelay = TimeSpan.FromSeconds(
                 _configuration.GetValue("EmergingTrendsCache:RetryDelaySeconds", 10));
 
+            await RefreshUntilCachedAsync(countryCount, retryDelay, stoppingToken);
+
             while (!stoppingToken.IsCancellationRequested)
             {
-                await RefreshUntilSuccessAsync(countryCount, retryDelay, stoppingToken);
-
                 try
                 {
                     await Task.Delay(refreshInterval, stoppingToken);
@@ -40,40 +42,21 @@ namespace PeaceEnablers.Backgroundjob
                 {
                     break;
                 }
+
+                await TryRefreshAsync(countryCount, stoppingToken);
             }
         }
 
-        private async Task RefreshUntilSuccessAsync(
+        private async Task RefreshUntilCachedAsync(
             int countryCount,
             TimeSpan retryDelay,
             CancellationToken stoppingToken)
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                try
+                if (await TryRefreshAsync(countryCount, stoppingToken))
                 {
-                    using var scope = _serviceProvider.CreateScope();
-                    var publicService = scope.ServiceProvider.GetRequiredService<IPublicService>();
-                    var _appLogger = scope.ServiceProvider.GetRequiredService<IAppLogger>();
-
-                    var cached = await publicService.RefreshEmergingTrendsCacheAsync(
-                        countryCount,
-                        stoppingToken);
-
-                    if (cached)
-                    {
-                        //await _appLogger.LogAsync($"Emerging trends cache refreshed successfully (countryCount={countryCount})");
-                        return;
-                    }
-
-                    //await _appLogger.LogAsync($"Emerging trends refresh returned no data (countryCount={countryCount}); retry in {retryDelay.TotalSeconds}s");
-
-                }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    using var scope = _serviceProvider.CreateScope();
-                    var _appLogger = scope.ServiceProvider.GetRequiredService<IAppLogger>();
-                    await _appLogger.LogAsync($"Emerging trends cache refresh failed (countryCount={countryCount}); retry in {retryDelay.TotalSeconds}s");
+                    return;
                 }
 
                 try
@@ -84,6 +67,27 @@ namespace PeaceEnablers.Backgroundjob
                 {
                     break;
                 }
+            }
+        }
+
+        private async Task<bool> TryRefreshAsync(int countryCount, CancellationToken stoppingToken)
+        {
+            try
+            {
+                using var scope = _serviceProvider.CreateScope();
+                var publicService = scope.ServiceProvider.GetRequiredService<IPublicService>();
+
+                return await publicService.RefreshEmergingTrendsCacheAsync(
+                    countryCount,
+                    stoppingToken);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Emerging trends cache refresh failed (countryCount={CountryCount})",
+                    countryCount);
+                return false;
             }
         }
     }

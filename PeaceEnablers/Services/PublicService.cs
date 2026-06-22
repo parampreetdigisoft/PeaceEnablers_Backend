@@ -440,22 +440,99 @@ namespace PeaceEnablers.Services
         private static string EmergingTrendsCacheKey(int countryCount) =>
             $"EmergingTrendsAndIssues_{countryCount}";
 
+        private static string EmergingTrendsStaleCacheKey(int countryCount) =>
+            $"EmergingTrendsAndIssues_Stale_{countryCount}";
+
+        private TimeSpan EmergingTrendsCacheDuration =>
+            TimeSpan.FromHours(_configuration.GetValue("EmergingTrendsCache:CacheExpirationHours", 12));
+
+        private TimeSpan EmergingTrendsStaleCacheDuration =>
+            TimeSpan.FromHours(_configuration.GetValue("EmergingTrendsCache:StaleCacheExpirationHours", 168));
+
+        private bool TryGetEmergingTrendsFromCache(
+            int countryCount,
+            out EmergingTrendsResult? result,
+            bool allowStale = false)
+        {
+            result = null;
+
+            if (_cache.TryGetValue(EmergingTrendsCacheKey(countryCount), out EmergingTrendsResult? cached)
+                && cached?.Countries?.Count > 0)
+            {
+                result = cached;
+                return true;
+            }
+
+            if (allowStale
+                && _cache.TryGetValue(EmergingTrendsStaleCacheKey(countryCount), out EmergingTrendsResult? stale)
+                && stale?.Countries?.Count > 0)
+            {
+                result = stale;
+                return true;
+            }
+
+            return false;
+        }
+
+        private void SetEmergingTrendsCache(
+            int countryCount,
+            EmergingTrendsResult data,
+            bool updateStale = true)
+        {
+            var cacheOptions = new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = EmergingTrendsCacheDuration,
+                Priority = CacheItemPriority.NeverRemove
+            };
+
+            _cache.Set(EmergingTrendsCacheKey(countryCount), data, cacheOptions);
+
+            if (updateStale)
+            {
+                _cache.Set(
+                    EmergingTrendsStaleCacheKey(countryCount),
+                    data,
+                    new MemoryCacheEntryOptions
+                    {
+                        AbsoluteExpirationRelativeToNow = EmergingTrendsStaleCacheDuration,
+                        Priority = CacheItemPriority.NeverRemove
+                    }
+                );
+            }
+        }
+
+        private bool PreserveEmergingTrendsCacheOnRefreshFailure(int countryCount)
+        {
+            if (!TryGetEmergingTrendsFromCache(countryCount, out var stale, allowStale: true)
+                || stale == null)
+            {
+                return false;
+            }
+
+            SetEmergingTrendsCache(countryCount, stale, updateStale: false);
+            return true;
+        }
+
         public async Task<ResultResponseDto<EmergingTrendsResult>> GetEmergingTrendsAndIssues(int countryCount)
         {
             try
             {
                 countryCount = _configuration.GetValue("EmergingTrendsCache:CountryCount", 8);
 
-                var cacheKey = EmergingTrendsCacheKey(countryCount);
-
-                if (_cache.TryGetValue(cacheKey, out EmergingTrendsResult cachedResult)
-                    && cachedResult?.Countries?.Count > 0)
+                if (TryGetEmergingTrendsFromCache(countryCount, out var cachedResult, allowStale: true)
+                    && cachedResult != null)
                 {
+                    var fromPrimary = _cache.TryGetValue(
+                        EmergingTrendsCacheKey(countryCount),
+                        out EmergingTrendsResult _);
+
                     return ResultResponseDto<EmergingTrendsResult>.Success(
                         cachedResult,
                         new List<string>
                         {
-                            "Emerging trends and issues fetched successfully from cache."
+                            fromPrimary
+                                ? "Emerging trends and issues fetched successfully from cache."
+                                : "Emerging trends and issues fetched successfully from last known data."
                         }
                     );
                 }
@@ -489,29 +566,17 @@ namespace PeaceEnablers.Services
         {
             try
             {
+                countryCount = _configuration.GetValue("EmergingTrendsCache:CountryCount", countryCount);
+
                 var enriched = await FetchAndEnrichEmergingTrendsAsync(countryCount, cancellationToken);
 
-                if (enriched == null || enriched.Countries == null || enriched.Countries.Count == 0)
+                if (enriched?.Countries?.Count > 0)
                 {
-                    return false;
-                }
-
-                if (enriched.Countries.Any())
-                {
-                    var cacheKey = EmergingTrendsCacheKey(countryCount);
-                    _cache.Set(
-                        cacheKey,
-                        enriched,
-                        new MemoryCacheEntryOptions
-                        {
-                            AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(12),
-                            Priority = CacheItemPriority.High
-                        }
-                    );
+                    SetEmergingTrendsCache(countryCount, enriched);
                     return true;
                 }
 
-                return false;
+                return PreserveEmergingTrendsCacheOnRefreshFailure(countryCount);
             }
             catch (Exception ex)
             {
@@ -519,7 +584,8 @@ namespace PeaceEnablers.Services
                     "An error occurred while refreshing the emerging trends cache.",
                     ex
                 );
-                return false;
+
+                return PreserveEmergingTrendsCacheOnRefreshFailure(countryCount);
             }
         }
 

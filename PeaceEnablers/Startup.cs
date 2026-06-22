@@ -26,6 +26,7 @@ namespace PeaceEnablers
         {
             // Controllers
             services.AddControllers();
+            services.AddMemoryCache();
 
             services.AddDbContext<ApplicationDbContext>(options =>
                 options.UseSqlServer(
