@@ -1056,9 +1056,9 @@ namespace PeaceEnablers.Services
             return countryDetails ?? new AiCountrySummeryDto();
         }
 
-        private void ApplyCountryRanking(List<AiCountrySummeryDto> countriesDetails, List<dynamic> countryRanks, string reportType = "AI", int? totalCountryCount)
+        private void ApplyCountryRanking(List<AiCountrySummeryDto> countriesDetails, List<dynamic> countryRanks, string reportType = "AI", int? totalCountryCount = 0)
         {
-            totalCountryCount ??= countriesDetails.Count;
+            totalCountryCount = (totalCountryCount == null || totalCountryCount == 0) ?  countriesDetails.Count : totalCountryCount;
 
             // Global rank lookup
             var countryRankLookup = countryRanks.ToDictionary(x => x.CountryID);
