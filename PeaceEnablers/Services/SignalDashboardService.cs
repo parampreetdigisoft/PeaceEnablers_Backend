@@ -144,9 +144,7 @@ namespace PeaceEnablers.Services
                 var previousResults = yearlyResults[year - 1];
 
                 var alerts = BuildSignalCards(orderedMappings, layers, currentResults, previousResults, accessibleLayerIds)
-                    .OrderByDescending(x => x.IsAlert)
-                    .ThenByDescending(x => Math.Abs(x.Delta ?? 0))
-                    .ThenByDescending(x => x.Value)
+                     .OrderBy(x => x.DisplayOrder)
                     .ToList();
 
                 var trends = orderedMappings
@@ -159,6 +157,7 @@ namespace PeaceEnablers.Services
                     return new SignalTrendDto
                     {
                         Code = layerCode,
+                        DisplayOrder = mapping.DisplayOrder,
                         Name = layerName,
                         Series = trendYears
                         .Select(trendYear =>
@@ -177,6 +176,7 @@ namespace PeaceEnablers.Services
                         .ToList()
                     };
                 })
+                .OrderBy(x=>x.DisplayOrder)
                 .ToList();
 
                 var alertCount = alerts.Count(x => x.IsAlert);
@@ -516,7 +516,9 @@ namespace PeaceEnablers.Services
                     InterpretationID = interpretation?.InterpretationID ?? 0,
                     IsAlert = isAlert,
                     IsAccessible = accessibleLayerIds.Contains(layer.LayerID),
-                    Interpretations = MapInterpretations(layer)
+                    Interpretations = MapInterpretations(layer),
+                    DisplayOrder = mapping.DisplayOrder
+
                 });
             }
 

@@ -35,6 +35,8 @@ namespace PeaceEnablers.Dtos.CountryUserDto
 
         public List<FiveLevelInterpretationDto> Interpretations { get; set; } = new();
 
+        public int? DisplayOrder { get; set; }
+
     }
 
 
@@ -77,6 +79,7 @@ namespace PeaceEnablers.Dtos.CountryUserDto
         public string Code { get; set; } = string.Empty;
 
         public string Name { get; set; } = string.Empty;
+        public int? DisplayOrder { get; set; }
 
         public List<YearSignalPointDto> Series { get; set; } = new();
 

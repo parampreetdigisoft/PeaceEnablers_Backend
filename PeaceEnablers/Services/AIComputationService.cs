@@ -62,12 +62,16 @@ namespace PeaceEnablers.Services
         {
             try
             {
+                int pillarCount = _appSettings.PillarCount;
                 IQueryable<AiCountrySummeryDto> query = await GetCountryAiSummeryDetails(userID, userRole, request.CountryID, request.Year);
 
-                var result = await query.ApplyPaginationAsync(request);
-                int pillarCount = _appSettings.PillarCount;
-
                 var progress = await _commonService.GetCountriesProgressAsync(userID, (int)userRole, DateTime.Now.Year);
+                var countryRanks = CalculateCountryRanks(progress, pillarCount);
+
+                var result = await query.ApplyPaginationAsync(request);
+
+                ApplyCountryRanking(result.Data.ToList(), countryRanks);
+
                 var ids = result.Data.Select(x => x.CountryID);
                 var countries = progress.Where(x => ids.Contains(x.CountryID));
 
@@ -97,7 +101,6 @@ namespace PeaceEnablers.Services
                 {                 
                     c.EvidenceSummary = CommonService.InitailLineOfExecutiveSummery(c.EvidenceSummary, c.ImmediateSituationSummary, c.AIProgress, c.CountryName, pillarCount, totalValidKpis);
                 }
-
 
                 if (userRole != UserRole.CountryUser)
                 {
