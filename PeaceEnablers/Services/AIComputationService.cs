@@ -141,9 +141,9 @@ namespace PeaceEnablers.Services
         }
         public async Task<IQueryable<AiCountrySummeryDto>> GetCountryAiSummeryDetails(int userID, UserRole userRole, int? countryID, int currentYear=0)
         {
-            currentYear = currentYear ==0 ? DateTime.Now.Year : currentYear;
+            currentYear = currentYear == 0 ? DateTime.Now.Year : currentYear;
             var firstDate = new DateTime(currentYear, 1, 1); 
-            var endDate = new DateTime(currentYear+1, 1, 1); 
+            var endDate = new DateTime(currentYear + 1, 1, 1); 
             IQueryable<AICountryScore> baseQuery = _context.AICountryScores.Where(x=> x.UpdatedAt >= firstDate && x.UpdatedAt < endDate && x.Year== currentYear);
 
             List<int> allowedCountryIds = new();
@@ -1021,7 +1021,10 @@ namespace PeaceEnablers.Services
             int pillarCount = _appSettings.PillarCount;
 
             var countryRanks = CalculateCountryRanks(progress, pillarCount, reportType);
-            ApplyCountryRanking(countresDetails, countryRanks , reportType);
+
+            var totalCountryCount = await _context.Countries.Where(x => !x.IsDeleted && x.IsActive).CountAsync();
+
+            ApplyCountryRanking(countresDetails, countryRanks , reportType , totalCountryCount);
 
             var countries = progress.Where(x => x.CountryID == CountryID);
 
@@ -1053,9 +1056,9 @@ namespace PeaceEnablers.Services
             return countryDetails ?? new AiCountrySummeryDto();
         }
 
-        private void ApplyCountryRanking(List<AiCountrySummeryDto> countriesDetails, List<dynamic> countryRanks, string reportType = "AI")
+        private void ApplyCountryRanking(List<AiCountrySummeryDto> countriesDetails, List<dynamic> countryRanks, string reportType = "AI", int? totalCountryCount)
         {
-            var totalCountryCount = countriesDetails.Count;
+            totalCountryCount ??= countriesDetails.Count;
 
             // Global rank lookup
             var countryRankLookup = countryRanks.ToDictionary(x => x.CountryID);
