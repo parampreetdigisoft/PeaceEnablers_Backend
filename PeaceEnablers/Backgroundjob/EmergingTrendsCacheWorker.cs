@@ -10,7 +10,6 @@ namespace PeaceEnablers.Backgroundjob
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly IConfiguration _configuration;
-        private readonly ILogger<EmergingTrendsCacheWorker> _logger;
 
         public EmergingTrendsCacheWorker(
             IServiceProvider serviceProvider,
@@ -19,7 +18,6 @@ namespace PeaceEnablers.Backgroundjob
         {
             _serviceProvider = serviceProvider;
             _configuration = configuration;
-            _logger = logger;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -29,12 +27,6 @@ namespace PeaceEnablers.Backgroundjob
                 _configuration.GetValue("EmergingTrendsCache:RefreshIntervalMinutes", 10));
             var retryDelay = TimeSpan.FromSeconds(
                 _configuration.GetValue("EmergingTrendsCache:RetryDelaySeconds", 10));
-
-            _logger.LogInformation(
-                "Emerging trends cache worker started (countryCount={CountryCount}, refresh={RefreshMinutes}m, retry={RetrySeconds}s)",
-                countryCount,
-                refreshInterval.TotalMinutes,
-                retryDelay.TotalSeconds);
 
             while (!stoppingToken.IsCancellationRequested)
             {
@@ -62,6 +54,7 @@ namespace PeaceEnablers.Backgroundjob
                 {
                     using var scope = _serviceProvider.CreateScope();
                     var publicService = scope.ServiceProvider.GetRequiredService<IPublicService>();
+                    var _appLogger = scope.ServiceProvider.GetRequiredService<IAppLogger>();
 
                     var cached = await publicService.RefreshEmergingTrendsCacheAsync(
                         countryCount,
@@ -69,24 +62,18 @@ namespace PeaceEnablers.Backgroundjob
 
                     if (cached)
                     {
-                        _logger.LogInformation(
-                            "Emerging trends cache refreshed successfully (countryCount={CountryCount})",
-                            countryCount);
+                        //await _appLogger.LogAsync($"Emerging trends cache refreshed successfully (countryCount={countryCount})");
                         return;
                     }
 
-                    _logger.LogWarning(
-                        "Emerging trends refresh returned no data (countryCount={CountryCount}); retry in {RetrySeconds}s",
-                        countryCount,
-                        retryDelay.TotalSeconds);
+                    //await _appLogger.LogAsync($"Emerging trends refresh returned no data (countryCount={countryCount}); retry in {retryDelay.TotalSeconds}s");
+
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    _logger.LogError(
-                        ex,
-                        "Emerging trends cache refresh failed (countryCount={CountryCount}); retry in {RetrySeconds}s",
-                        countryCount,
-                        retryDelay.TotalSeconds);
+                    using var scope = _serviceProvider.CreateScope();
+                    var _appLogger = scope.ServiceProvider.GetRequiredService<IAppLogger>();
+                    await _appLogger.LogAsync($"Emerging trends cache refresh failed (countryCount={countryCount}); retry in {retryDelay.TotalSeconds}s");
                 }
 
                 try

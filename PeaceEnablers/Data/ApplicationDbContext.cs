@@ -45,6 +45,8 @@ namespace PeaceEnablers.Data
         public DbSet<AIAssistantFAQ> AIAssistantFAQ { get; set; }
         public DbSet<DocumentChunks> DocumentChunks { get; set; }
         public DbSet<DocumentTOC> DocumentTOC { get; set; }
+        public DbSet<DashboardMode> DashboardModes { get; set; } = default!;
+        public DbSet<DashboardModeKPIMapping> DashboardModeKPIMappings { get; set; } = default!;
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -171,6 +173,39 @@ namespace PeaceEnablers.Data
             {
                 entity.HasKey(e => e.ChunkID);
                 entity.ToTable("DocumentChunks");
+            });
+
+            modelBuilder.Entity<DashboardMode>(entity =>
+            {
+                entity.HasKey(e => e.DashboardModeID);
+                entity.ToTable("DashboardModes");
+
+                entity.Property(e => e.ModeName)
+                    .HasMaxLength(100)
+                    .IsRequired();
+
+                entity.Property(e => e.Description)
+                    .HasMaxLength(500);
+
+                entity.HasMany(e => e.DashboardModeKPIMappings)
+                    .WithOne(m => m.DashboardMode)
+                    .HasForeignKey(m => m.DashboardModeID)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<DashboardModeKPIMapping>(entity =>
+            {
+                entity.HasKey(e => e.DashboardModeKPIMappingID);
+                entity.ToTable("DashboardModeKPIMappings");
+
+                entity.Property(e => e.Description)
+                    .HasMaxLength(500);
+
+                entity.Property(e => e.PriorityLevel)
+                    .HasDefaultValue(1);
+
+                entity.Property(e => e.IsActive)
+                    .HasDefaultValue(true);
             });
 
             base.OnModelCreating(modelBuilder);

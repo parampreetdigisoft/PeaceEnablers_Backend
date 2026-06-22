@@ -496,18 +496,22 @@ namespace PeaceEnablers.Services
                     return false;
                 }
 
-                var cacheKey = EmergingTrendsCacheKey(countryCount);
-                _cache.Set(
-                    cacheKey,
-                    enriched,
-                    new MemoryCacheEntryOptions
-                    {
-                        AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(12),
-                        Priority = CacheItemPriority.High
-                    }
-                );
+                if (enriched.Countries.Any())
+                {
+                    var cacheKey = EmergingTrendsCacheKey(countryCount);
+                    _cache.Set(
+                        cacheKey,
+                        enriched,
+                        new MemoryCacheEntryOptions
+                        {
+                            AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(12),
+                            Priority = CacheItemPriority.High
+                        }
+                    );
+                    return true;
+                }
 
-                return true;
+                return false;
             }
             catch (Exception ex)
             {

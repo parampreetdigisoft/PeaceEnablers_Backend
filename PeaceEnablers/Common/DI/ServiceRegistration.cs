@@ -32,6 +32,7 @@ namespace PeaceEnablers.Common.DI
             services.AddScoped<IEmailService, EmailService>();
             services.AddScoped<IAuthService, AuthService>();
             services.AddScoped<ICountryUserService, CountryUserService>();
+            services.AddScoped<ISignalDashboardService, SignalDashboardService>();
             services.AddScoped<IPaymentService, PaymentService>();
             services.AddScoped<IPublicService, PublicService>();
             services.AddScoped<IKpiService, KpiService>();
