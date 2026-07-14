@@ -17,7 +17,7 @@ namespace PeaceEnablers.Dtos.UserDtos
     {
         public int InvitedUserID { get; set; }
         public List<int> CountryID { get; set; } = new();
-
+        public bool IsAllCountries { get; set; }
         public List<int>? Pillars { get; set; }
 
     }

@@ -724,25 +724,48 @@ namespace PeaceEnablers.Services
                 if (!Enum.TryParse<TieredAccessPlan>(tierName, true, out var tier))
                     return ResultResponseDto<string>.Failure(new[] { "Invalid tier access. Please contact support team." });
 
-                var tierLimits = tier switch
-                {
-                    TieredAccessPlan.Basic => new { Min = 5, Max = 7, Name = "Basic" },
-                    TieredAccessPlan.Standard => new { Min = 8, Max = 12, Name = "Standard" },
-                    TieredAccessPlan.Premium => new { Min = 13, Max = 23, Name = "Premium" },
-                    _ => new { Min = 0, Max = 0, Name = "Unknown" }
-                };
+                var allPillarIds = await _context.Pillars.Select(p => p.PillarID).ToListAsync();
+                var allCountryIds = await _context.Countries
+                    .Where(c => c.IsActive)
+                    .Select(c => c.CountryID)
+                    .ToListAsync();
 
-                if (tier != TieredAccessPlan.Premium)
+                if (tier == TieredAccessPlan.Premium)
                 {
-                    bool isValid =
-                        payload.Countries.Count >= tierLimits.Min && payload.Countries.Count <= tierLimits.Max &&
-                        payload.Pillars.Count >= tierLimits.Min && payload.Pillars.Count <= tierLimits.Max;
+                    // Premium always receives every pillar
+                    payload.Pillars = allPillarIds;
 
-                    if (!isValid)
+                    if (payload.IsAllCountries)
+                    {
+                        payload.Countries = allCountryIds;
+                    }
+                    else if (payload.Countries == null || payload.Countries.Count < 1)
                     {
                         return ResultResponseDto<string>.Failure(new[]
                         {
-                            $"Your {tierLimits.Name} plan allows between {tierLimits.Min} and {tierLimits.Max} selections per category (Country, Pillar, and KPI). Please adjust your selections accordingly."
+                            "Premium plan requires at least one country, or all countries."
+                        });
+                    }
+                }
+                else
+                {
+                    var pillarLimits = tier switch
+                    {
+                        TieredAccessPlan.Basic => new { Min = 1, Max = 7, Name = "Basic" },
+                        TieredAccessPlan.Standard => new { Min = 1, Max = 12, Name = "Standard" },
+                        _ => new { Min = 0, Max = 0, Name = "Unknown" }
+                    };
+
+                    var countryCount = payload.Countries?.Count ?? 0;
+                    var pillarCount = payload.Pillars?.Count ?? 0;
+                    var countriesOk = countryCount >= 1;
+                    var pillarsOk = pillarCount >= pillarLimits.Min && pillarCount <= pillarLimits.Max;
+
+                    if (!countriesOk || !pillarsOk)
+                    {
+                        return ResultResponseDto<string>.Failure(new[]
+                        {
+                            $"Your {pillarLimits.Name} plan requires at least 1 country and between {pillarLimits.Min} and {pillarLimits.Max} pillars."
                         });
                     }
                 }
