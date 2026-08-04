@@ -862,7 +862,7 @@ namespace PeaceEnablers.Common.Implementation
             // =========================
             // PROGRESS SECTION
             // =========================
-            body.AppendChild(SectionHeading("Progress Metrics", DarkBlue));
+            body.AppendChild(SectionHeading("Pillar Score", DarkBlue));
             body.AppendChild(CreateProgressBar("Score", (float)(data.AIProgress ?? 0), MedBlue));
             body.AppendChild(Gap(160));
 

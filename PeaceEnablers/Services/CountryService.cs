@@ -1032,7 +1032,7 @@ namespace PeaceEnablers.Services
             IEnumerable<IGrouping<(int CountryID, string CountryName, string Continent), GetCountriesProgressAdminDto>> cityGroups)
         {
             using var workbook = new XLWorkbook();
-            var ws = workbook.Worksheets.Add("Countries Progress Report");
+            var ws = workbook.Worksheets.Add("Countries Score Report");
 
             bool isRanking = request.IsRanking == true;
 

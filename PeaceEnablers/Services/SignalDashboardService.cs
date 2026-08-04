@@ -48,12 +48,14 @@ namespace PeaceEnablers.Services
                 var secondaryMappings = OrderMappings(mappings.Where(x => x.PriorityLevel != 1));
                 var primarySignals = BuildSignalCards(primaryMappings, layers, currentResults, previousResults, accessibleLayerIds, pemScores.Current);
 
-                primarySignals.Insert(0,new SignalCardDto
+                primarySignals.Insert(0, new SignalCardDto
                 {
                     LayerID = 0,
                     LayerCode = "PEM",
                     LayerName = "Country Score",
-                    Description = "Score of the Country",
+                    Description = "Represents the country's overall resilience score based on the latest assessment.",
+                    Descriptor = "Overall assessment of the country's current resilience and performance.",
+                    StrategicAction = "Review the score category and prioritize actions to strengthen resilience and improve overall performance.",
                     Code = "PEM Score",
                     Name = "Country Score",
                     Value = pemScores.Current,
@@ -504,14 +506,14 @@ namespace PeaceEnablers.Services
                     LayerID = layer.LayerID,
                     LayerCode = layer.LayerCode,
                     LayerName = layer.LayerName,
-                    Description = "",
+                    Description = CommonStaticMethods.StripHtml(layer.Purpose),
                     Code = layer.LayerCode,
                     Name = layer.LayerName,
                     Value = value,
                     Delta = delta,
                     Condition = condition,
                     Descriptor = interpretation?.Descriptor ?? string.Empty,
-                    StrategicAction = interpretation?.StrategicAction ?? string.Empty,
+                    StrategicAction = interpretation?.StrategicAction + " "+ interpretation?.Descriptor ?? string.Empty,
                     Narrative = interpretation?.Descriptor ?? string.Empty,
                     InterpretationID = interpretation?.InterpretationID ?? 0,
                     IsAlert = isAlert,

@@ -1,4 +1,7 @@
-﻿namespace PeaceEnablers.Common.Implementation
+﻿using System.Net;
+using System.Text.RegularExpressions;
+
+namespace PeaceEnablers.Common.Implementation
 {
     public class CommonStaticMethods
     {
@@ -17,6 +20,17 @@
                 return "Stable";
 
             return "Strong";
+        }
+        public static string StripHtml(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input))
+                return string.Empty;
+
+            // Remove HTML tags
+            var noTags = Regex.Replace(input, "<.*?>", string.Empty);
+
+            // Decode HTML entities (e.g., &mdash;)
+            return WebUtility.HtmlDecode(noTags);
         }
     }
 }
