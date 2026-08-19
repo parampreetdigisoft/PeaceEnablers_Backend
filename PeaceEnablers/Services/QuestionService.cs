@@ -29,7 +29,7 @@ namespace PeaceEnablers.Services
         {
             try
             {
-                return await _context.Pillars.OrderBy(p => p.DisplayOrder).ToListAsync();
+                return await _context.Pillars.Where(p => !p.IsDeleted).OrderBy(p => p.DisplayOrder).ToListAsync();
             }
             catch (Exception ex)
             {

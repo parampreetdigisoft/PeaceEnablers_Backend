@@ -10,5 +10,7 @@
         public bool Reliability { get; set; } = true; // Default fully reliable     
         public string? ImagePath { get; set; }
         public IFormFile? ImageFile { get; set; }
+        public string? KpiLayerIds { get; set; }
+        public string? PillarCode { get; set; }
     }
 }

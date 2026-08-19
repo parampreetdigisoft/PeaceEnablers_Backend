@@ -200,6 +200,27 @@ namespace PeaceEnablers.Common.Implementation
                     PageFooter(page);
                 });
             }
+
+            if (!isAllCountries)
+            {
+                // -- Section 2 : Recommendations -------------------------------------
+                container.Page(page =>
+                {
+                    ApplyPageDefaults(page);
+                    page.Header().Element(x =>
+                        CountryComposeHeader(x, countryDetails, userRole, null));
+                    page.Content().Element(content =>
+                    {
+                        content.Column(column =>
+                        {
+                            column.Spacing(10);
+                            column.Item().Element(x =>
+                                AssessmentRecommendations(x, countryDetails, userRole));
+                        });
+                    });
+                    PageFooter(page);
+                });
+            }
         }
 
         // ─────────────────────────────────────────────────────────────────────────────
@@ -1849,8 +1870,23 @@ namespace PeaceEnablers.Common.Implementation
                 column.Item().PaddingTop(8).Element(c =>
                     PillarContentSection(c, "Strategic Policy Priorities", SanitizeText(data.StrategicRecommendation), "#2e9975"));
 
-                column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Why This Assessment Matters", SanitizeText(data.DataTransparencyNote), "#63a68f"));
+                if (!string.IsNullOrEmpty(data.KeyFindings))
+                    column.Item().PaddingTop(8).Element(c =>
+                    PillarContentSection(c, "Key Findings", SanitizeText(data.KeyFindings), "#0d47a1"));
+            
+            });
+        }
+        void AssessmentRecommendations(IContainer container, AiCountrySummeryDto data, UserRole userRole, bool isAllCountries = false)
+        {
+            container.PaddingTop(4).Column(column =>
+            {
+                if (!isAllCountries)
+                {
+
+                    if (!string.IsNullOrEmpty(data.Recommendations))
+                        column.Item().PaddingTop(8).Element(c =>
+                        PillarContentSection(c, "Recommendations", SanitizeText(data.Recommendations), "#00695c"));
+                }
             });
         }
 

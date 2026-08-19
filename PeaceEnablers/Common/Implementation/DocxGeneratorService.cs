@@ -243,6 +243,13 @@ namespace PeaceEnablers.Common.Implementation
                 AddKpiDashboardSection(body, mainPart, kpiChartItems);
             }
 
+            // ── 7. Findings and Recommendations (LAST, after KPI) ───────────────────
+            if (!isAllCountries && !string.IsNullOrEmpty(countryDetails.Recommendations))
+            {
+                AppendCountryHeader(mainPart, countryDetails, "Recommendations");
+                AppendContentSection(body, "Recommendations", countryDetails.Recommendations, "b2dfdb");
+            }
+
             FinalizeLastSection(mainPart);
         }
 
@@ -780,6 +787,8 @@ namespace PeaceEnablers.Common.Implementation
 
             AppendContentSection(body, "Strategic Policy Priorities", data.StrategicRecommendation, "2e9975");
             AppendContentSection(body, "Why This Assessment Matters", data.DataTransparencyNote, "63a68f");
+            AppendContentSection(body, "Key Findings", data.KeyFindings, "bbdefb");
+
         }
 
         private static Paragraph CreateRankingHeader(string text)
@@ -2196,55 +2205,7 @@ namespace PeaceEnablers.Common.Implementation
                 body.AppendChild(CreateFullWidthImage(mainPart, incScatterPng, 180));
                 body.AppendChild(Gap(80));
 
-                // ══════════════════════════════════════════════════════════════
-                // NEW ── PPP Analytical Section
-                // ══════════════════════════════════════════════════════════════
-                //var withPpp = all.Where(p => p.PPP.HasValue && p.PPP > 0).ToList();
-                //if (withPpp.Any())
-                //{
-                //    // Section divider heading
-                //    body.AppendChild(CreateSectionDivider("Purchasing Power Parity (PPP) Analysis", DarkBlue));
-
-                //    // Explanatory note
-                //    body.AppendChild(CreateItalicNote(
-                //        "PPP-adjusted income reflects real purchasing power in International Dollars, " +
-                //        "correcting for local price differences. A higher PPP vs Nominal income indicates " +
-                //        "a more affordable city; a lower PPP suggests high cost of living that erodes nominal " +
-                //        "earnings. Use this alongside structural factors (inequality, informal markets) for a " +
-                //        "complete welfare picture."));
-                //    body.AppendChild(Gap(60));
-
-                //    // ── Nominal vs PPP scatter ────────────────────────────────
-                //    body.AppendChild(SectionHeading(
-                //        "Nominal Income vs PPP-Adjusted Income  (each dot = one city)", DarkBlue));
-                //    var pppScatterPng = RenderPng(
-                //        (c, s) => PdfGeneratorService.DrawScatterPlotCanvas(
-                //            c, s, withPpp, countryDetails,
-                //            city => (float)(city.Income ?? 0),
-                //            city => (float)(city.PPP ?? 0),
-                //            "Nominal Income (USD)", "PPP Income (Int'l $)"),
-                //        700, 180);
-                //    body.AppendChild(CreateFullWidthImage(mainPart, pppScatterPng, 180));
-                //    body.AppendChild(Gap(80));
-
-                //    // ── PPP Comparison Table ──────────────────────────────────
-                //    body.AppendChild(SectionHeading(
-                //        "Nominal vs PPP-Adjusted Income Comparison", DarkBlue));
-                //    //body.AppendChild(CreatePppComparisonTable(withPpp, countryDetails));
-                //    body.AppendChild(Gap(60));
-
-                //    // ── PPP signal legend ─────────────────────────────────────
-                //    body.AppendChild(CreatePppLegend());
-                //    body.AppendChild(Gap(40));
-
-                //    // Footnote
-                //    body.AppendChild(CreateFootnote(
-                //        "▲ PPP adjustment moves city to a higher income category.  " +
-                //        "▼ PPP adjustment moves city to a lower income category.  " +
-                //        "Signal Ratio = PPP ÷ Nominal Income."));
-                //    body.AppendChild(Gap(80));
-                //}
-
+                
                 // ── Top performers by income group (PPP column added) ─────────
                 body.AppendChild(SectionHeading("Top Performers by Income Group", DarkBlue));
                 body.AppendChild(CreateIncomeGroupTable(all, countryDetails));

@@ -1,11 +1,15 @@
 ﻿using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using PeaceEnablers.Common.Interface;
+using PeaceEnablers.Common.Models;
 using PeaceEnablers.Common.Models.settings;
 using PeaceEnablers.Data;
 using PeaceEnablers.Dtos.CountryDto;
+using PeaceEnablers.Dtos.PillarDto;
 using PeaceEnablers.IServices;
+using PeaceEnablers.Models;
 
 namespace PeaceEnablers.Common.Implementation
 {
@@ -17,15 +21,25 @@ namespace PeaceEnablers.Common.Implementation
         private readonly IAppLogger _appLogger;
         private readonly IWebHostEnvironment _env;
         private readonly AppSettings _appSettings;
-        public CommonService(ApplicationDbContext context, IAppLogger appLogger, IWebHostEnvironment env, IOptions<AppSettings> appSettings)
+        private readonly IMemoryCache _memoryCache;
+        private const string PILLAR_CACHE_KEY = "PILLAR_CACHE";
+
+
+        public CommonService(ApplicationDbContext context, IAppLogger appLogger, IWebHostEnvironment env, IOptions<AppSettings> appSettings, IMemoryCache memoryCache)
         {
             _context = context;
             _appLogger = appLogger;
             _env = env;
             _appSettings = appSettings.Value;
+            _memoryCache = memoryCache;
         }
         #endregion
+        public static string CountryScoreSummery(decimal? progress, string? countryName = "The country", int pillarCount = 23, int kpiCount = 37)
+        {
+            var evidenceSummaryStaringLine = $"{countryName ?? "The country"} records an overall PEM score of {progress ?? 0}, reflecting performance across {pillarCount} pillars and {kpiCount} KPIs.";
 
+            return evidenceSummaryStaringLine;
+        }
 
         public static string InitailLineOfExecutiveSummery(
             string evidenceSummary,
@@ -116,6 +130,93 @@ namespace PeaceEnablers.Common.Implementation
             {
                 await _appLogger.LogAsync("Error in Executing usp_getCountriesProgress_Admin", ex);
                 return new List<GetCountriesProgressAdminDto>();
+            }
+        }
+        public async Task<List<GetPillarDto>> GetPillars()
+        {
+            try
+            {
+                if (_memoryCache.TryGetValue(PILLAR_CACHE_KEY, out List<GetPillarDto> pillars))
+                {
+                    return pillars;
+                }
+
+                pillars = await _context.Pillars
+                    .Where(x => x.IsActive && !x.IsDeleted)
+                    .OrderBy(x => x.DisplayOrder)
+                    .Select(x => new GetPillarDto
+                    {
+                        PillarID = x.PillarID,
+                        PillarName = x.PillarName,
+                        Description = x.Description,
+                        DisplayOrder = x.DisplayOrder,
+                        ImagePath = x.ImagePath,
+                        Weight = x.Weight,
+                        Reliability = x.Reliability,
+                        PillarCode = x.PillarCode,
+                        IsActive = x.IsActive,
+                        QuestionCount = x.Questions.Where(x => !x.IsDeleted).Count()
+                    })
+                    .ToListAsync();
+
+                var cacheOptions = new MemoryCacheEntryOptions()
+                    .SetAbsoluteExpiration(TimeSpan.FromHours(1));
+
+                _memoryCache.Set(PILLAR_CACHE_KEY, pillars, cacheOptions);
+
+                return pillars;
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error in GetPillars", ex);
+                return new List<GetPillarDto>();
+            }
+        }
+        public void ClearPillarCache()
+        {
+            _memoryCache.Remove(PILLAR_CACHE_KEY);
+        }
+        public async Task<ResultResponseDto<bool>> RevokeCountriesPermission(List<int> countryIds, int userID, int year)
+        {
+            try
+            {
+                var date = DateTime.UtcNow;
+                year = year == 0 ? date.Year : year;
+                var permissionList = await _context.AIEditPermissions.Where(x => countryIds.Contains(x.CountryID) && x.Year == year).ToListAsync();
+                if (permissionList == null || permissionList.Count == 0)
+                    return ResultResponseDto<bool>.Failure(new[] { "Permission not found." });
+
+                foreach (var permission in permissionList)
+                {
+                    permission.Status = permission.Status == AIEditPermissionStatus.PendingRequest
+                    ? AIEditPermissionStatus.Rejected
+                    : AIEditPermissionStatus.Revoked;
+                    permission.GrantedBy = userID;
+                    permission.GrantedAt = date;
+
+                }
+
+                var sessionIds = permissionList.Where(x => x.ActiveSessionID.HasValue).Select(x => x.ActiveSessionID);
+                var sessionList = await _context.AIEditSessions.Where(x => sessionIds.Contains(x.SessionID)).ToListAsync();
+
+                foreach (var session in sessionList)
+                {
+                    if (session != null && session.Status == AIEditSessionStatus.Draft)
+                    {
+                        session.Status = AIEditSessionStatus.Cancelled;
+                        session.ReviewedBy = userID;
+                        session.ReviewedAt = date;
+                        session.ReviewComment = "Permission revoked by admin.";
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+                return ResultResponseDto<bool>.Success(true, new[] { "Permission revoked." });
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error in RevokePermission", ex);
+                return ResultResponseDto<bool>.Failure(new[] { "Failed to revoke permission." });
             }
         }
     }

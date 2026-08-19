@@ -57,6 +57,17 @@ namespace PeaceEnablers.Controllers
             return Ok(await _pillarService.GetAllAsync(userId.GetValueOrDefault(), userRole));
         }
 
+        [HttpGet("{pillarId:int}/kpiMappings")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetPillarKpiMappings(int pillarId)
+        {
+            var result = await _pillarService.GetPillarKpiMappingsAsync(pillarId);
+            if (!result.Succeeded)
+                return NotFound(result);
+
+            return Ok(result);
+        }
+
         [HttpGet("{id}")]
         [Authorize]
         public async Task<IActionResult> GetById(int id)
@@ -73,7 +84,20 @@ namespace PeaceEnablers.Controllers
             var result = await _pillarService.AddAsync(pillar);
             return Created($"/api/pillar/{result.PillarID}", result);
         }
-       
+
+        [HttpPost("add")]
+        [Consumes("multipart/form-data")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> AddPillar([FromForm] AddPillarDto pillar)
+        {
+            var result = await _pillarService.AddPillarAsync(pillar);
+            if (!result.Succeeded)
+                return BadRequest(result);
+
+            return Ok(result);
+        }
+
+
         [HttpPost("edit/{id}")]
         [Consumes("multipart/form-data")]
         [Authorize(Roles = "Admin")]
@@ -90,9 +114,8 @@ namespace PeaceEnablers.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(int id)
         {
-            var success = await _pillarService.DeleteAsync(id);
-            if (!success) return NotFound();
-            return Ok();
+            var result = await _pillarService.DeleteAsync(id);
+            return Ok(result);
         }
 
         [HttpGet("ExportPillarsHistoryByUserId")]

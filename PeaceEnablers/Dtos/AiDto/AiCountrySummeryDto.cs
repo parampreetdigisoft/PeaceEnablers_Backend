@@ -14,6 +14,8 @@
         public decimal? Discrepancy { get; set; }
 
         public string ConfidenceLevel { get; set; }
+        public string? ImmediateSituationSummary { get; set; }
+        public string CountryScoreSummery { get; set; }
         public string EvidenceSummary { get; set; }
 
         public string StructuralEvidence { get; set; }
@@ -41,11 +43,11 @@
         public DateTime UpdatedAt { get; set; }
         public bool IsVerified { get; set; }
         public decimal? AICompletionRate { get; set; }
-        public string? ImmediateSituationSummary { get; set; } 
         public string? KeyDevelopments { get; set; }
         public string? CriticalRisks { get; set; }
         public string? Gaps { get; set; }
-
+        public string? KeyFindings { get; set; }
+        public string? Recommendations { get; set; }
         public int? Rank { get; set; }
         public int? TotalCountry { get; set; }
         public int? RegionRank { get; set; }

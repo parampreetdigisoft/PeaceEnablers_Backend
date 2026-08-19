@@ -11,5 +11,7 @@ namespace PeaceEnablers.Models
         public bool Reliability { get; set; } = true; 
         public string? PillarCode { get; set; } 
         public ICollection<Question> Questions { get; set; }
+        public bool IsActive { get; set; } = true;
+        public bool IsDeleted { get; set; } = false;
     }
 } 

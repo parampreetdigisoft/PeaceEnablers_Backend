@@ -25,10 +25,13 @@ namespace PeaceEnablers.Services
     {
         private readonly ApplicationDbContext _context;
         private readonly IAppLogger _appLogger;
-        public KpiService(ApplicationDbContext context, IAppLogger appLogger)
+        private readonly IAIAnalyzeService _aiAnalyzeService;
+
+        public KpiService(ApplicationDbContext context, IAppLogger appLogger, IAIAnalyzeService aiAnalyzeService)
         {
             _context = context;
             _appLogger = appLogger;
+            _aiAnalyzeService = aiAnalyzeService;
         }
 
         #region GetAnalyticalLayerResults
@@ -627,5 +630,182 @@ namespace PeaceEnablers.Services
 
             return Regex.Replace(input, "<.*?>", string.Empty).Trim();
         }
+
+        #region SummarizeKpiPerformance
+        public async Task<ResultResponseDto<SummarizeKpiResponseDto>> SummarizeKpiPerformance(
+            SummarizeKpiRequestDto request, int userId, UserRole role)
+        {
+            try
+            {
+                if (role == UserRole.Evaluator)
+                {
+                    return ResultResponseDto<SummarizeKpiResponseDto>.Failure(
+                        new[] { "AI KPI summary is not available for evaluators." });
+                }
+
+                if (request.LayerResultID <= 0)
+                {
+                    return ResultResponseDto<SummarizeKpiResponseDto>.Failure(
+                        new[] { "A valid KPI result is required to generate a summary." });
+                }
+
+                var layerResult = await _context.AnalyticalLayerResults
+                    .AsNoTracking()
+                    .Include(ar => ar.AnalyticalLayer)
+                        .ThenInclude(al => al.FiveLevelInterpretations)
+                    .Include(ar => ar.Country)
+                    .FirstOrDefaultAsync(ar => ar.LayerResultID == request.LayerResultID);
+
+                if (layerResult?.AnalyticalLayer == null)
+                {
+                    return ResultResponseDto<SummarizeKpiResponseDto>.Failure(
+                        new[] { "KPI result was not found." });
+                }
+
+                var accessError = await ValidateKpiSummaryAccess(layerResult, userId, role);
+                if (accessError != null)
+                {
+                    return ResultResponseDto<SummarizeKpiResponseDto>.Failure(new[] { accessError });
+                }
+
+                var interpretations = layerResult.AnalyticalLayer.FiveLevelInterpretations?
+                    .OrderByDescending(f => f.MaxRange)
+                    .ToList() ?? new List<FiveLevelInterpretation>();
+
+                string? ResolveCondition(int? interpretationId, decimal? score)
+                {
+                    if (interpretationId.HasValue)
+                    {
+                        var byId = interpretations.FirstOrDefault(x => x.InterpretationID == interpretationId.Value);
+                        if (byId != null) return byId.Condition;
+                    }
+
+                    if (score.HasValue)
+                    {
+                        var byRange = interpretations.FirstOrDefault(x =>
+                            score >= (x.MinRange ?? decimal.MinValue) &&
+                            score <= (x.MaxRange ?? decimal.MaxValue));
+                        return byRange?.Condition;
+                    }
+
+                    return null;
+                }
+
+                // Role-based score filtering:
+                // Admin/Analyst → manual + AI; CountryUser → AI only; Evaluator blocked above.
+                decimal? manualScore = null;
+                string? manualCondition = null;
+                if (role == UserRole.Admin || role == UserRole.Analyst)
+                {
+                    manualScore = layerResult.CalValue5;
+                    manualCondition = ResolveCondition(layerResult.InterpretationID, layerResult.CalValue5);
+                }
+
+                var aiScore = layerResult.AiCalValue5;
+                var aiCondition = ResolveCondition(layerResult.AiInterpretationID, layerResult.AiCalValue5);
+
+                var categoryParts = new List<string>();
+                if (!string.IsNullOrWhiteSpace(layerResult.AnalyticalLayer.CalText5))
+                {
+                    categoryParts.Add($"Composite metric: {layerResult.AnalyticalLayer.CalText5}");
+                }
+
+                var aiRequest = new KpiSummaryAiRequest
+                {
+                    CountryName = layerResult.Country?.CountryName,
+                    LayerName = layerResult.AnalyticalLayer.LayerName ?? string.Empty,
+                    LayerCode = layerResult.AnalyticalLayer.LayerCode ?? string.Empty,
+                    Purpose = StripHtml(layerResult.AnalyticalLayer.Purpose ?? string.Empty),
+                    ManualScore = manualScore,
+                    AiScore = aiScore,
+                    ManualCondition = manualCondition,
+                    AiCondition = aiCondition,
+                    CategoryDetails = categoryParts.Count > 0 ? string.Join("; ", categoryParts) : null,
+                    InterpretationBands = interpretations.Select(i => new KpiInterpretationBandAiDto
+                    {
+                        MinRange = i.MinRange,
+                        MaxRange = i.MaxRange,
+                        Condition = i.Condition,
+                        Descriptor = i.Descriptor,
+                        StrategicAction = null
+                    }).ToList()
+                };
+
+                var aiResult = await _aiAnalyzeService.SummarizeKpiPerformance(aiRequest);
+
+                if (aiResult == null)
+                {
+                    return ResultResponseDto<SummarizeKpiResponseDto>.Failure(
+                        new[] { "Unable to reach the AI service. Please try again later." });
+                }
+
+                if (!aiResult.Success || aiResult.Result == null || string.IsNullOrWhiteSpace(aiResult.Result.Summary))
+                {
+                    return ResultResponseDto<SummarizeKpiResponseDto>.Failure(
+                        new[] { aiResult.Message ?? "Failed to generate KPI summary. Please try again later." });
+                }
+
+                return ResultResponseDto<SummarizeKpiResponseDto>.Success(
+                    new SummarizeKpiResponseDto
+                    {
+                        Summary = aiResult.Result.Summary,
+                        ScoreInterpretation = aiResult.Result.ScoreInterpretation,
+                        KeyTakeaways = aiResult.Result.KeyTakeaways ?? new List<string>(),
+                        Outlook = aiResult.Result.Outlook
+                    },
+                    new[] { "KPI summary generated successfully." });
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error occurred in SummarizeKpiPerformance", ex);
+                return ResultResponseDto<SummarizeKpiResponseDto>.Failure(
+                    new[] { "An error occurred while generating the KPI summary. Please try again later." });
+            }
+        }
+
+        private async Task<string?> ValidateKpiSummaryAccess(AnalyticalLayerResult layerResult, int userId, UserRole role)
+        {
+            if (role == UserRole.Admin)
+                return null;
+
+            if (role == UserRole.CountryUser)
+            {
+                var hasCountry = await _context.PublicUserCountryMappings
+                    .AnyAsync(x => x.IsActive && x.UserID == userId && x.CountryID == layerResult.CountryID);
+
+                if (!hasCountry)
+                    return "You don't have access to this country data.";
+
+                var hasLayer = await (
+                    from map in _context.AnalyticalLayerPillarMappings
+                    join userMap in _context.CountryUserPillarMappings
+                        on map.PillarID equals userMap.PillarID
+                    where map.LayerID == layerResult.LayerID
+                          && userMap.IsActive
+                          && userMap.UserID == userId
+                    select map.LayerID
+                ).AnyAsync();
+
+                if (!hasLayer)
+                    return "You don't have access to this KPI.";
+
+                return null;
+            }
+
+            if (role == UserRole.Analyst)
+            {
+                var hasCountry = await _context.UserCountryMappings
+                    .AnyAsync(x => !x.IsDeleted && x.UserID == userId && x.CountryID == layerResult.CountryID);
+
+                if (!hasCountry)
+                    return "You don't have access to this country data.";
+
+                return null;
+            }
+
+            return "You don't have access to generate an AI KPI summary.";
+        }
+        #endregion
+
     }
 }

@@ -15,6 +15,7 @@ using PeaceEnablers.IServices;
 using PeaceEnablers.Models;
 using System.Linq.Expressions;
 using System.Net;
+using System.Reflection;
 using System.Text.RegularExpressions;
 
 namespace PeaceEnablers.Services
@@ -130,7 +131,12 @@ namespace PeaceEnablers.Services
                         c.AICompletionRate = answeredQuestions.FirstOrDefault(x=>x.CountryID == c.CountryID)?.CompletionRate;                         
                     }
                 }
-
+                // Analyst draft mode: overlay unpublished Draft session fields onto this page only.
+                // Live AI tables stay unchanged; Submitted/Approved sessions are not applied here.
+                if (userRole == UserRole.Analyst && result.Data != null && result.Data.Any())
+                {
+                    await ApplyAnalystCountryDraftsAsync(result.Data, userID, request.Year);
+                }
                 return result;
             }
             catch (Exception ex)
@@ -269,7 +275,9 @@ namespace PeaceEnablers.Services
                     ImmediateSituationSummary = score != null ? score.ImmediateSituationSummary : null,
                     KeyDevelopments = score != null ? score.KeyDevelopments : null,
                     CriticalRisks = score != null ? score.CriticalRisks : null,
-                    Gaps = score != null ? score.Gaps : null
+                    Gaps = score != null ? score.Gaps : null,
+                    KeyFindings = score != null ? score.KeyFindings : null,
+                    Recommendations = score != null ? score.Recommendations : null
                 };
             return query;
         }
@@ -394,7 +402,11 @@ namespace PeaceEnablers.Services
                     c.Discrepancy = Math.Abs(pillarScore - (c.AIProgress ?? 0));
                     c.AICompletionRate = answeredQuestion * 100.0M / totalQuestions;
                 }
-
+                // Analyst draft mode: overlay unpublished Draft session fields (pillar + citations).
+                if (userRole == UserRole.Analyst && result.Count > 0)
+                {
+                    await ApplyAnalystPillarDraftsAsync(result, userID, CountryID, currentYear);
+                }
                 var finalResutl = new AiCountryPillarResponseDto
                 {
 
@@ -483,7 +495,19 @@ namespace PeaceEnablers.Services
                     };
 
                 var r = await res.ApplyPaginationAsync(request);
-
+                // Analyst draft mode: overlay unpublished Draft session question fields onto this page.
+                if (userRole == UserRole.Analyst
+                    && request.CountryID.HasValue
+                    && r.Data != null
+                    && r.Data.Any())
+                {
+                    await ApplyAnalystQuestionDraftsAsync(
+                        r.Data,
+                        userID,
+                        request.CountryID.Value,
+                        request.PillarID,
+                        request.Year);
+                }
                 return r;
             }
             catch (Exception ex)
@@ -911,6 +935,8 @@ namespace PeaceEnablers.Services
                     msglist.Add(msg);
                 }
                 await _context.SaveChangesAsync();
+                await _commonService.RevokeCountriesPermission(new List<int> { dto.CountryID }, userID, DateTime.UtcNow.Year);
+
                 return ResultResponseDto<bool>.Success(true, msglist);
             }
             catch (Exception ex)
@@ -1056,6 +1082,255 @@ namespace PeaceEnablers.Services
             return countryDetails ?? new AiCountrySummeryDto();
         }
 
+        /// <summary>
+        /// For the current analyst only: replace live country summary fields with the latest
+        /// values from open Draft sessions (not Submitted). Does not mutate live AI tables.
+        /// </summary>
+        private async Task ApplyAnalystCountryDraftsAsync(IEnumerable<AiCountrySummeryDto> countries, int userID, int year)
+        {
+            var countryList = countries as IList<AiCountrySummeryDto> ?? countries.ToList();
+            if (countryList.Count == 0)
+                return;
+
+            var countryIds = countryList.Select(c => c.CountryID).Distinct().ToList();
+
+            var draftLogs = await GetAnalystDraftLogsAsync(
+                userID, year, countryIds, AIEditEntityType.Country);
+
+            if (draftLogs.Count == 0)
+                return;
+
+            var latestByCountry = draftLogs
+                .GroupBy(x => x.CountryID)
+                .ToDictionary(
+                    g => g.Key,
+                    g => ToLatestFieldMap(g));
+
+            foreach (var country in countryList)
+            {
+                if (!latestByCountry.TryGetValue(country.CountryID, out var fields))
+                    continue;
+
+                ApplyDraftFields(country, fields);
+            }
+        }
+
+        /// <summary>
+        /// Overlay Draft pillar (+ citation) field changes for this analyst onto pillar responses.
+        /// </summary>
+        private async Task ApplyAnalystPillarDraftsAsync(
+            IList<AiCountryPillarResponse> pillars,
+            int userID,
+            int countryID,
+            int year)
+        {
+            if (pillars.Count == 0)
+                return;
+
+            var draftLogs = await GetAnalystDraftLogsAsync(
+                userID, year, new[] { countryID },
+                AIEditEntityType.Pillar, AIEditEntityType.Citation);
+
+            if (draftLogs.Count == 0)
+                return;
+
+            var pillarLogs = draftLogs
+                .Where(x => x.EntityType == AIEditEntityType.Pillar)
+                .ToList();
+
+            var latestByPillar = pillarLogs
+                .GroupBy(x => x.PillarID ?? 0)
+                .Where(g => g.Key > 0)
+                .ToDictionary(g => g.Key, g => ToLatestFieldMap(g));
+
+            // Fallback: match by PillarScoreID when PillarID was not stored on older rows
+            var latestByPillarScoreId = pillarLogs
+                .GroupBy(x => x.EntityRecordID)
+                .ToDictionary(g => g.Key, g => ToLatestFieldMap(g));
+
+            foreach (var pillar in pillars)
+            {
+                Dictionary<string, string?>? fields = null;
+                if (pillar.PillarID > 0 && latestByPillar.TryGetValue(pillar.PillarID, out fields))
+                {
+                    ApplyDraftFields(pillar, fields);
+                }
+                else if (pillar.PillarScoreID > 0 && latestByPillarScoreId.TryGetValue(pillar.PillarScoreID, out fields))
+                {
+                    ApplyDraftFields(pillar, fields);
+                }
+
+                if (pillar.DataSourceCitations == null || pillar.DataSourceCitations.Count == 0)
+                    continue;
+
+                var citationLogs = draftLogs
+                    .Where(x => x.EntityType == AIEditEntityType.Citation
+                                && (!x.PillarID.HasValue || x.PillarID == pillar.PillarID))
+                    .GroupBy(x => x.EntityRecordID)
+                    .ToDictionary(g => g.Key, g => ToLatestFieldMap(g));
+
+                if (citationLogs.Count == 0)
+                    continue;
+
+                foreach (var citation in pillar.DataSourceCitations)
+                {
+                    if (!citationLogs.TryGetValue(citation.CitationID, out var citationFields))
+                        continue;
+                    ApplyDraftFields(citation, citationFields);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Overlay Draft question field changes for this analyst onto the paginated question page.
+        /// </summary>
+        private async Task ApplyAnalystQuestionDraftsAsync(
+            IEnumerable<AIEstimatedQuestionScoreDto> questions,
+            int userID,
+            int countryID,
+            int? pillarID,
+            int year)
+        {
+            var questionList = questions as IList<AIEstimatedQuestionScoreDto> ?? questions.ToList();
+            if (questionList.Count == 0)
+                return;
+
+            var draftLogs = await GetAnalystDraftLogsAsync(
+                userID, year, new[] { countryID }, AIEditEntityType.Question);
+
+            if (pillarID.HasValue)
+                draftLogs = draftLogs.Where(x => !x.PillarID.HasValue || x.PillarID == pillarID.Value).ToList();
+
+            if (draftLogs.Count == 0)
+                return;
+
+            var latestByQuestion = draftLogs
+                .Where(x => x.QuestionID.HasValue)
+                .GroupBy(x => x.QuestionID!.Value)
+                .ToDictionary(g => g.Key, g => ToLatestFieldMap(g));
+
+            foreach (var question in questionList)
+            {
+                if (!latestByQuestion.TryGetValue(question.QuestionID, out var fields))
+                    continue;
+
+                ApplyDraftFields(question, fields);
+
+                if (fields.ContainsKey(nameof(AIEstimatedQuestionScoreDto.AIScore)))
+                {
+                    question.Discrepancy = Math.Abs((question.EvaluatorScore ?? 0) - (question.AIScore ?? 0));
+                }
+            }
+        }
+
+        private async Task<List<AnalystDraftLogRow>> GetAnalystDraftLogsAsync(
+            int userID,
+            int year,
+            IEnumerable<int> countryIds,
+            params AIEditEntityType[] entityTypes)
+        {
+            var ids = countryIds.Distinct().ToList();
+            if (ids.Count == 0 || entityTypes.Length == 0)
+                return new List<AnalystDraftLogRow>();
+            var query = from log in _context.AIEditChangeLogs
+                        join session in _context.AIEditSessions
+                            on log.SessionID equals session.SessionID
+                        join per in _context.AIEditPermissions
+                              on session.PermissionID equals per.PermissionID
+                        where session.UserID == userID
+                              && session.Status == AIEditSessionStatus.Draft
+                              && session.Year == year
+                              && ids.Contains(session.CountryID)
+                              && entityTypes.Contains(log.EntityType)
+                              && log.Year == year
+                              && per.Status == AIEditPermissionStatus.Active
+                              && ids.Contains(log.CountryID)
+                              && !log.IsPublished
+                              && log.ChangedBy == userID
+                              && !log.FieldName.StartsWith("__")
+                        select new AnalystDraftLogRow
+                        {
+                            CountryID = log.CountryID,
+                            EntityType = log.EntityType,
+                            EntityRecordID = log.EntityRecordID,
+                            PillarID = log.PillarID,
+                            QuestionID = log.QuestionID,
+                            FieldName = log.FieldName,
+                            NewValue = log.NewValue,
+                            ChangedAt = log.ChangedAt
+                        };
+
+            return await (
+                query
+            ).ToListAsync();
+        }
+
+        private static Dictionary<string, string?> ToLatestFieldMap(IEnumerable<AnalystDraftLogRow> rows)
+        {
+            return rows
+                .GroupBy(x => x.FieldName, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(
+                    fg => fg.Key,
+                    fg => fg.OrderByDescending(x => x.ChangedAt).First().NewValue,
+                    StringComparer.OrdinalIgnoreCase);
+        }
+
+        private sealed class AnalystDraftLogRow
+        {
+            public int CountryID { get; set; }
+            public AIEditEntityType EntityType { get; set; }
+            public int EntityRecordID { get; set; }
+            public int? PillarID { get; set; }
+            public int? QuestionID { get; set; }
+            public string FieldName { get; set; } = string.Empty;
+            public string? NewValue { get; set; }
+            public DateTime ChangedAt { get; set; }
+        }
+
+        private static void ApplyDraftFields(object target, Dictionary<string, string?> fields)
+        {
+            var type = target.GetType();
+            foreach (var kv in fields)
+            {
+                if (kv.Key.StartsWith("__", StringComparison.Ordinal))
+                    continue;
+
+                var prop = type.GetProperty(kv.Key, BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                if (prop == null || !prop.CanWrite)
+                    continue;
+
+                try
+                {
+                    var targetType = Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType;
+                    if (kv.Value == null)
+                    {
+                        if (Nullable.GetUnderlyingType(prop.PropertyType) != null || !targetType.IsValueType)
+                            prop.SetValue(target, null);
+                        continue;
+                    }
+
+                    object? converted;
+                    if (targetType == typeof(string))
+                        converted = kv.Value;
+                    else if (targetType == typeof(decimal))
+                        converted = decimal.Parse(kv.Value);
+                    else if (targetType == typeof(int))
+                        converted = int.Parse(kv.Value);
+                    else if (targetType == typeof(bool))
+                        converted = bool.Parse(kv.Value);
+                    else if (targetType == typeof(DateTime))
+                        converted = DateTime.Parse(kv.Value);
+                    else
+                        converted = Convert.ChangeType(kv.Value, targetType);
+
+                    prop.SetValue(target, converted);
+                }
+                catch
+                {
+                    // Skip invalid conversion for a single field rather than failing the whole page.
+                }
+            }
+        }
         private void ApplyCountryRanking(List<AiCountrySummeryDto> countriesDetails, List<dynamic> countryRanks, string reportType = "AI", int? totalCountryCount = 0)
         {
             totalCountryCount = (totalCountryCount == null || totalCountryCount == 0) ?  countriesDetails.Count : totalCountryCount;

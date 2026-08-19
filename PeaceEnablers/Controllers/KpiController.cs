@@ -2,6 +2,7 @@
 using DocumentFormat.OpenXml.Spreadsheet;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using PeaceEnablers.Common.Models;
 using PeaceEnablers.Dtos.CountryUserDto;
 using PeaceEnablers.Dtos.kpiDto;
 using PeaceEnablers.Enums;
@@ -193,6 +194,34 @@ namespace PeaceEnablers.Controllers
                 return Unauthorized("You Don't have access.");
             }
 
+            return Ok(result);
+        }
+
+        [HttpPost]
+        [Route("SummarizeKpiPerformance")]
+        [Authorize(Roles = "Admin, Analyst, CountryUser")]
+        public async Task<IActionResult> SummarizeKpiPerformance([FromBody] SummarizeKpiRequestDto request)
+        {
+            var userId = GetUserIdFromClaims();
+            if (userId == null)
+                return Unauthorized("User ID not found in token.");
+
+            var role = GetRoleFromClaims();
+            if (role == null)
+                return Unauthorized("You Don't have access.");
+
+            if (!Enum.TryParse<UserRole>(role, true, out var userRole))
+            {
+                return Unauthorized("You Don't have access.");
+            }
+
+            if (userRole == UserRole.Evaluator)
+            {
+                return Ok(ResultResponseDto<SummarizeKpiResponseDto>.Failure(
+                    new[] { "AI KPI summary is not available for evaluators." }));
+            }
+
+            var result = await _kpiService.SummarizeKpiPerformance(request, userId.GetValueOrDefault(), userRole);
             return Ok(result);
         }
     }

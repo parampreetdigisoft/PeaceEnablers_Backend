@@ -1,4 +1,8 @@
-﻿using PeaceEnablers.Backgroundjob;
+﻿using ClosedXML.Excel;
+using Microsoft.EntityFrameworkCore;
+using PeaceEnablers.Backgroundjob;
+using PeaceEnablers.Common.Implementation;
+using PeaceEnablers.Common.Interface;
 using PeaceEnablers.Common.Models;
 using PeaceEnablers.Data;
 using PeaceEnablers.Dtos.AssessmentDto;
@@ -6,10 +10,8 @@ using PeaceEnablers.Dtos.CommonDto;
 using PeaceEnablers.Dtos.PillarDto;
 using PeaceEnablers.IServices;
 using PeaceEnablers.Models;
-using ClosedXML.Excel;
-using Microsoft.EntityFrameworkCore;
-using System.Linq.Expressions;
 using QuestPDF.Fluent;
+using System.Linq.Expressions;
 
 namespace PeaceEnablers.Services
 {
@@ -18,10 +20,12 @@ namespace PeaceEnablers.Services
         private readonly ApplicationDbContext _context;
         private readonly IAppLogger _appLogger;
         private readonly Download _download;
-        public PillarService(ApplicationDbContext context, IAppLogger appLogger, Download download)
+        private readonly ICommonService _commonService;
+        public PillarService(ApplicationDbContext context, IAppLogger appLogger, Download download, ICommonService commonService)
         {
             _context = context;
             _appLogger = appLogger;
+            _commonService = commonService;
             _download = download;
         }
 
@@ -29,21 +33,21 @@ namespace PeaceEnablers.Services
         {
             try
             {
-                if(userRole != UserRole.CountryUser)
+                if (userRole != UserRole.CountryUser)
                 {
-                    return await _context.Pillars.OrderBy(p => p.DisplayOrder).ToListAsync();
+                    return await _context.Pillars.Where(p => !p.IsDeleted).OrderBy(p => p.DisplayOrder).ToListAsync();
                 }
                 else
                 {
                     var userPillar = await _context.CountryUserPillarMappings
                         .Where(x => x.IsActive && x.UserID == userId)
                         .Select(x => x.Pillar)
-                        .Where(x => x != null)
+                        .Where(x => x != null && !x.IsDeleted)
                         .Distinct()
                         .ToListAsync();
 
                     return userPillar ?? new List<Pillar>();
-                }                
+                }
             }
             catch (Exception ex)
             {
@@ -82,7 +86,57 @@ namespace PeaceEnablers.Services
             }
 
         }
+        public async Task<ResultResponseDto<Pillar>> AddPillarAsync(AddPillarDto pillar)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(pillar.PillarName))
+                    return ResultResponseDto<Pillar>.Failure(new[] { "Pillar name is required." });
 
+                if (string.IsNullOrWhiteSpace(pillar.Description))
+                    return ResultResponseDto<Pillar>.Failure(new[] { "Description is required." });
+
+                var maxDisplayOrder = await _context.Pillars.MaxAsync(p => (int?)p.DisplayOrder) ?? 0;
+
+                var newPillar = new Pillar
+                {
+                    PillarName = pillar.PillarName.Trim(),
+                    Description = pillar.Description,
+                    DisplayOrder = pillar.DisplayOrder > 0 ? pillar.DisplayOrder : maxDisplayOrder + 1,
+                    PillarCode = string.IsNullOrWhiteSpace(pillar.PillarCode) ? null : pillar.PillarCode.Trim(),
+                    Weight = pillar.Weight,
+                    Reliability = pillar.Reliability,
+                    ImagePath = string.Empty,
+                    IsActive = true,
+                    IsDeleted = false
+                };
+
+                if (pillar.ImageFile != null)
+                {
+                    var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/assets/pillars");
+                    if (!Directory.Exists(uploadsFolder))
+                        Directory.CreateDirectory(uploadsFolder);
+
+                    var fileName = Guid.NewGuid() + Path.GetExtension(pillar.ImageFile.FileName);
+                    var filePath = Path.Combine(uploadsFolder, fileName);
+                    using var stream = new FileStream(filePath, FileMode.Create);
+                    await pillar.ImageFile.CopyToAsync(stream);
+                    newPillar.ImagePath = $"assets/pillars/{fileName}";
+                }
+                _commonService.ClearPillarCache();
+                _context.Pillars.Add(newPillar);
+                await _context.SaveChangesAsync();
+                await SyncPillarKpiMappingsAsync(newPillar.PillarID, pillar.KpiLayerIds);
+                await _context.SaveChangesAsync();
+
+                return ResultResponseDto<Pillar>.Success(newPillar, new[] { "Pillar created successfully." });
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error Occure in AddPillarAsync", ex);
+                return ResultResponseDto<Pillar>.Failure(new[] { "Failed to create pillar." });
+            }
+        }
         public async Task<Pillar> UpdateAsync(int id, UpdatePillarDto pillar)
         {
             try
@@ -92,6 +146,7 @@ namespace PeaceEnablers.Services
                 existing.PillarName = pillar.PillarName ?? "";
                 existing.Description = pillar.Description ?? "";
                 existing.DisplayOrder = pillar.DisplayOrder;
+                existing.PillarCode = string.IsNullOrWhiteSpace(pillar.PillarCode) ? null : pillar.PillarCode.Trim();
 
                 if (pillar.ImageFile != null)
                 {
@@ -119,6 +174,8 @@ namespace PeaceEnablers.Services
                     existing.Reliability = pillar.Reliability;
                     _download.InsertAnalyticalLayerResults();
                 }
+                await SyncPillarKpiMappingsAsync(id, pillar.KpiLayerIds);
+
                 await _context.SaveChangesAsync();
                 return existing;
             }
@@ -129,23 +186,115 @@ namespace PeaceEnablers.Services
             }
         }
 
+        public async Task<ResultResponseDto<List<PillarKpiMappingDto>>> GetPillarKpiMappingsAsync(int pillarId)
+        {
+            try
+            {
+                var pillarExists = await _context.Pillars.AnyAsync(p => p.PillarID == pillarId);
+                if (!pillarExists)
+                    return ResultResponseDto<List<PillarKpiMappingDto>>.Failure(new[] { "Pillar not found." });
 
-        public async Task<bool> DeleteAsync(int id)
+                var mappings = await (
+                    from map in _context.AnalyticalLayerPillarMappings
+                    join layer in _context.AnalyticalLayers on map.LayerID equals layer.LayerID
+                    where map.PillarID == pillarId && !layer.IsDeleted
+                    orderby layer.LayerName
+                    select new PillarKpiMappingDto
+                    {
+                        LayerID = layer.LayerID,
+                        LayerCode = layer.LayerCode,
+                        LayerName = layer.LayerName
+                    }).ToListAsync();
+
+                return ResultResponseDto<List<PillarKpiMappingDto>>.Success(mappings);
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error Occure in GetPillarKpiMappingsAsync", ex);
+                return ResultResponseDto<List<PillarKpiMappingDto>>.Failure(new[] { "Failed to load KPI mappings." });
+            }
+        }
+
+        private async Task SyncPillarKpiMappingsAsync(int pillarId, string? kpiLayerIds)
+        {
+            if (kpiLayerIds == null)
+                return;
+
+            var requestedLayerIds = kpiLayerIds
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(id => int.TryParse(id, out var layerId) ? layerId : 0)
+                .Where(id => id > 0)
+                .Distinct()
+                .ToList();
+
+            var validLayerIds = requestedLayerIds.Count == 0
+                ? new List<int>()
+                : await _context.AnalyticalLayers
+                    .Where(x => !x.IsDeleted && requestedLayerIds.Contains(x.LayerID))
+                    .Select(x => x.LayerID)
+                    .ToListAsync();
+
+            var existingMappings = await _context.AnalyticalLayerPillarMappings
+                .Where(x => x.PillarID == pillarId)
+                .ToListAsync();
+
+            var mappingsToRemove = existingMappings
+                .Where(x => !validLayerIds.Contains(x.LayerID))
+                .ToList();
+
+            if (mappingsToRemove.Count > 0)
+                _context.AnalyticalLayerPillarMappings.RemoveRange(mappingsToRemove);
+
+            var existingLayerIds = existingMappings.Select(x => x.LayerID).ToHashSet();
+            foreach (var layerId in validLayerIds.Where(id => !existingLayerIds.Contains(id)))
+            {
+                _context.AnalyticalLayerPillarMappings.Add(new AnalyticalLayerPillarMapping
+                {
+                    LayerID = layerId,
+                    PillarID = pillarId,
+                    Category = string.Empty,
+                    CategoryNumber = 0
+                });
+            }
+        }
+        public async Task<ResultResponseDto<bool>> DeleteAsync(int id)
         {
             try
             {
                 var pillar = await _context.Pillars.FindAsync(id);
-                if (pillar == null) return false;
-                _context.Pillars.Remove(pillar);
+                if (pillar == null)
+                    return ResultResponseDto<bool>.Failure(new[] { "Pillar not found." });
+
+                if (pillar.IsDeleted)
+                    return ResultResponseDto<bool>.Failure(new[] { "Pillar already deleted." });
+
+                pillar.IsDeleted = true;
+                _context.Pillars.Update(pillar);
+
+                var questions = await _context.Questions
+                    .Where(q => q.PillarID == id && !q.IsDeleted)
+                    .ToListAsync();
+
+                foreach (var question in questions)
+                {
+                    question.IsDeleted = true;
+                    _context.Questions.Update(question);
+                }
+                _commonService.ClearPillarCache();
+
                 await _context.SaveChangesAsync();
-                return true;
+
+                var message = questions.Count > 0
+                    ? $"Pillar deleted successfully. {questions.Count} associated question(s) have also been deleted."
+                    : "Pillar deleted successfully.";
+
+                return ResultResponseDto<bool>.Success(true, new[] { message });
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure", ex);
-                return false;
+                await _appLogger.LogAsync("Error Occure in DeleteAsync", ex);
+                return ResultResponseDto<bool>.Failure(new[] { "Failed to delete pillar." });
             }
-
         }
 
         public async Task<ResultResponseDto<List<PillarWithQuestionsDto>>> GetPillarsWithQuestions(GetCountryPillarHistoryRequestDto request)

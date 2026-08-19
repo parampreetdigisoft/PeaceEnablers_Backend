@@ -31,5 +31,6 @@ namespace PeaceEnablers.IServices
         Task<ResultResponseDto<List<GetCountryPillarDocumentResponseDto>>> GetAICountryPillarDocuments(AiCountryPillarDocumentRequestDto request,int userID, UserRole userRole);
         Task<ResultResponseDto<string>> DeleteDocument(DeleteCountryDocumentRequestDto request, int userID, UserRole userRole);
         Task<FileResult> DownloadDocument(int countryDocumentID, int userID, UserRole userRole);
+
     }
 }

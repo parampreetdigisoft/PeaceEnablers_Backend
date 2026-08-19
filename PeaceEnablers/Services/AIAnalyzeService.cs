@@ -293,6 +293,12 @@ namespace PeaceEnablers.Services
             var url = aiUrl + AiEndpoints.AnalyzeCityMissingQuestions();
             await _httpService.SendAsync<dynamic>(HttpMethod.Post, url, r, headers);
         }
+        public async Task<KpiSummaryAiResponse?> SummarizeKpiPerformance(KpiSummaryAiRequest request)
+        {
+            var url = aiUrl + AiEndpoints.KpiSummary();
+            return await _httpService.SendAsync<KpiSummaryAiResponse>(HttpMethod.Post, url, request, headers);
+        }
+
 
         #endregion Ai api calls 
     }
@@ -342,6 +348,7 @@ namespace PeaceEnablers.Services
         public static string AnalyzeCityMissingQuestions() =>
           $"{BasePath}/analyze/missing-pillar-questions";
 
+        public static string KpiSummary() => $"{ChatPath}/kpi-summary";
 
     }
     #endregion
@@ -380,5 +387,42 @@ namespace PeaceEnablers.Services
         public string? Result { get; set; }
     }
 
+    public class KpiSummaryAiRequest
+    {
+        public string? CountryName { get; set; }
+        public string LayerName { get; set; } = string.Empty;
+        public string LayerCode { get; set; } = string.Empty;
+        public string? Purpose { get; set; }
+        public decimal? ManualScore { get; set; }
+        public decimal? AiScore { get; set; }
+        public string? ManualCondition { get; set; }
+        public string? AiCondition { get; set; }
+        public List<KpiInterpretationBandAiDto> InterpretationBands { get; set; } = new();
+        public string? CategoryDetails { get; set; }
+    }
+
+    public class KpiInterpretationBandAiDto
+    {
+        public decimal? MinRange { get; set; }
+        public decimal? MaxRange { get; set; }
+        public string? Condition { get; set; }
+        public string? Descriptor { get; set; }
+        public string? StrategicAction { get; set; }
+    }
+
+    public class KpiSummaryAiResponse
+    {
+        public bool Success { get; set; }
+        public string? Message { get; set; }
+        public KpiSummaryAiResultDto? Result { get; set; }
+    }
+
+    public class KpiSummaryAiResultDto
+    {
+        public string Summary { get; set; } = string.Empty;
+        public string? ScoreInterpretation { get; set; }
+        public List<string> KeyTakeaways { get; set; } = new();
+        public string? Outlook { get; set; }
+    }
     #endregion
 }
