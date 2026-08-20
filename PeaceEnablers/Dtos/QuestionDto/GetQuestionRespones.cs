@@ -21,6 +21,7 @@ namespace PeaceEnablers.Dtos.QuestionDto
         public int DisplayOrder { get; set; }
         public string Description { get; set; }
         public int SubmittedPillarDisplayOrder { get; set; }
+        public int LastPillarDisplayOrder { get; set; }
         public List<AssessmentQuestionResponseDto> Questions { get; set; }
     }
 }

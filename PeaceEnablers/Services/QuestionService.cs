@@ -300,6 +300,13 @@ namespace PeaceEnablers.Services
                         .Include(x => x.PillarAssessments).ThenInclude(x => x.Responses)
                         .Where(a => a.UserCountryMappingID == request.UserCountryMappingID && a.UpdatedAt.Year == year && a.IsActive)
                         .FirstOrDefaultAsync();
+
+                    if (assessment != null && (assessment.AssessmentPhase == AssessmentPhase.Completed || assessment.AssessmentPhase == AssessmentPhase.EditRejected || assessment.AssessmentPhase == AssessmentPhase.EditRequested))
+                    {
+                        return ResultResponseDto<GetPillarQuestionByCountryResponse>.Failure(
+                            new[] { "You have submitted assessment for this country" });
+                    }
+
                     if (assessment != null)
                     {
                         answeredPillarIds = assessment.PillarAssessments
@@ -335,7 +342,11 @@ namespace PeaceEnablers.Services
                         editAssessmentResponse = assessment.PillarAssessments
                         .Where(a => a.PillarID == request.PillarID)
                         .SelectMany(x => x.Responses)
-                        .ToDictionary(x => x.QuestionID);
+                        .GroupBy(x => x.QuestionID)
+                            .ToDictionary(
+                                g => g.Key,
+                                g => g.Last()
+                            );
                     }
 
                     // Project questions
@@ -375,6 +386,7 @@ namespace PeaceEnablers.Services
                         Description = selectPillar.Description,
                         DisplayOrder = selectPillar.DisplayOrder,
                         SubmittedPillarDisplayOrder = answeredPillarIds.Count == _appSettings.PillarCount ? _appSettings.PillarCount : summitedPillar?.DisplayOrder ?? selectPillar.DisplayOrder,
+                        LastPillarDisplayOrder= _appSettings.PillarCount, //need to changed it
                         Questions = questions
                     };
                     return ResultResponseDto<GetPillarQuestionByCountryResponse>.Success(result, new[] { "get questions successfully" });
@@ -1043,6 +1055,12 @@ namespace PeaceEnablers.Services
                              && a.IsActive)
                     .FirstOrDefaultAsync();
 
+                if(assessment != null && (assessment.AssessmentPhase == AssessmentPhase.Completed || assessment.AssessmentPhase == AssessmentPhase.EditRejected || assessment.AssessmentPhase == AssessmentPhase.EditRequested))
+                {                    
+                        return ResultResponseDto<GetPillarQuestionByCountryResponse>.Failure(
+                            new[] { "You have submitted assessment for this country" });
+                }
+
                 var answeredPillarIds = assessment?.PillarAssessments
                     .Select(r => r.PillarID)
                     .ToList() ?? new List<int>();
@@ -1068,18 +1086,24 @@ namespace PeaceEnablers.Services
                 if (selectPillar?.Questions == null)
                     return ResultResponseDto<GetPillarQuestionByCountryResponse>.Failure(
                         new[] { "You have submitted assessment for this country" });
-
-                // Build lookup for existing responses for the selected pillar
                 var editAssessmentResponse = assessment?.PillarAssessments
                     .Where(a => a.PillarID == request.PillarID)
                     .SelectMany(x => x.Responses)
-                    .ToDictionary(x => x.QuestionID)
+                    .GroupBy(x => x.QuestionID)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.Last()
+                    )
                     ?? new Dictionary<int, AssessmentResponse>();
 
                 // Build option text lookup for history display
                 var optionTextLookup = selectPillar.Questions
                     .SelectMany(q => q.QuestionOptions)
-                    .ToDictionary(o => o.OptionID, o => o.OptionText);
+                    .GroupBy(x => x.OptionID)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.Last()
+                    );
 
                 // Project questions with pre-filled answers
                 var questions = selectPillar.Questions
@@ -1206,6 +1230,7 @@ namespace PeaceEnablers.Services
                     SubmittedPillarDisplayOrder = answeredPillarIds.Count == _appSettings.PillarCount
                                                    ? _appSettings.PillarCount
                                                    : nextUnansweredPillar?.DisplayOrder ?? selectPillar.DisplayOrder,
+                    LastPillarDisplayOrder= _appSettings.PillarCount, //need to chagned it 
                     Questions = questions
                 };
 

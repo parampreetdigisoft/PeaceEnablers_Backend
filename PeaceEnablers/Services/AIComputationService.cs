@@ -100,7 +100,7 @@ namespace PeaceEnablers.Services
 
                 foreach (var c in result.Data)
                 {                 
-                    c.EvidenceSummary = CommonService.InitailLineOfExecutiveSummery(c.EvidenceSummary, c.ImmediateSituationSummary, c.AIProgress, c.CountryName, pillarCount, totalValidKpis);
+                    c.CountryScoreSummery = CommonService.CountryScoreSummery(c.AIProgress, c.CountryName, pillarCount, totalValidKpis);
                 }
 
                 if (userRole != UserRole.CountryUser)
