@@ -339,6 +339,12 @@ namespace PeaceEnablers.Controllers
                 {
                     string fileName;
                     string contentType;
+
+                    if (request?.CountryIDs?.Any() ==  true)
+                    {
+                        countryDetails = countryDetails.Where(c => request.CountryIDs.Contains(c.CountryID)).ToList();
+                    }
+
                     var pdfBytes = await _aIComputationService.GenerateAllCountryDetailsReport(countryDetails, userRole, userId.GetValueOrDefault(), year, request.Format);
 
                     if (request.Format == IServices.DocumentFormat.Docx)

@@ -90,6 +90,7 @@ namespace PeaceEnablers.Common.Implementation
             for (int i = 0; i < n; i++)
             {
                 float v  = (float)(data[i].Value);
+                var shortName = data[i].ShortName;
                 float bx = lp + i * barW + barGap;
                 float bh = v / 100f * chartH;
                 float by = tp + chartH - bh;
@@ -112,7 +113,7 @@ namespace PeaceEnablers.Common.Implementation
                 if (vly < tp + 8f) vly = by + 10f;
                 valLbl.Color = textColor;
                 c.DrawText($"{v:F1}%", bx + innerW / 2f, vly, valLbl);
-                c.DrawText($"{offset + i + 1}", bx + innerW / 2f, s.Height - 6f, numLbl);
+                c.DrawText($"{offset + i + 1}. " + shortName, bx + innerW / 2f, s.Height - 6f, numLbl);
             }
         }
 

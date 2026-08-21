@@ -193,7 +193,7 @@ namespace PeaceEnablers.Common.Implementation
             // Reset pending header state for this document
             ResetSectionState();
 
-            var kpiChartItems = kpis.ToList();
+            var kpiChartItems = kpis.OrderByDescending(x => x.Value).ToList();
             var pillarChartItems = pillars.Take(23)
                 .Select(p => new PillarChartItem(
                     p.PillarName?.Length > 20 ? p.PillarName[..20] : p.PillarName ?? "—",
@@ -202,15 +202,12 @@ namespace PeaceEnablers.Common.Implementation
                 .ToList();
 
             // ── 1. Global Dashboard ──────────────────────────────────────────────────
-            if (!isAllCountries)
-            {
                 AppendCountryHeader(mainPart, countryDetails, "Country Performance Dashboard");
                 AddDashboardSection(body, mainPart, countryDetails, pillarChartItems, kpiChartItems);
-            }
 
             // ── 2. Country Summary ──────────────────────────────────────────────────────
             AppendCountryHeader(mainPart, countryDetails, null);          
-            AddCountrySummarySection(body, mainPart, countryDetails, userRole);
+            AddCountrySummarySection(body, mainPart, countryDetails, userRole, isAllCountries);
 
             // ── 3. Pillar Radial Overview ────────────────────────────────────────────
             if (pillars.Any())
@@ -220,27 +217,30 @@ namespace PeaceEnablers.Common.Implementation
             }
 
             // ── 4. Peer Comparison & Trends ─────────────────────────────────────────
-            if (!isAllCountries && peerCountries.Any())
+            if (!isAllCountries)
             {
-                AddPeerComparisonSections(body, mainPart, peerCountries, countryDetails, userRole);
-                AddPerformanceTrendSections(body, mainPart, peerCountries, countryDetails, userRole);
-            }
+                if (peerCountries.Any())
+                {
+                    AddPeerComparisonSections(body, mainPart, peerCountries, countryDetails, userRole);
+                    AddPerformanceTrendSections(body, mainPart, peerCountries, countryDetails, userRole);
+                }
 
-            // ── 5. Per-Pillar Detail ─────────────────────────────────────────────────
-            var accessiblePillars = pillars.Where(x =>
-                (x.IsAccess && userRole == UserRole.CountryUser) || userRole != UserRole.CountryUser).ToList();
+                // ── 5. Per-Pillar Detail ─────────────────────────────────────────────────
+                var accessiblePillars = pillars.Where(x =>
+                    (x.IsAccess && userRole == UserRole.CountryUser) || userRole != UserRole.CountryUser).ToList();
 
-            foreach (var pillar in accessiblePillars)
-            {
-                AppendCountryHeader(mainPart, countryDetails, pillar.PillarName);
-                AddPillarSection(body, mainPart, pillar, userRole);
+                foreach (var pillar in accessiblePillars)
+                {
+                    AppendCountryHeader(mainPart, countryDetails, pillar.PillarName);
+                    AddPillarSection(body, mainPart, pillar, userRole);
+                }
             }
 
             // ── 6. KPI Dashboard (LAST section) ─────────────────────────────────────
             if (kpiChartItems.Any())
             {
                 AppendCountryHeader(mainPart, countryDetails, "KPI Dashboard");
-                AddKpiDashboardSection(body, mainPart, kpiChartItems);
+                AddKpiDashboardSection(body, mainPart, kpiChartItems, isAllCountries);
             }
 
             // ── 7. Findings and Recommendations (LAST, after KPI) ───────────────────
@@ -694,7 +694,7 @@ namespace PeaceEnablers.Common.Implementation
         //  CITY SUMMARY SECTION
         // ════════════════════════════════════════════════════════════════════
 
-        private void AddCountrySummarySection( Body body, MainDocumentPart mainPart, AiCountrySummeryDto data, UserRole userRole)
+        private void AddCountrySummarySection(Body body, MainDocumentPart mainPart, AiCountrySummeryDto data, UserRole userRole, bool isAllCountries= false)
         {
             // =========================
             // PROGRESS SECTION
@@ -717,78 +717,80 @@ namespace PeaceEnablers.Common.Implementation
             // =========================
             AppendContentSection(body, "Executive Summary", data.EvidenceSummary, "163329");
 
-            // =====================================================
-            // current situation
-            // =====================================================
-            AppendContentSection(body, "Key Developments", data.KeyDevelopments, "e6ccff");
-            AppendContentSection(body, "Critical Risks", data.CriticalRisks, "c2f0f0");
-            AppendContentSection(body, "Gaps", data.Gaps, "ffe6cc");
+            if (!isAllCountries)
+            {
+                // =====================================================
+                // current situation
+                // =====================================================
+                AppendContentSection(body, "Key Developments", data.KeyDevelopments, "e6ccff");
+                AppendContentSection(body, "Critical Risks", data.CriticalRisks, "c2f0f0");
+                AppendContentSection(body, "Gaps", data.Gaps, "ffe6cc");
 
-            // =====================================================
-            // EVIDENCE SECTION
-            // =====================================================
-            AppendContentSection(body, "Structural Evidence", data.StructuralEvidence, "e6ccff");
-            AppendContentSection(body, "Operational Evidence", data.OperationalEvidence, "c2f0f0");
+                // =====================================================
+                // EVIDENCE SECTION
+                // =====================================================
+                AppendContentSection(body, "Structural Evidence", data.StructuralEvidence, "e6ccff");
+                AppendContentSection(body, "Operational Evidence", data.OperationalEvidence, "c2f0f0");
 
-            //body.AppendChild(PageBreak());
+                //body.AppendChild(PageBreak());
 
-            AppendContentSection(body, "Outcome Evidence", data.OutcomeEvidence, "ffe6cc");
-            AppendContentSection(body, "Perception Evidence", data.PerceptionEvidence, "e6f7ff");
+                AppendContentSection(body, "Outcome Evidence", data.OutcomeEvidence, "ffe6cc");
+                AppendContentSection(body, "Perception Evidence", data.PerceptionEvidence, "e6f7ff");
 
-            // =====================================================
-            // INTEGRITY CHECKS
-            // =====================================================
-            //body.AppendChild(PageBreak());
+                // =====================================================
+                // INTEGRITY CHECKS
+                // =====================================================
+                //body.AppendChild(PageBreak());
 
-            AppendContentSection(body, "Temporal Scope", data.TemporalScope, "d9e6ff");
-            AppendContentSection(body, "Distortion Screening", data.DistortionScreening, "f2d9e6");
-            AppendContentSection(body, "Relational Integrity", data.RelationalIntegrity, "f0ffe6");
+                AppendContentSection(body, "Temporal Scope", data.TemporalScope, "d9e6ff");
+                AppendContentSection(body, "Distortion Screening", data.DistortionScreening, "f2d9e6");
+                AppendContentSection(body, "Relational Integrity", data.RelationalIntegrity, "f0ffe6");
 
-            // =====================================================
-            // STRESS TESTS
-            // =====================================================
-            //body.AppendChild(PageBreak());
+                // =====================================================
+                // STRESS TESTS
+                // =====================================================
+                //body.AppendChild(PageBreak());
 
-            AppendContentSection(body, "Political Shock", data.PoliticalShock, "ffd9cc");
-            AppendContentSection(body, "Economic Shock", data.EconomicShock, "fff2cc");
-            AppendContentSection(body, "Narrative Shock", data.NarrativeShock, "e6f2ff");
+                AppendContentSection(body, "Political Shock", data.PoliticalShock, "ffd9cc");
+                AppendContentSection(body, "Economic Shock", data.EconomicShock, "fff2cc");
+                AppendContentSection(body, "Narrative Shock", data.NarrativeShock, "e6f2ff");
 
-            //body.AppendChild(PageBreak());
+                //body.AppendChild(PageBreak());
 
-            //AppendContentSection(body, "Overall Stress Resilience", data.OverallStressResilience, "e6ffe6");
-            AppendContentSection(body, "Stress Score Adjustment", data.StressScoreAdjustment, "ffe6f2");
+                //AppendContentSection(body, "Overall Stress Resilience", data.OverallStressResilience, "e6ffe6");
+                AppendContentSection(body, "Stress Score Adjustment", data.StressScoreAdjustment, "ffe6f2");
 
-            // =====================================================
-            // GOVERNANCE ADJUSTMENTS
-            // =====================================================
-            //body.AppendChild(PageBreak());
+                // =====================================================
+                // GOVERNANCE ADJUSTMENTS
+                // =====================================================
+                //body.AppendChild(PageBreak());
 
-            AppendContentSection(body, "Inequality Adjustment", data.InequalityAdjustment, "f9e6ff");
-            AppendContentSection(body, "Opacity Risk", data.OpacityRisk, "fff0e6");
-            AppendContentSection(body, "Non Compensation Note", data.NonCompensationNote, "e6fff9");
+                AppendContentSection(body, "Inequality Adjustment", data.InequalityAdjustment, "f9e6ff");
+                AppendContentSection(body, "Opacity Risk", data.OpacityRisk, "fff0e6");
+                AppendContentSection(body, "Non Compensation Note", data.NonCompensationNote, "e6fff9");
 
-            // =====================================================
-            // SYSTEM ANALYSIS
-            // =====================================================
-            //body.AppendChild(PageBreak());
+                // =====================================================
+                // SYSTEM ANALYSIS
+                // =====================================================
+                //body.AppendChild(PageBreak());
 
-            AppendContentSection(body, "Cross-Pillar System Dynamics", data.CrossPillarPatterns, "6e9688");
-            AppendContentSection(body, "Institutional Capacity Assessment", data.InstitutionalCapacity, "0d8057");
+                AppendContentSection(body, "Cross-Pillar System Dynamics", data.CrossPillarPatterns, "6e9688");
+                AppendContentSection(body, "Institutional Capacity Assessment", data.InstitutionalCapacity, "0d8057");
 
-            //body.AppendChild(PageBreak());
+                //body.AppendChild(PageBreak());
 
-            AppendContentSection(body, "Equity Assessment", data.EquityAssessment, "e8f5e9");
-            AppendContentSection(body, "Conflict Risk Outlook", data.ConflictRiskOutlook, "fce4ec");
+                AppendContentSection(body, "Equity Assessment", data.EquityAssessment, "e8f5e9");
+                AppendContentSection(body, "Conflict Risk Outlook", data.ConflictRiskOutlook, "fce4ec");
 
-            // =====================================================
-            // STRATEGIC OUTPUT
-            // =====================================================
-            //body.AppendChild(PageBreak());
+                // =====================================================
+                // STRATEGIC OUTPUT
+                // =====================================================
+                //body.AppendChild(PageBreak());
 
-            AppendContentSection(body, "Strategic Policy Priorities", data.StrategicRecommendation, "2e9975");
-            AppendContentSection(body, "Why This Assessment Matters", data.DataTransparencyNote, "63a68f");
-            AppendContentSection(body, "Key Findings", data.KeyFindings, "bbdefb");
-
+                AppendContentSection(body, "Strategic Policy Priorities", data.StrategicRecommendation, "2e9975");
+                AppendContentSection(body, "Why This Assessment Matters", data.DataTransparencyNote, "63a68f");
+                AppendContentSection(body, "Key Findings", data.KeyFindings, "bbdefb");
+            }     
         }
 
         private static Paragraph CreateRankingHeader(string text)
@@ -850,7 +852,7 @@ namespace PeaceEnablers.Common.Implementation
             Body body, MainDocumentPart mainPart,
             List<PillarChartItem> pillars)
         {
-            var data = pillars.Where(p => p.Value.HasValue).Take(23).ToList();
+            var data = pillars.Where(p => p.Value.HasValue).OrderByDescending(x => x.Value).ToList();
             if (!data.Any()) return;
 
             var radialPng = RenderPng((c, s) => PaintPillarRadialChart(c, s, data), 340, 340);
@@ -982,7 +984,7 @@ namespace PeaceEnablers.Common.Implementation
 
         private void AddKpiDashboardSection(
             Body body, MainDocumentPart mainPart,
-            List<KpiChartItem> kpis)
+            List<KpiChartItem> kpis, bool isAllCountries = false)
         {
             if (!kpis.Any()) return;
 
@@ -998,7 +1000,7 @@ namespace PeaceEnablers.Common.Implementation
             // Groups of 18 KPIs — bar chart + interpretation cards
             var groups = kpis
                 .Select((k, i) => new { k, i })
-                .GroupBy(x => x.i / 18)
+                .GroupBy(x => x.i / 13)
                 .Select(g => g.Select(x => x.k).ToList())
                 .ToList();
 
@@ -1012,8 +1014,11 @@ namespace PeaceEnablers.Common.Implementation
 
                 body.AppendChild(CreateFullWidthImage(mainPart, barPng, 155));
                 body.AppendChild(Gap(80));
-                body.AppendChild(CreateKpiCardTable(mainPart, group));
-                body.AppendChild(Gap(160));
+                if (!isAllCountries)
+                {
+                    body.AppendChild(CreateKpiCardTable(mainPart, group));
+                    body.AppendChild(Gap(160));
+                }
                 offset += group.Count;
             }
         }

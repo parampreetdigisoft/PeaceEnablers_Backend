@@ -2,7 +2,7 @@
 {
     public class DownloadReportDto
     {
-        public List<int>? CityIDs { get; set; }
+        public List<int>? CountryIDs { get; set; }
         public IServices.DocumentFormat Format { get; set; } = IServices.DocumentFormat.Pdf;
 
     }
