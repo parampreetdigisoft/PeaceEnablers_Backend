@@ -97,6 +97,25 @@ namespace PeaceEnablers.Controllers
             return Ok(result);
         }
 
+        [HttpGet]
+        [Route("getKPIDetailsByLayerID")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetKPIDetailsByLayerID([FromQuery] string? layerIds)
+        {
+            var ids = (layerIds ?? string.Empty)
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(id => int.TryParse(id, out var layerId) ? layerId : 0)
+                .Where(id => id > 0)
+                .Distinct()
+                .ToList();
+
+            var result = await _kpiService.GetKPIDetailsByLayerID(ids);
+            if (!result.Succeeded)
+                return NotFound(result);
+
+            return Ok(result);
+        }
+
         [HttpPost]
         [Route("CompareCountries")]
         [Authorize(Policy = "StaffOnly")]

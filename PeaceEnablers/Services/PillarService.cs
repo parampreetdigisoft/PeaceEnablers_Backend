@@ -12,6 +12,7 @@ using PeaceEnablers.IServices;
 using PeaceEnablers.Models;
 using QuestPDF.Fluent;
 using System.Linq.Expressions;
+using System.Text.Json;
 
 namespace PeaceEnablers.Services
 {
@@ -96,6 +97,14 @@ namespace PeaceEnablers.Services
                 if (string.IsNullOrWhiteSpace(pillar.Description))
                     return ResultResponseDto<Pillar>.Failure(new[] { "Description is required." });
 
+                var replacements = ParseKpiUpdates(pillar.KpiUpdates);
+                if (replacements == null)
+                    return ResultResponseDto<Pillar>.Failure(new[] { "Invalid KPI replacement data." });
+
+                var replacementValidation = await ValidateKpiReplacementsAsync(replacements);
+                if (!replacementValidation.Succeeded)
+                    return ResultResponseDto<Pillar>.Failure(replacementValidation.Errors);
+
                 var maxDisplayOrder = await _context.Pillars.MaxAsync(p => (int?)p.DisplayOrder) ?? 0;
 
                 var newPillar = new Pillar
@@ -126,7 +135,11 @@ namespace PeaceEnablers.Services
                 _commonService.ClearPillarCache();
                 _context.Pillars.Add(newPillar);
                 await _context.SaveChangesAsync();
-                await SyncPillarKpiMappingsAsync(newPillar.PillarID, pillar.KpiLayerIds);
+
+                var mappingResult = await ApplyPillarKpiMappingChangesAsync(newPillar.PillarID, pillar.KpiLayerIds, pillar.KpiUpdates);
+                if (!mappingResult.Succeeded)
+                    return ResultResponseDto<Pillar>.Failure(mappingResult.Errors);
+
                 await _context.SaveChangesAsync();
 
                 return ResultResponseDto<Pillar>.Success(newPillar, new[] { "Pillar created successfully." });
@@ -137,12 +150,14 @@ namespace PeaceEnablers.Services
                 return ResultResponseDto<Pillar>.Failure(new[] { "Failed to create pillar." });
             }
         }
-        public async Task<Pillar> UpdateAsync(int id, UpdatePillarDto pillar)
+        public async Task<ResultResponseDto<Pillar>> UpdateAsync(int id, UpdatePillarDto pillar)
         {
             try
             {
                 var existing = await _context.Pillars.FindAsync(id);
-                if (existing == null) return null;
+                if (existing == null)
+                    return ResultResponseDto<Pillar>.Failure(new[] { "Pillar not found." });
+
                 existing.PillarName = pillar.PillarName ?? "";
                 existing.Description = pillar.Description ?? "";
                 existing.DisplayOrder = pillar.DisplayOrder;
@@ -174,15 +189,19 @@ namespace PeaceEnablers.Services
                     existing.Reliability = pillar.Reliability;
                     _download.InsertAnalyticalLayerResults();
                 }
-                await SyncPillarKpiMappingsAsync(id, pillar.KpiLayerIds);
 
+                var mappingResult = await ApplyPillarKpiMappingChangesAsync(id, pillar.KpiLayerIds, pillar.KpiUpdates);
+                if (!mappingResult.Succeeded)
+                    return ResultResponseDto<Pillar>.Failure(mappingResult.Errors);
+
+                _commonService.ClearPillarCache();
                 await _context.SaveChangesAsync();
-                return existing;
+                return ResultResponseDto<Pillar>.Success(existing, new[] { "Pillar updated successfully." });
             }
             catch (Exception ex)
             {
                 await _appLogger.LogAsync("Error Occured", ex);
-                return new Pillar();
+                return ResultResponseDto<Pillar>.Failure(new[] { "Failed to update pillar." });
             }
         }
 
@@ -215,7 +234,93 @@ namespace PeaceEnablers.Services
             }
         }
 
-        private async Task SyncPillarKpiMappingsAsync(int pillarId, string? kpiLayerIds)
+        private static readonly JsonSerializerOptions KpiUpdateJsonOptions = new()
+        {
+            PropertyNameCaseInsensitive = true
+        };
+
+        private async Task<ResultResponseDto<bool>> ApplyPillarKpiMappingChangesAsync(int pillarId, string? kpiLayerIds, string? kpiUpdates)
+        {
+            var replacements = ParseKpiUpdates(kpiUpdates);
+            if (replacements == null)
+                return ResultResponseDto<bool>.Failure(new[] { "Invalid KPI replacement data." });
+
+            var replaceResult = await ReplacePillarsOnKpisAsync(pillarId, replacements);
+            if (!replaceResult.Succeeded)
+                return replaceResult;
+
+            var replacedLayerIds = replacements
+                .Select(x => x.LayerID)
+                .Where(id => id > 0)
+                .ToHashSet();
+
+            await AddMissingPillarKpiMappingsAsync(pillarId, kpiLayerIds, replacedLayerIds);
+            return ResultResponseDto<bool>.Success(true);
+        }
+
+        private static List<PillarKpiReplacementDto>? ParseKpiUpdates(string? kpiUpdates)
+        {
+            if (string.IsNullOrWhiteSpace(kpiUpdates))
+                return new List<PillarKpiReplacementDto>();
+
+            try
+            {
+                return JsonSerializer.Deserialize<List<PillarKpiReplacementDto>>(kpiUpdates, KpiUpdateJsonOptions)
+                    ?? new List<PillarKpiReplacementDto>();
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+        }
+
+        private async Task<ResultResponseDto<bool>> ValidateKpiReplacementsAsync(List<PillarKpiReplacementDto> updates)
+        {
+            foreach (var update in updates)
+            {
+                if (update.LayerID <= 0 || update.ReplacedPillarID <= 0)
+                    return ResultResponseDto<bool>.Failure(new[] { "Please select a replacement pillar for every newly selected KPI." });
+
+                var mappingExists = await _context.AnalyticalLayerPillarMappings
+                    .AnyAsync(x => x.LayerID == update.LayerID && x.PillarID == update.ReplacedPillarID);
+
+                if (!mappingExists)
+                    return ResultResponseDto<bool>.Failure(new[] { "No existing pillar mapping was found to replace for one of the selected KPIs." });
+            }
+
+            return ResultResponseDto<bool>.Success(true);
+        }
+
+        private async Task<ResultResponseDto<bool>> ReplacePillarsOnKpisAsync(int newPillarId, List<PillarKpiReplacementDto> updates)
+        {
+            foreach (var update in updates)
+            {
+                if (update.LayerID <= 0 || update.ReplacedPillarID <= 0)
+                    return ResultResponseDto<bool>.Failure(new[] { "Please select a replacement pillar for every newly selected KPI." });
+
+                if (update.ReplacedPillarID == newPillarId)
+                    continue;
+
+                var mapping = await _context.AnalyticalLayerPillarMappings
+                    .FirstOrDefaultAsync(x => x.LayerID == update.LayerID && x.PillarID == update.ReplacedPillarID);
+
+                if (mapping == null)
+                    return ResultResponseDto<bool>.Failure(new[] { "No existing pillar mapping was found to replace for one of the selected KPIs." });
+
+                var alreadyMapped = await _context.AnalyticalLayerPillarMappings
+                    .AnyAsync(x => x.LayerID == update.LayerID && x.PillarID == newPillarId);
+                if (alreadyMapped)
+                    return ResultResponseDto<bool>.Failure(new[] { "This pillar is already mapped to one of the selected KPIs." });
+
+                mapping.PillarID = newPillarId;
+                if (update.CategoryNumber > 0)
+                    mapping.CategoryNumber = update.CategoryNumber;
+            }
+
+            return ResultResponseDto<bool>.Success(true);
+        }
+
+        private async Task AddMissingPillarKpiMappingsAsync(int pillarId, string? kpiLayerIds, HashSet<int> replacedLayerIds)
         {
             if (kpiLayerIds == null)
                 return;
@@ -234,19 +339,13 @@ namespace PeaceEnablers.Services
                     .Select(x => x.LayerID)
                     .ToListAsync();
 
-            var existingMappings = await _context.AnalyticalLayerPillarMappings
+            var existingLayerIds = await _context.AnalyticalLayerPillarMappings
                 .Where(x => x.PillarID == pillarId)
+                .Select(x => x.LayerID)
                 .ToListAsync();
 
-            var mappingsToRemove = existingMappings
-                .Where(x => !validLayerIds.Contains(x.LayerID))
-                .ToList();
-
-            if (mappingsToRemove.Count > 0)
-                _context.AnalyticalLayerPillarMappings.RemoveRange(mappingsToRemove);
-
-            var existingLayerIds = existingMappings.Select(x => x.LayerID).ToHashSet();
-            foreach (var layerId in validLayerIds.Where(id => !existingLayerIds.Contains(id)))
+            var existingLayerIdSet = existingLayerIds.ToHashSet();
+            foreach (var layerId in validLayerIds.Where(id => !existingLayerIdSet.Contains(id) && !replacedLayerIds.Contains(id)))
             {
                 _context.AnalyticalLayerPillarMappings.Add(new AnalyticalLayerPillarMapping
                 {
@@ -257,6 +356,7 @@ namespace PeaceEnablers.Services
                 });
             }
         }
+
         public async Task<ResultResponseDto<bool>> DeleteAsync(int id)
         {
             try

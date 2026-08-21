@@ -162,6 +162,44 @@ namespace PeaceEnablers.Services
                 return ResultResponseDto<List<AnalyticalLayer>>.Failure(new List<string> { "An error occurred" });
             }
         }
+
+        public async Task<ResultResponseDto<List<AnalyticalLayerPillarMappingDto>>> GetKPIDetailsByLayerID(IReadOnlyCollection<int> layerIds)
+        {
+            try
+            {
+                var ids = (layerIds ?? Array.Empty<int>())
+                    .Where(id => id > 0)
+                    .Distinct()
+                    .ToList();
+
+                if (ids.Count == 0)
+                    return ResultResponseDto<List<AnalyticalLayerPillarMappingDto>>.Success(new List<AnalyticalLayerPillarMappingDto>());
+
+                var mappings = await (
+                    from map in _context.AnalyticalLayerPillarMappings
+                    join pillar in _context.Pillars on map.PillarID equals pillar.PillarID
+                    join layer in _context.AnalyticalLayers on map.LayerID equals layer.LayerID
+                    where ids.Contains(map.LayerID) && !pillar.IsDeleted && !layer.IsDeleted
+                    orderby map.LayerID, map.CategoryNumber, pillar.DisplayOrder, pillar.PillarName
+                    select new AnalyticalLayerPillarMappingDto
+                    {
+                        AnalyticalLayerPillarMappingID = map.AnalyticalLayerPillarMappingID,
+                        LayerID = map.LayerID,
+                        LayerName = layer.LayerName,
+                        PillarID = pillar.PillarID,
+                        PillarCode = pillar.PillarCode,
+                        PillarName = pillar.PillarName,
+                        CategoryNumber = map.CategoryNumber
+                    }).ToListAsync();
+
+                return ResultResponseDto<List<AnalyticalLayerPillarMappingDto>>.Success(mappings);
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error occurred in GetKPIDetailsByLayerID", ex);
+                return ResultResponseDto<List<AnalyticalLayerPillarMappingDto>>.Failure(new[] { "Failed to load KPI pillar details." });
+            }
+        }
         public async Task<ResultResponseDto<CompareCountryResponseDto>> CompareCountries(CompareCountryRequestDto c, int userId, UserRole role, bool applyPagination = true)
         {
             try

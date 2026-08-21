@@ -11,6 +11,7 @@
         public string? ImagePath { get; set; }
         public IFormFile? ImageFile { get; set; }
         public string? KpiLayerIds { get; set; }
+        public string? KpiUpdates { get; set; }
         public string? PillarCode { get; set; }
     }
 }

@@ -105,7 +105,14 @@ namespace PeaceEnablers.Controllers
         {          
 
             var result = await _pillarService.UpdateAsync(id, pillar);
-            if (result == null) return NotFound();
+            if (!result.Succeeded)
+            {
+                if (result.Errors.Any(e => e.Contains("not found", StringComparison.OrdinalIgnoreCase)))
+                    return NotFound(result);
+
+                return BadRequest(result);
+            }
+
             return Ok(result);
         }
 
