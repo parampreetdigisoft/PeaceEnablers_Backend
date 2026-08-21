@@ -1,9 +1,8 @@
 ﻿using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using PeaceEnablers.Common.Implementation;
+using PeaceEnablers.Common.Interface;
 using PeaceEnablers.Common.Models;
-using PeaceEnablers.Common.Models.settings;
 using PeaceEnablers.Data;
 using PeaceEnablers.Dtos.AssessmentDto;
 using PeaceEnablers.Dtos.CommonDto;
@@ -17,19 +16,32 @@ namespace PeaceEnablers.Services
     {
         private readonly ApplicationDbContext _context;
         private readonly IAppLogger _appLogger;
-        private readonly AppSettings _appSettings;
-        public QuestionService(ApplicationDbContext context, IAppLogger appLogger, IOptions<AppSettings> appSettings)
+        private readonly ICommonService _commonService;
+        public QuestionService(ApplicationDbContext context, IAppLogger appLogger, ICommonService commonService)
         {
             _context = context;
             _appLogger = appLogger;
-            _appSettings = appSettings.Value;
+            _commonService = commonService;
         }
 
         public async Task<List<Pillar>> GetPillarsAsync()
         {
             try
             {
-                return await _context.Pillars.Where(p => !p.IsDeleted).OrderBy(p => p.DisplayOrder).ToListAsync();
+                var pillars = await _commonService.GetPillars();
+                return pillars.Select(p => new Pillar
+                {
+                    PillarID = p.PillarID,
+                    PillarName = p.PillarName,
+                    Description = p.Description,
+                    DisplayOrder = p.DisplayOrder,
+                    ImagePath = p.ImagePath ?? string.Empty,
+                    Weight = p.Weight,
+                    Reliability = p.Reliability,
+                    PillarCode = p.PillarCode,
+                    IsActive = p.IsActive,
+                    IsDeleted = false
+                }).ToList();
             }
             catch (Exception ex)
             {
@@ -75,6 +87,7 @@ namespace PeaceEnablers.Services
             {
                 _context.Questions.Add(q);
                 await _context.SaveChangesAsync();
+                _commonService.ClearPillarCache();
                 return q;
             }
             catch (Exception ex)
@@ -94,6 +107,7 @@ namespace PeaceEnablers.Services
                 existing.PillarID = q.PillarID;
                 existing.DisplayOrder = q.DisplayOrder;
                 await _context.SaveChangesAsync();
+                _commonService.ClearPillarCache();
                 return existing;
             }
             catch (Exception ex)
@@ -113,6 +127,7 @@ namespace PeaceEnablers.Services
                 q.IsDeleted = true;
                 _context.Questions.Update(q);
                 await _context.SaveChangesAsync();
+                _commonService.ClearPillarCache();
                 return true;
             }
             catch (Exception ex)
@@ -206,6 +221,7 @@ namespace PeaceEnablers.Services
                     _context.Questions.Add(question);
 
                 await _context.SaveChangesAsync();
+                _commonService.ClearPillarCache();
 
                 return ResultResponseDto<string>.Success("", new[] { q.QuestionID > 0 ? "Question updated successfully" : "Question saved successfully" });
             }
@@ -276,6 +292,7 @@ namespace PeaceEnablers.Services
                 {
                     await _context.Questions.AddRangeAsync(newQuestions);
                     await _context.SaveChangesAsync();
+                    _commonService.ClearPillarCache();
                 }
 
                 return ResultResponseDto<string>.Success("", new[] { newQuestions.Count + " Questions imported successfully" });
@@ -313,7 +330,11 @@ namespace PeaceEnablers.Services
                        .Select(r => r.PillarID)
                        .ToList();
                     }
-                    if (assessment != null && answeredPillarIds.Count == _appSettings.PillarCount && !request.PillarID.HasValue)
+                    var allPillars = await _commonService.GetPillars();
+                    var pillarCount = allPillars.Count;
+                    var lastDisplayOrder = allPillars.Count == 0 ? 0 : allPillars.Max(p => p.DisplayOrder);
+
+                    if (assessment != null && answeredPillarIds.Count == pillarCount && !request.PillarID.HasValue)
                     {
                         request.PillarID = assessment.PillarAssessments.First().PillarID;
                     }
@@ -326,10 +347,10 @@ namespace PeaceEnablers.Services
                         .OrderBy(p => p.DisplayOrder)
                         .FirstOrDefaultAsync();
 
-                    var summitedPillar = await _context.Pillars
+                    var summitedPillar = allPillars
                         .Where(p => !answeredPillarIds.Contains(p.PillarID))
                         .OrderBy(p => p.DisplayOrder)
-                        .FirstOrDefaultAsync();
+                        .FirstOrDefault();
 
                     if (selectPillar == null || selectPillar?.Questions == null)
                     {
@@ -385,8 +406,8 @@ namespace PeaceEnablers.Services
                         PillarID = selectPillar.PillarID,
                         Description = selectPillar.Description,
                         DisplayOrder = selectPillar.DisplayOrder,
-                        SubmittedPillarDisplayOrder = answeredPillarIds.Count == _appSettings.PillarCount ? _appSettings.PillarCount : summitedPillar?.DisplayOrder ?? selectPillar.DisplayOrder,
-                        LastPillarDisplayOrder= _appSettings.PillarCount, //need to changed it
+                        SubmittedPillarDisplayOrder = answeredPillarIds.Count == pillarCount ? lastDisplayOrder : summitedPillar?.DisplayOrder ?? selectPillar.DisplayOrder,
+                        LastPillarDisplayOrder= lastDisplayOrder,
                         Questions = questions
                     };
                     return ResultResponseDto<GetPillarQuestionByCountryResponse>.Success(result, new[] { "get questions successfully" });
@@ -1065,7 +1086,11 @@ namespace PeaceEnablers.Services
                     .Select(r => r.PillarID)
                     .ToList() ?? new List<int>();
 
-                if (assessment != null && answeredPillarIds.Count == _appSettings.PillarCount && !request.PillarID.HasValue)
+                var allPillars = await _commonService.GetPillars();
+                var pillarCount = allPillars.Count;
+                var lastDisplayOrder = allPillars.Count == 0 ? 0 : allPillars.Max(p => p.DisplayOrder);
+
+                if (assessment != null && answeredPillarIds.Count == pillarCount && !request.PillarID.HasValue)
                     request.PillarID = assessment.PillarAssessments.First().PillarID;
 
                 // Get the target pillar (next unanswered or specific)
@@ -1078,10 +1103,10 @@ namespace PeaceEnablers.Services
                     .OrderBy(p => p.DisplayOrder)
                     .FirstOrDefaultAsync();
 
-                var nextUnansweredPillar = await _context.Pillars
+                var nextUnansweredPillar = allPillars
                     .Where(p => !answeredPillarIds.Contains(p.PillarID))
                     .OrderBy(p => p.DisplayOrder)
-                    .FirstOrDefaultAsync();
+                    .FirstOrDefault();
 
                 if (selectPillar?.Questions == null)
                     return ResultResponseDto<GetPillarQuestionByCountryResponse>.Failure(
@@ -1227,10 +1252,10 @@ namespace PeaceEnablers.Services
                     PillarID = selectPillar.PillarID,
                     Description = selectPillar.Description,
                     DisplayOrder = selectPillar.DisplayOrder,
-                    SubmittedPillarDisplayOrder = answeredPillarIds.Count == _appSettings.PillarCount
-                                                   ? _appSettings.PillarCount
+                    SubmittedPillarDisplayOrder = answeredPillarIds.Count == pillarCount
+                                                   ? lastDisplayOrder
                                                    : nextUnansweredPillar?.DisplayOrder ?? selectPillar.DisplayOrder,
-                    LastPillarDisplayOrder= _appSettings.PillarCount, //need to chagned it 
+                    LastPillarDisplayOrder= lastDisplayOrder, 
                     Questions = questions
                 };
 

@@ -1,12 +1,10 @@
 ﻿using AssessmentPlatform.Dtos.AiDto;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using PeaceEnablers.Backgroundjob;
 using PeaceEnablers.Common.Implementation;
 using PeaceEnablers.Common.Interface;
 using PeaceEnablers.Common.Models;
-using PeaceEnablers.Common.Models.settings;
 using PeaceEnablers.Data;
 using PeaceEnablers.Dtos.AiDto;
 using PeaceEnablers.Dtos.CommonDto;
@@ -30,13 +28,12 @@ namespace PeaceEnablers.Services
         private readonly Download _download;
         private readonly IAIAnalyzeService _iAIAnalayzeService;        
         private readonly IDocumentGeneratorService _documentGeneratorService;
-        private readonly AppSettings _appSettings;
         private readonly IWebHostEnvironment _env;
         public AIComputationService(ApplicationDbContext context, IAppLogger appLogger,
             ICommonService commonService, 
             Download download, IAIAnalyzeService iAIAnalayzeService
             ,  IDocumentGeneratorService documentGeneratorService, 
-            IOptions<AppSettings> appSettings, IWebHostEnvironment env)
+            IWebHostEnvironment env)
         {
             _context = context;
             _appLogger = appLogger;
@@ -44,7 +41,6 @@ namespace PeaceEnablers.Services
             _download = download;
             _iAIAnalayzeService = iAIAnalayzeService;          
             _documentGeneratorService = documentGeneratorService;
-            _appSettings = appSettings.Value;
             _env = env;
         }
         #endregion
@@ -63,7 +59,8 @@ namespace PeaceEnablers.Services
         {
             try
             {
-                int pillarCount = _appSettings.PillarCount;
+                var cachedPillars = await _commonService.GetPillars();
+                int pillarCount = cachedPillars.Count;
                 IQueryable<AiCountrySummeryDto> query = await GetCountryAiSummeryDetails(userID, userRole, request.CountryID, request.Year);
 
                 var progress = await _commonService.GetCountriesProgressAsync(userID, (int)userRole, DateTime.Now.Year);
@@ -105,10 +102,7 @@ namespace PeaceEnablers.Services
 
                 if (userRole != UserRole.CountryUser)
                 {
-                    var counts = await _context.Pillars
-                        .Select(p => p.Questions.Count()).ToListAsync();
-
-                    var totalQuestions = counts.Sum();
+                    var totalQuestions = cachedPillars.Sum(p => p.QuestionCount);
 
                     var answeredQuestions = await _context.AIEstimatedQuestionScores
                         .Where(x => x.Year == request.Year && ids.Contains(x.CountryID))
@@ -288,7 +282,8 @@ namespace PeaceEnablers.Services
             {
                 currentYear = currentYear == 0 ? DateTime.Now.Year : currentYear;
                 var firstDate = new DateTime(currentYear, 1, 1);
-                int pillarCount = _appSettings.PillarCount;
+                var pillars = await _commonService.GetPillars();
+                int pillarCount = pillars.Count;
                 var res = await _context.AIPillarScores
                     .Where(x => x.CountryID == CountryID && x.UpdatedAt >= firstDate && x.Year == currentYear)
                     .Include(x=>x.Country)
@@ -304,15 +299,6 @@ namespace PeaceEnablers.Services
                                 .Distinct()
                                 .ToListAsync();
                 }
-                var pillars = await _context.Pillars.Select(x=>new
-                {
-                    PillarID = x.PillarID,
-                    PillarName = x.PillarName,
-                    DisplayOrder = x.DisplayOrder,
-                    ImagePath = x.ImagePath,
-                    TotalQuestions = x.Questions.Count()
-                }).ToListAsync();
-
                 var result = pillars
                 .GroupJoin(
                     res,
@@ -391,7 +377,7 @@ namespace PeaceEnablers.Services
 
                 foreach (var c in result)
                 {
-                    var totalQuestions = pillars.FirstOrDefault(x => x.PillarID == c.PillarID)?.TotalQuestions ?? 0;
+                    var totalQuestions = pillars.FirstOrDefault(x => x.PillarID == c.PillarID)?.QuestionCount ?? 0;
                     var answeredQuestion = answeredQuestions.FirstOrDefault(x => x.PillarID == c.PillarID)?.AnsweredQuestions ?? 0;
                     var pillarScore = countries
                         .Where(x => x.PillarID == c.PillarID)
@@ -519,7 +505,8 @@ namespace PeaceEnablers.Services
         private async Task<List<PeerCountryHistoryReportDto>> GetPeerCountries(int userID, UserRole role, int CountryID, int year, bool isAiScore = true)
         {
             var peerCountries = new List<PeerCountryHistoryReportDto>();
-            int pillarCount = _appSettings.PillarCount;
+            var cachedPillars = await _commonService.GetPillars();
+            int pillarCount = cachedPillars.Count;
             var peersCountryIDs = await _context.Countries
                    .Where(x => x.CountryID == CountryID && x.IsActive && !x.IsDeleted)
                    .SelectMany(x => x.CountryPeers)
@@ -593,12 +580,7 @@ namespace PeaceEnablers.Services
             }
             else
             {
-                var pillars = await _context.Pillars.Select(x => new
-                {
-                    x.PillarID,
-                    x.PillarName,
-                    x.DisplayOrder
-                }).ToListAsync();
+                var pillars = cachedPillars;
 
                 var countryProgress = await _commonService
                     .GetCountriesProgressHistoryAsync(userID, (int)role, year - 5, year);
@@ -734,7 +716,7 @@ namespace PeaceEnablers.Services
                         .ToListAsync();
                 }
 
-                var pillars = await _context.Pillars.ToListAsync();
+                var pillars = await _commonService.GetPillars();
 
                 // Categories
                 response.Categories.AddRange(
@@ -1044,7 +1026,7 @@ namespace PeaceEnablers.Services
 
             var totalValidKpis = await analyticalLayers.Distinct().CountAsync();
 
-            int pillarCount = _appSettings.PillarCount;
+            int pillarCount = (await _commonService.GetPillars()).Count;
 
             var countryRanks = CalculateCountryRanks(progress, pillarCount, reportType);
 
@@ -1488,7 +1470,7 @@ namespace PeaceEnablers.Services
         {
             var query = await GetCountryAiSummeryDetails(userID, userRole, null, year);
             var countriesDetails = await query.ToListAsync();
-            int pillarCount = _appSettings.PillarCount;
+            int pillarCount = (await _commonService.GetPillars()).Count;
 
             var progress = await _commonService.GetCountriesProgressAsync(userID, (int)userRole, DateTime.Now.Year);
             var countryRanks = CalculateCountryRanks(progress, pillarCount);
@@ -1573,7 +1555,8 @@ namespace PeaceEnablers.Services
         {
             try
             {
-                int pillarCount = _appSettings.PillarCount;
+                var pillars = await _commonService.GetPillars();
+                int pillarCount = pillars.Count;
                 currentYear = currentYear == 0 ? DateTime.Now.Year : currentYear;
                 var firstDate = new DateTime(currentYear, 1, 1);
 
@@ -1592,15 +1575,6 @@ namespace PeaceEnablers.Services
                         .Distinct()
                         .ToListAsync();
                 }
-
-                var pillars = await _context.Pillars.Select(x => new
-                {
-                    x.PillarID,
-                    x.PillarName,
-                    x.DisplayOrder,
-                    x.ImagePath,
-                    TotalQuestions = x.Questions.Count()
-                }).ToListAsync();
 
                 var CountryIDs = scores.Select(x => x.CountryID).Distinct().ToList();
 
@@ -1692,7 +1666,7 @@ namespace PeaceEnablers.Services
                 {
                     foreach (var c in country.Value)
                     {
-                        var totalQuestions = pillars.FirstOrDefault(x => x.PillarID == c.PillarID)?.TotalQuestions ?? 1;
+                        var totalQuestions = pillars.FirstOrDefault(x => x.PillarID == c.PillarID)?.QuestionCount ?? 1;
 
                         var answeredQuestion = answeredQuestions
                             .FirstOrDefault(x => x.CountryID == country.Key && x.PillarID == c.PillarID)?.AnsweredQuestions ?? 0;
@@ -2114,6 +2088,9 @@ namespace PeaceEnablers.Services
         {
             try
             {
+                var cachedPillars = await _commonService.GetPillars();
+                var pillarNameById = cachedPillars.ToDictionary(p => p.PillarID, p => p.PillarName);
+
                 var result = await _context.CountryDocuments
                    .Where(x => !x.IsDeleted && (x.CountryID == request.CountryID || x.CountryID == null))
                    .Select(x => new GetCountryPillarDocumentResponseDto
@@ -2121,24 +2098,26 @@ namespace PeaceEnablers.Services
                        CountryDocumentID = x.CountryDocumentID,
                        CountryID = x.CountryID,
                        PillarID = x.PillarID,
-
-                       PillarName = x.CountryID.HasValue ? _context.Pillars
-                           .Where(p => p.PillarID == x.PillarID)
-                           .Select(p => p.PillarName)
-                           .FirstOrDefault() : x.DocumentLevel,
-
+                       PillarName = x.DocumentLevel,
                        FileName = x.FileName,
                        FilePath = x.FilePath,
                        FileSize = x.FileSize,
                        FileType = x.FileType,
                        ProcessingStatus = x.ProcessingStatus,
                        StoredFileName = x.StoredFileName,
-
                        UploadedBy = "",
                        UploadedByUserID = x.UploadedByUserID ?? 0
                    })
                    .OrderBy(x => x.PillarID)
                    .ToListAsync();
+
+                foreach (var r in result)
+                {
+                    if (r.CountryID.HasValue && r.PillarID.HasValue && pillarNameById.TryGetValue(r.PillarID.Value, out var pillarName))
+                    {
+                        r.PillarName = pillarName;
+                    }
+                }
 
                 var users = _context.Users
                     .Where(x => result.Select(x => x.UploadedByUserID)

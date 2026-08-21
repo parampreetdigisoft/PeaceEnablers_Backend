@@ -1,12 +1,10 @@
 ﻿using AssessmentPlatform.Models;
 using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using PeaceEnablers.Backgroundjob;
 using PeaceEnablers.Common.Implementation;
 using PeaceEnablers.Common.Interface;
 using PeaceEnablers.Common.Models;
-using PeaceEnablers.Common.Models.settings;
 using PeaceEnablers.Data;
 using PeaceEnablers.Dtos.AssessmentDto;
 using PeaceEnablers.Dtos.CountryDto;
@@ -27,15 +25,13 @@ namespace PeaceEnablers.Services
         private readonly IWebHostEnvironment _env;
         private readonly ICommonService _commonService;
         private readonly Download _download;
-        private readonly AppSettings _appSettings;
-        public CountryService(ApplicationDbContext context, IAppLogger appLogger, IWebHostEnvironment env, ICommonService commonService, Download download, IOptions<AppSettings> appSettings)
+        public CountryService(ApplicationDbContext context, IAppLogger appLogger, IWebHostEnvironment env, ICommonService commonService, Download download)
         {
             _context = context;
             _appLogger = appLogger;
             _env = env;
             _commonService = commonService;
             _download = download;
-            _appSettings = appSettings.Value;
         }
 
         #endregion
@@ -463,7 +459,7 @@ namespace PeaceEnablers.Services
         private async Task ApplyManualScoresAsync(PaginationResponse<UserCountryMappingResponseDto> response,PaginationRequest request, UserRole role, int year)
         {
             var scores = await _commonService.GetCountriesProgressAsync(request.UserId.GetValueOrDefault(),(int)role, year);
-            int pillarCount = _appSettings.PillarCount;
+            int pillarCount = (await _commonService.GetPillars()).Count;
             var scoreMap = scores
                 .GroupBy(x => x.CountryID)
                 .ToDictionary(
@@ -496,7 +492,7 @@ namespace PeaceEnablers.Services
                 int year = DateTime.UtcNow.Year;
                 var startDate = new DateTime(year, 1, 1);
                 var endDate = new DateTime(year + 1, 1, 1);
-                int pillarCount = _appSettings.PillarCount;
+                int pillarCount = (await _commonService.GetPillars()).Count;
                 if (userRole == UserRole.Admin)
                 {
                     countryQuery = GetAdminCountryQuery(year);
@@ -797,12 +793,9 @@ namespace PeaceEnablers.Services
                 var endDate = new DateTime(year + 1, 1, 1);
 
                 // Get total pillars and questions (independent query)
-                var pillarStats = await _context.Pillars
-                    .Select(p => new { QuestionsCount = p.Questions.Count() })
-                    .ToListAsync();
-
-                int totalPillars = pillarStats.Count;
-                int totalQuestions = pillarStats.Sum(p => p.QuestionsCount);
+                var cachedPillars = await _commonService.GetPillars();
+                int totalPillars = cachedPillars.Count;
+                int totalQuestions = cachedPillars.Sum(p => p.QuestionCount);
 
                 Expression<Func<UserCountryMapping, bool>> predicate;
 

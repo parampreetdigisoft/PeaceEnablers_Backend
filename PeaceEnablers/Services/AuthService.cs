@@ -35,7 +35,8 @@ namespace PeaceEnablers.Services
         private readonly IEmailService _emailService;
         private readonly IAppLogger _appLogger;
         private readonly IWebHostEnvironment _env;
-        public AuthService(ApplicationDbContext context, IOptions<AppSettings> appSettings, IEmailService emailService, IOptions<JwtSetting> jwtSetting, IAppLogger appLogger, IWebHostEnvironment env)
+        private readonly ICommonService _commonService;
+        public AuthService(ApplicationDbContext context, IOptions<AppSettings> appSettings, IEmailService emailService, IOptions<JwtSetting> jwtSetting, IAppLogger appLogger, IWebHostEnvironment env, ICommonService commonService)
         {
             _context = context;
             _appSettings = appSettings.Value;
@@ -43,6 +44,7 @@ namespace PeaceEnablers.Services
             _jwtSetting = jwtSetting.Value;
             _appLogger = appLogger;
             _env = env;
+            _commonService = commonService;
         }
         #endregion
 
@@ -570,7 +572,7 @@ namespace PeaceEnablers.Services
                 {
                     if (inviteUser.Tier == TieredAccessPlan.Premium)
                     {
-                        var allPillarIds = await _context.Pillars.Select(p => p.PillarID).ToListAsync();
+                        var allPillarIds = (await _commonService.GetPillars()).Select(p => p.PillarID).ToList();
                         inviteUser.Pillars = allPillarIds;
 
                         if (inviteUser.IsAllCountries)
@@ -1425,7 +1427,7 @@ namespace PeaceEnablers.Services
                 if (!Enum.TryParse<TieredAccessPlan>(tierName, true, out var tier))
                     return ResultResponseDto<string>.Failure(new[] { "Invalid tier access. Please contact support team." });
 
-                var allPillarIds = await _context.Pillars.Select(p => p.PillarID).ToListAsync();
+                var allPillarIds = (await _commonService.GetPillars()).Select(p => p.PillarID).ToList();
                 var allCountryIds = await _context.Countries
                     .Where(c => c.IsActive)
                     .Select(c => c.CountryID)

@@ -1,11 +1,9 @@
 ﻿using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using PeaceEnablers.Backgroundjob;
 using PeaceEnablers.Common.Implementation;
 using PeaceEnablers.Common.Interface;
 using PeaceEnablers.Common.Models;
-using PeaceEnablers.Common.Models.settings;
 using PeaceEnablers.Data;
 using PeaceEnablers.Dtos.AssessmentDto;
 using PeaceEnablers.Dtos.CountryDto;
@@ -23,15 +21,12 @@ namespace PeaceEnablers.Services
         private readonly IAppLogger _appLogger;
         private readonly Download _download;
         private readonly ICommonService _commonService;
-        private readonly AppSettings _appSettings;
-        public AssessmentResponseService(ApplicationDbContext context, IAppLogger appLogger, Download download, ICommonService commonService,
-            IOptions<AppSettings> appSettings)
+        public AssessmentResponseService(ApplicationDbContext context, IAppLogger appLogger, Download download, ICommonService commonService)
         {
             _context = context;
             _appLogger = appLogger;
             _download = download;
             _commonService = commonService;
-            _appSettings = appSettings.Value;
         }
 
         public async Task<List<AssessmentResponse>> GetAllAsync()
@@ -163,8 +158,10 @@ namespace PeaceEnablers.Services
                     
                     if (!request.IsAutoSave) // removed if entire assessement is update for all responses
                     {
-                        var pillar = await _context.Pillars.OrderByDescending(x => x.DisplayOrder).FirstOrDefaultAsync();
-                        assessment.AssessmentPhase = pillar?.PillarID == request.PillarID ? AssessmentPhase.Completed : AssessmentPhase.InProgress;
+                        var lastPillar = (await _commonService.GetPillars())
+                            .OrderByDescending(x => x.DisplayOrder)
+                            .FirstOrDefault();
+                        assessment.AssessmentPhase = lastPillar?.PillarID == request.PillarID ? AssessmentPhase.Completed : AssessmentPhase.InProgress;
 
                         var requestResponseIds = request.Responses
                             .Where(r => r.QuestionID > 0)
@@ -566,44 +563,39 @@ namespace PeaceEnablers.Services
                     .Where(a => ucmIds.Contains(a.UserCountryMappingID) && a.IsActive && a.UpdatedAt.Year == userCountryRequestDto.UpdatedAt.Year)
                     .SelectMany(x => x.PillarAssessments);
 
-                // 2. Fetch country-wise pillar/question details in one go
-                var countryPillarQuery =
-                    from p in _context.Pillars
-                    join pa in pillarAssessments on p.PillarID equals pa.PillarID into paGroup
-                    from pa in paGroup.DefaultIfEmpty()
-                    select new
+                var cachedPillars = await _commonService.GetPillars();
+
+                var paStats = await pillarAssessments
+                    .Select(pa => new
                     {
-                        p.PillarID,
-                        p.PillarName,
-                        UserID = pa != null && pa.Responses
+                        pa.PillarID,
+                        UserID = pa.Responses
                                 .Where(r => r.Score.HasValue && (int)r.Score.Value <= (int)ScoreValue.Four)
                                 .Count() > 0 ? pa.Assessment.UserCountryMapping.UserID : 0,
-                        Score = pa != null
-                            ? pa.Responses
+                        Score = pa.Responses
                                 .Where(r => r.Score.HasValue && (int)r.Score.Value <= (int)ScoreValue.Four)
-                                .Sum(r => (int?)r.Score ?? 0)
-                            : 0,
-                        ScoreCount = pa != null ? pa.Responses.Where(r => r.Score.HasValue && (int)r.Score.Value <= (int)ScoreValue.Four).Count() : 0,
-                        TotalQuestion = p.Questions.Count(),
-                        AnsQuestion = pa != null ? pa.Responses.Count() : 0,
-                        HasAnswer = pa != null
-                    };
-                var list = await countryPillarQuery.Distinct().ToListAsync();
-                var countryPillars = (list)
-                    .GroupBy(x => new { x.PillarID, x.PillarName })
-                    .Select(g =>
+                                .Sum(r => (int?)r.Score ?? 0),
+                        ScoreCount = pa.Responses.Where(r => r.Score.HasValue && (int)r.Score.Value <= (int)ScoreValue.Four).Count(),
+                        AnsQuestion = pa.Responses.Count(),
+                        HasAnswer = true
+                    })
+                    .ToListAsync();
+
+                var countryPillars = cachedPillars
+                    .Select(p =>
                     {
+                        var g = paStats.Where(x => x.PillarID == p.PillarID).ToList();
                         var totalAnsScoreOfPillar = g.Sum(x => x.Score);
                         var ScoreCount = g.Sum(x => x.ScoreCount);
-                        var ansUserCount = g.Where(x => x.UserID > 0).Distinct().Count();
-                        var totalQuestionsInPillar = g.Max(x => x.TotalQuestion) * ansUserCount;
+                        var ansUserCount = g.Where(x => x.UserID > 0).Select(x => x.UserID).Distinct().Count();
+                        var totalQuestionsInPillar = p.QuestionCount * ansUserCount;
 
                         decimal progress = ScoreCount != 0 && ansUserCount > 0 ? totalAnsScoreOfPillar * 100 / (ScoreCount * 4m ) : 0m;
 
                         return new CountryPillarQuestionHistoryResponseDto
                         {
-                            PillarID = g.Key.PillarID,
-                            PillarName = g.Key.PillarName,
+                            PillarID = p.PillarID,
+                            PillarName = p.PillarName,
                             Score = totalAnsScoreOfPillar,
                             ScoreProgress = progress,
                             AnsPillar = g.Sum(x => x.HasAnswer ? 1 : 0),
@@ -870,7 +862,8 @@ namespace PeaceEnablers.Services
             try
             {
                 var year = request.UpdatedAt.Year;
-                int pillarCount = _appSettings.PillarCount;
+                var cachedPillars = await _commonService.GetPillars();
+                int pillarCount = cachedPillars.Count;
                 // 1. Validate country access
                 var hasAccess = await _context.UserCountryMappings
                     .AnyAsync(x =>
@@ -888,10 +881,7 @@ namespace PeaceEnablers.Services
                 var pillarEvaluationsList = await _commonService
                     .GetCountriesProgressAsync(userId, (int)userRole, year);
 
-                var pillars = await _context.Pillars
-                    .AsNoTracking()
-                    .OrderBy(x => x.DisplayOrder)
-                    .ToListAsync();
+                var pillars = cachedPillars;
 
                 var aiCountryProgress = await _context.AICountryScores
                     .Where(x => x.CountryID == request.CountryID && x.Year == year)

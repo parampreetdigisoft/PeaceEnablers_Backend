@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using PeaceEnablers.Common.Implementation;
+using PeaceEnablers.Common.Interface;
 using PeaceEnablers.Common.Models.settings;
 using PeaceEnablers.Data;
 using PeaceEnablers.Dtos.chatDto;
@@ -15,13 +16,15 @@ namespace PeaceEnablers.Services
         private readonly  string aiUrl = "http://127.0.0.1:8000";
         private readonly ApplicationDbContext _context;
         private readonly IAppLogger _appLogger;
+        private readonly ICommonService _commonService;
         private Dictionary<string, string> headers;
-        public AIAnalyzeService(HttpService httpService, IOptions<AppSettings> appSettings, ApplicationDbContext context, IAppLogger appLogger)
+        public AIAnalyzeService(HttpService httpService, IOptions<AppSettings> appSettings, ApplicationDbContext context, IAppLogger appLogger, ICommonService commonService)
         {
             _httpService = httpService;
             aiUrl = appSettings?.Value?.AiUrl ?? aiUrl;
             _context = context;
             _appLogger = appLogger;
+            _commonService = commonService;
             headers = new Dictionary<string, string> { { "X-API-Key", appSettings?.Value?.AiToken ?? "" } };
         }
         public async Task RunMonthlyJob()
@@ -70,7 +73,7 @@ namespace PeaceEnablers.Services
         public async Task ImportAiScore()
         {
             // if new city added
-            var totalPillar = await _context.Pillars.CountAsync();
+            var totalPillar = (await _commonService.GetPillars()).Count;
             var allCountriesIds = _context.Countries.Where(x=>x.IsActive && !x.IsDeleted).Select(x=>x.CountryID).ToList();
             var importedCountriesIds = _context.AICountryScores.Select(x => x.CountryID);
 

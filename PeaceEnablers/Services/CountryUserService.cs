@@ -3,6 +3,7 @@ using ClosedXML.Excel;
 using DocumentFormat.OpenXml.Drawing.Charts;
 using Microsoft.EntityFrameworkCore;
 using PeaceEnablers.Common.Implementation;
+using PeaceEnablers.Common.Interface;
 using PeaceEnablers.Common.Models;
 using PeaceEnablers.Data;
 using PeaceEnablers.Dtos.AiDto;
@@ -23,24 +24,41 @@ namespace PeaceEnablers.Services
     {
         private readonly ApplicationDbContext _context;
         private readonly IAppLogger _appLogger;
-        public CountryUserService(ApplicationDbContext context, IAppLogger appLogger)
+        private readonly ICommonService _commonService;
+        public CountryUserService(ApplicationDbContext context, IAppLogger appLogger, ICommonService commonService)
         {
             _context = context;
             _appLogger = appLogger;
+            _commonService = commonService;
         }
 
         public async Task<List<Pillar>> GetAllAsync(int userId, UserRole userRole)
         {
             try
             {
-                var userPillar = await _context.CountryUserPillarMappings
+                var mappedPillarIds = await _context.CountryUserPillarMappings
                       .Where(x => x.IsActive && x.UserID == userId)
-                      .Select(x => x.Pillar)
-                      .Where(x => x != null)
+                      .Select(x => x.PillarID)
                       .Distinct()
                       .ToListAsync();
 
-                return userPillar!.Where(x => x != null).ToList()!;
+                var pillars = await _commonService.GetPillars();
+                return pillars
+                    .Where(p => mappedPillarIds.Contains(p.PillarID))
+                    .Select(p => new Pillar
+                    {
+                        PillarID = p.PillarID,
+                        PillarName = p.PillarName,
+                        Description = p.Description,
+                        DisplayOrder = p.DisplayOrder,
+                        ImagePath = p.ImagePath ?? string.Empty,
+                        Weight = p.Weight,
+                        Reliability = p.Reliability,
+                        PillarCode = p.PillarCode,
+                        IsActive = p.IsActive,
+                        IsDeleted = false
+                    })
+                    .ToList();
             }
             catch (Exception ex)
             {
@@ -144,17 +162,7 @@ namespace PeaceEnablers.Services
                     return new GetCountryQuestionHistoryResponseDto();
                 }
                 // 🔹 Fetch pillars
-                var pillars = await _context.Pillars
-                    .AsNoTracking()
-                    .OrderBy(x => x.DisplayOrder)
-                    .Select(p => new
-                    {
-                        p.PillarID,
-                        p.PillarName,
-                        p.ImagePath,
-                        p.DisplayOrder
-                    })
-                    .ToListAsync();
+                var pillars = await _commonService.GetPillars();
 
                 // 🔹 Fetch pillar scores and map for O(1) lookup
                 var pillarScoreMap = await _context.AIPillarScores
@@ -277,12 +285,10 @@ namespace PeaceEnablers.Services
                 var date = DateTime.Now;
 
                 // Get total pillars and questions
-                var pillarStats = await _context.Pillars
-                    .Select(p => new { p.PillarID, QuestionsCount = p.Questions.Count })
-                    .ToListAsync();
+                var pillarStats = await _commonService.GetPillars();
 
                 int totalPillars = pillarStats.Count;
-                int totalQuestions = pillarStats.Sum(p => p.QuestionsCount);
+                int totalQuestions = pillarStats.Sum(p => p.QuestionCount);
 
                 // Determine allowed pillars based on tier
                 var pillarPredicate = user.Tier switch
@@ -724,7 +730,7 @@ namespace PeaceEnablers.Services
                 if (!Enum.TryParse<TieredAccessPlan>(tierName, true, out var tier))
                     return ResultResponseDto<string>.Failure(new[] { "Invalid tier access. Please contact support team." });
 
-                var allPillarIds = await _context.Pillars.Select(p => p.PillarID).ToListAsync();
+                var allPillarIds = (await _commonService.GetPillars()).Select(p => p.PillarID).ToList();
                 var allCountryIds = await _context.Countries
                     .Where(c => c.IsActive)
                     .Select(c => c.CountryID)
@@ -1047,7 +1053,7 @@ namespace PeaceEnablers.Services
                                 .Distinct()
                                 .ToListAsync();
                 
-                var pillars = await _context.Pillars.ToListAsync();
+                var pillars = await _commonService.GetPillars();
 
                 var result = pillars
                 .GroupJoin(

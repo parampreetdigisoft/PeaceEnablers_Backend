@@ -1,4 +1,5 @@
 ﻿
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using PeaceEnablers.Common.Interface;
 using PeaceEnablers.Common.Models;
@@ -207,25 +208,26 @@ namespace PeaceEnablers.Services
                    return ResultResponseDto<ChatCountryExecutiveSlidesResponse>.Failure(new[] { "Country not found." });
                 }                
 
-                var pillars = (
-                    from p in _context.Pillars
+                var cachedPillars = await _commonService.GetPillars();
+                var pillarScores = await _context.AIPillarScores
+                    .Where(a => a.CountryID == country.CountryID && a.Year == country.DataYear)
+                    .ToListAsync();
+                var scoreByPillar = pillarScores
+                    .GroupBy(s => s.PillarID)
+                    .ToDictionary(g => g.Key, g => g.First());
 
-                    join x in _context.AIPillarScores
-                        .Where(a => a.CountryID == country.CountryID
-                                 && a.Year == country.DataYear)
-                    on p.PillarID equals x.PillarID into pillarScores
-
-                    from score in pillarScores.DefaultIfEmpty()
-
-                    select new PillarsUserHistroyResponseDto
+                var pillars = cachedPillars.Select(p =>
+                {
+                    scoreByPillar.TryGetValue(p.PillarID, out var score);
+                    return new PillarsUserHistroyResponseDto
                     {
                         PillarID = p.PillarID,
                         PillarName = p.PillarName ?? "",
                         DisplayOrder = p.DisplayOrder,
                         PillarScore = score != null ? score.AIProgress ?? 0 : 0,
                         ImagePath = p.ImagePath
-                    }
-                ).ToList();
+                    };
+                }).ToList();
 
                 if (userRole == UserRole.CountryUser)
                 {

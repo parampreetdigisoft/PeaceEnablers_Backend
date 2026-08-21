@@ -110,7 +110,8 @@ namespace PeaceEnablers.Services
         {
             try
             {
-                var res =  await _context.Pillars
+                var cachedPillars = await _commonService.GetPillars();
+                var res = cachedPillars
                 .OrderBy(p => p.DisplayOrder)
                 .Select(x => new PillarResponseDto
                 {
@@ -118,7 +119,7 @@ namespace PeaceEnablers.Services
                     PillarID = x.PillarID,
                     PillarName = x.PillarName,
                     ImagePath = x.ImagePath
-                }).ToListAsync();
+                }).ToList();
                 return ResultResponseDto<List<PillarResponseDto>>.Success(res, new List<string> { "Get Countries history successfully" });
 
             }
@@ -375,9 +376,8 @@ namespace PeaceEnablers.Services
                      .AsNoTracking()
                      .ToListAsync();
 
-                var pillars = await _context.Pillars
-                     .AsNoTracking()
-                     .ToDictionaryAsync(x => x.PillarID);
+                var cachedPillars = await _commonService.GetPillars();
+                var pillars = cachedPillars.ToDictionary(x => x.PillarID);
 
                 var result = data
                     .GroupBy(x => new { x.PillarID })
@@ -680,16 +680,7 @@ namespace PeaceEnablers.Services
                     );
                 }
 
-                var pillarLookup = await _context.Pillars
-                    .AsNoTracking()
-                    .Select(p => new
-                    {
-                        p.PillarID,
-                        p.PillarName,
-                        p.ImagePath,
-                        p.DisplayOrder
-                    })
-                    .ToListAsync();
+                var pillarLookup = await _commonService.GetPillars();
 
                 foreach (var pillarCard in result.Result.Pillars)
                 {

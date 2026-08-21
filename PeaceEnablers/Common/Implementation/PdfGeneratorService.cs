@@ -1,8 +1,5 @@
 ﻿
-using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
 using PeaceEnablers.Common.Interface;
-using PeaceEnablers.Common.Models.settings;
 using PeaceEnablers.Dtos.AiDto;
 using PeaceEnablers.IServices;
 using PeaceEnablers.Models;
@@ -20,11 +17,12 @@ namespace PeaceEnablers.Common.Implementation
         #region constructor
 
         private readonly IAppLogger _appLogger;
-        private readonly AppSettings _appSettings;
-        public PdfGeneratorService(IAppLogger appLogger, IOptions<AppSettings> appSettings)
+        private readonly ICommonService _commonService;
+        private int _pillarCount;
+        public PdfGeneratorService(IAppLogger appLogger, ICommonService commonService)
         {
             _appLogger = appLogger;
-            _appSettings = appSettings.Value;
+            _commonService = commonService;
         }
         #endregion
 
@@ -36,6 +34,7 @@ namespace PeaceEnablers.Common.Implementation
             try
             {
                 QuestPDF.Settings.EnableDebugging = true;
+                _pillarCount = (await _commonService.GetPillars()).Count;
                 var document = Document.Create(container =>
                 {
                     foreach(var countryDetails in countries)
@@ -66,6 +65,7 @@ namespace PeaceEnablers.Common.Implementation
             {
 
                 QuestPDF.Settings.EnableDebugging = true;
+                _pillarCount = (await _commonService.GetPillars()).Count;
                 var document = Document.Create(container =>
                 {
                     AddCountryDetailsPdf(container, countryDetails, pillars, kpis, peerCountry, userRole);
@@ -3033,7 +3033,7 @@ namespace PeaceEnablers.Common.Implementation
                 .GroupBy(p => p.PillarID)
                 .Select(g => g.OrderBy(p => p.DisplayOrder).First())
                 .OrderBy(p => p.DisplayOrder)
-                .Take(_appSettings.PillarCount)
+                .Take(_pillarCount)
                 .ToList();
 
             container.Padding(16).Column(col =>

@@ -953,16 +953,17 @@ namespace PeaceEnablers.Services
                 // =========================
                 // 3. ALL PILLARS (MAIN FIX)
                 // =========================
-                var pillars = await _context.Pillars
+                var cachedPillars = await _commonService.GetPillars();
+                var pillars = cachedPillars
                     .Where(p => !request.PillarID.HasValue || p.PillarID == request.PillarID)
                     .Select(p => new
                     {
                         p.PillarID,
                         p.PillarName,
                         p.DisplayOrder,
-                        TotalQuestion = p.Questions.Count()
+                        TotalQuestion = p.QuestionCount
                     })
-                    .ToListAsync();
+                    .ToList();
 
                 var aiData = aiDataList.ToDictionary(
                     x => x.PillarID,
