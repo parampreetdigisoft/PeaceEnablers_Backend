@@ -15,3 +15,7 @@ obj/
 
 # Ignore local secrets (optional)
 appsettings.Development.json
+
+# ASP.NET Core configuration
+appsettings.json
+appsettings.*.json
