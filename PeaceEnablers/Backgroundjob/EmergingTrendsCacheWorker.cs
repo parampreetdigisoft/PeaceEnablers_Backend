@@ -4,7 +4,7 @@ using PeaceEnablers.IServices;
 namespace PeaceEnablers.Backgroundjob
 {
     /// <summary>
-    /// Refreshes emerging trends in memory on a schedule. Failed refreshes keep serving the last good snapshot.
+    /// Refreshes emerging trends every 10 minutes. Failed refreshes keep the last good in-memory and disk snapshot.
     /// </summary>
     public class EmergingTrendsCacheWorker : BackgroundService
     {
@@ -30,7 +30,15 @@ namespace PeaceEnablers.Backgroundjob
             var retryDelay = TimeSpan.FromSeconds(
                 _configuration.GetValue("EmergingTrendsCache:RetryDelaySeconds", 10));
 
-            await RefreshUntilCachedAsync(countryCount, retryDelay, stoppingToken);
+            var hydrated = HydrateFromDisk(countryCount);
+            if (!hydrated)
+            {
+                await RefreshUntilCachedAsync(countryCount, retryDelay, stoppingToken);
+            }
+            else
+            {
+                await TryRefreshAsync(countryCount, stoppingToken);
+            }
 
             while (!stoppingToken.IsCancellationRequested)
             {
@@ -68,6 +76,31 @@ namespace PeaceEnablers.Backgroundjob
                     break;
                 }
             }
+        }
+
+        private bool HydrateFromDisk(int countryCount)
+        {
+            try
+            {
+                using var scope = _serviceProvider.CreateScope();
+                var publicService = scope.ServiceProvider.GetRequiredService<IPublicService>();
+                if (publicService.HydrateEmergingTrendsCacheFromDisk(countryCount))
+                {
+                    _logger.LogInformation(
+                        "Emerging trends cache hydrated from disk (countryCount={CountryCount})",
+                        countryCount);
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(
+                    ex,
+                    "Emerging trends disk hydrate failed (countryCount={CountryCount})",
+                    countryCount);
+            }
+
+            return false;
         }
 
         private async Task<bool> TryRefreshAsync(int countryCount, CancellationToken stoppingToken)

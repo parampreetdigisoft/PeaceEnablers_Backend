@@ -49,4 +49,11 @@ namespace PeaceEnablers.Dtos.chatDto
 
         public EmergingTrendsResult Result { get; set; } = new();
     }
+
+    public class EmergingTrendsDiskSnapshot
+    {
+        public DateTime SavedAtUtc { get; set; }
+
+        public EmergingTrendsResult Data { get; set; } = new();
+    }
 }
