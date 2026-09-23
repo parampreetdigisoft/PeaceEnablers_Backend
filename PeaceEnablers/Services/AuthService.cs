@@ -520,10 +520,6 @@ namespace PeaceEnablers.Services
                 string msg = "User updated successfully";
 
                 var invitedUser = userList.FirstOrDefault(x => x.UserID == inviteUser.InvitedUserID);
-                var mergedCountries = (inviteUser.CountryID ?? new List<int>()).Concat(countriesToDelete).ToList();
-                var countryDetails = await _context.Countries
-                    .Where(c => mergedCountries.Contains(c.CountryID))
-                    .ToListAsync();
 
                 if (inviteUser.Email != user.Email || !user.IsEmailConfirmed)
                 {
