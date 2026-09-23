@@ -1,6 +1,7 @@
 ﻿using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using PeaceEnablers.Data;
+using PeaceEnablers.Dtos.AiDto;
 using PeaceEnablers.IServices;
 using PeaceEnablers.Models;
 using PeaceEnablers.Services;

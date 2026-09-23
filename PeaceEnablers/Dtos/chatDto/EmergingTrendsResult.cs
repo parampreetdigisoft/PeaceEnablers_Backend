@@ -1,3 +1,5 @@
+using PeaceEnablers.Common.Models;
+
 namespace PeaceEnablers.Dtos.chatDto
 {
     public class EmergingTrendCountryCard
@@ -41,11 +43,11 @@ namespace PeaceEnablers.Dtos.chatDto
         public List<EmergingTrendCountryCard> Countries { get; set; } = new();
     }
 
-    public class ChatEmergingTrendsResponse
+    public class ChatEmergingTrendsResponse : IAiServiceResponse
     {
         public bool Success { get; set; }
 
-        public string Message { get; set; } = string.Empty;
+        public string? Message { get; set; } = string.Empty;
 
         public EmergingTrendsResult Result { get; set; } = new();
     }

@@ -9,6 +9,7 @@ using PeaceEnablers.Common.Implementation;
 using PeaceEnablers.Common.Models;
 using PeaceEnablers.Data;
 
+using PeaceEnablers.Dtos.AiDto;
 using PeaceEnablers.Dtos.CommonDto;
 using PeaceEnablers.Dtos.CountryUserDto;
 using PeaceEnablers.Dtos.kpiDto;

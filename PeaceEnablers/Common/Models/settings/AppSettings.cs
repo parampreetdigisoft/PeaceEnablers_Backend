@@ -12,5 +12,9 @@
         public int OTPExpiryValidMinutes { get; set; }
         public string AiUrl { get; set; }
         public string AiToken { get; set; }
+        /// <summary>
+        /// When false, AI HTTP calls are skipped and a result is returned. Null/true keeps current behavior.
+        /// </summary>
+        public bool? IsAiActive { get; set; }
     }
 }

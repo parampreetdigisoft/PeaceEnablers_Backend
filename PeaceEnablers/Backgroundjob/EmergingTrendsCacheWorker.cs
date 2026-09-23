@@ -28,7 +28,7 @@ namespace PeaceEnablers.Backgroundjob
             var refreshInterval = TimeSpan.FromMinutes(
                 _configuration.GetValue("EmergingTrendsCache:RefreshIntervalMinutes", 10));
             var retryDelay = TimeSpan.FromSeconds(
-                _configuration.GetValue("EmergingTrendsCache:RetryDelaySeconds", 10));
+                _configuration.GetValue("EmergingTrendsCache:RetryDelaySeconds", 100));
 
             var hydrated = HydrateFromDisk(countryCount);
             if (!hydrated)

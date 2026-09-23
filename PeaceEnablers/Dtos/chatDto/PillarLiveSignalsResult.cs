@@ -1,3 +1,5 @@
+using PeaceEnablers.Common.Models;
+
 namespace PeaceEnablers.Dtos.chatDto
 {
     public class PillarLiveSignalCard
@@ -34,11 +36,11 @@ namespace PeaceEnablers.Dtos.chatDto
         public List<PillarLiveSignalCard> Pillars { get; set; } = new();
     }
 
-    public class ChatPillarLiveSignalsResponse
+    public class ChatPillarLiveSignalsResponse : IAiServiceResponse
     {
         public bool Success { get; set; }
 
-        public string Message { get; set; } = string.Empty;
+        public string? Message { get; set; } = string.Empty;
 
         public PillarLiveSignalsResult Result { get; set; } = new();
     }

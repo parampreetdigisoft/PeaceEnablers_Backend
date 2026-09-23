@@ -4,6 +4,7 @@ using Microsoft.Extensions.Caching.Memory;
 using PeaceEnablers.Common.Interface;
 using PeaceEnablers.Common.Models;
 using PeaceEnablers.Data;
+using PeaceEnablers.Dtos.AiDto;
 using PeaceEnablers.Dtos.chatDto;
 using PeaceEnablers.IServices;
 using PeaceEnablers.Models;

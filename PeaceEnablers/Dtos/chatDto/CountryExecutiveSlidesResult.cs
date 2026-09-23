@@ -1,4 +1,6 @@
-﻿namespace PeaceEnablers.Dtos.chatDto
+﻿using PeaceEnablers.Common.Models;
+
+namespace PeaceEnablers.Dtos.chatDto
 {
     public class PerformanceSummary
     {
@@ -46,11 +48,11 @@
         public List<EarlyWarningItem> EarlyWarnings { get; set; } = new();
     }
 
-    public class ChatCountryExecutiveSlidesResponse
+    public class ChatCountryExecutiveSlidesResponse : IAiServiceResponse
     {
         public bool Success { get; set; }
 
-        public string Message { get; set; } = string.Empty;
+        public string? Message { get; set; } = string.Empty;
 
         public CountryExecutiveSlidesResult Result { get; set; } = new();
     }

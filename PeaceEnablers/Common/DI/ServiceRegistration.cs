@@ -1,4 +1,5 @@
-﻿using PeaceEnablers.Backgroundjob;
+﻿using PeaceEnablers.AI;
+using PeaceEnablers.Backgroundjob;
 using PeaceEnablers.Backgroundjob.logging;
 using PeaceEnablers.Common.Implementation;
 using PeaceEnablers.Common.Interface;
@@ -13,7 +14,7 @@ namespace PeaceEnablers.Common.DI
         {
             services.AddHostedService<ChannelWorker>();
             services.AddHostedService<AiJobService>();
-            services.AddHostedService<EmergingTrendsCacheWorker>();
+            //services.AddHostedService<EmergingTrendsCacheWorker>();
             services.AddScoped<Download>();
             services.AddHostedService<LogWorker>();
             // Channels
@@ -22,6 +23,7 @@ namespace PeaceEnablers.Common.DI
             services.AddScoped<IAppLogger, AppLogger>();
 
 
+            services.AddScoped<IAiGateway, AiGateway>();
             services.AddScoped<IAIAnalyzeService, AIAnalyzeService>();
             services.AddScoped<IChatService, ChatService>();
             services.AddScoped<IQuestionService, QuestionService>();
@@ -42,6 +44,7 @@ namespace PeaceEnablers.Common.DI
             services.AddScoped<IDocxGeneratorService, DocxGeneratorService>();
             services.AddScoped<IDocumentGeneratorService, DocumentGeneratorService>();
             services.AddScoped<IAIEditService, AIEditService>();
+            services.AddScoped<IAiCurrentJobsService, AiCurrentJobsService>();
 
             return services;
         }
