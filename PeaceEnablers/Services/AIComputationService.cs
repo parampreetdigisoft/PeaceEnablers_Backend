@@ -63,7 +63,7 @@ namespace PeaceEnablers.Services
                 int pillarCount = cachedPillars.Count;
                 IQueryable<AiCountrySummeryDto> query = await GetCountryAiSummeryDetails(userID, userRole, request.CountryID, request.Year);
 
-                var progress = await _commonService.GetCountriesProgressAsync(userID, (int)userRole, DateTime.Now.Year);
+                var progress = await _commonService.GetCountriesProgressAsync(userID, (int)userRole, request.Year);
                 var countryRanks = CalculateCountryRanks(progress, pillarCount);
 
                 var result = await query.ApplyPaginationAsync(request);
@@ -697,10 +697,7 @@ namespace PeaceEnablers.Services
 
                 var firstDate = new DateTime(currentYear, 1, 1);
 
-                var aiPillarScores = await _context.AIPillarScores
-                    .Where(x => CountryIDs.CountryIDs.Contains(x.CountryID) && x.UpdatedAt >= firstDate && x.Year== currentYear)
-                    .ToListAsync();
-
+              
                 var countries = await _context.Countries
                     .Where(x => CountryIDs.CountryIDs.Contains(x.CountryID))
                     .ToListAsync();
@@ -739,10 +736,20 @@ namespace PeaceEnablers.Services
                     })
                     .ToDictionaryAsync(x => x.CountryID, x => new { x.AIProgress ,x.UpdatedAt });
 
+                var verifiedCountries = aiCountries.Select(x => x.Key);
+
+                var aiPillarScores = await _context.AIPillarScores
+                   .Where(x => CountryIDs.CountryIDs.Contains(x.CountryID) && x.UpdatedAt >= firstDate && x.Year == currentYear)
+                   .ToListAsync();
+
+                if(UserRole.CountryUser == userRole)
+                {
+                    aiPillarScores = aiPillarScores.Where(x => verifiedCountries.Contains(x.CountryID)).ToList();
+                }
 
                 foreach (var country in countries)
                 {
-                    var pillarResults = pillars
+                    var pillarResults = pillars      
                     .GroupJoin(
                         aiPillarScores.Where(x => x.CountryID == country.CountryID),
                         p => p.PillarID,

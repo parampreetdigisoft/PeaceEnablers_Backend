@@ -298,7 +298,7 @@ namespace PeaceEnablers.Services
                 }
 
                 string sub = $"{roleName} Access Granted – Peace Enablers Matrix Platform";
-                var url = _appSettings.ApplicationUrl; 
+                var url = user.Role != UserRole.CountryUser ? _appSettings.ApplicationUrl : _appSettings.PublicApplicationUrl;
                 string passwordResetLink = url + "/auth/reset-password?PasswordToken=" + token;
 
                 var countryName = string.Join(", ",
@@ -351,10 +351,10 @@ namespace PeaceEnablers.Services
                     var kpiPayload = new AddCountryUserKpisCountryAndPillar
                     {
                         Countries = inviteUser.IsAllCountries ? new List<int>() : (inviteUser.CountryID ?? new List<int>()),
-                        Pillars = inviteUser.Pillars,
+                        Pillars = inviteUser.Pillars ?? new List<int>(),
                         IsAllCountries = inviteUser.IsAllCountries
                     };
-                   var response =  await AddCountryUserKpisCountryAndPillar(kpiPayload, user.UserID, tierName);
+                   var response =  await AddCountryUserKpisCountryAndPillar(kpiPayload, user.UserID, tierName ??"");
                     if (!response.Succeeded)
                     {
                         return ResultResponseDto<object>.Failure(
@@ -386,153 +386,6 @@ namespace PeaceEnablers.Services
             }
         }
 
-        //   public async Task<ResultResponseDto<object>> UpdateInviteUser(UpdateInviteUserDto inviteUser)
-        //   {
-        //       try
-        //       {
-        //           if (inviteUser == null || string.IsNullOrEmpty(inviteUser.Email) || string.IsNullOrEmpty(inviteUser.FullName))
-        //           {
-        //               return ResultResponseDto<object>.Failure(new string[] { "Invalid request data." });
-        //           }
-        //           var userList = await _context.Users.Where(u => u.UserID == inviteUser.UserID || u.UserID == inviteUser.InvitedUserID).ToListAsync();
-
-        //           var user = userList.FirstOrDefault(u => u.UserID == inviteUser.UserID);
-        //           if (user == null)
-        //           {
-        //               return ResultResponseDto<object>.Failure(new string[] { "User not found." });
-        //           }
-        //           if (user.Role != inviteUser.Role)
-        //           {
-        //               return ResultResponseDto<object>.Failure(new string[] { "User already have different role" });
-        //           }
-        //           user.FullName = inviteUser.FullName;
-        //           user.Phone = inviteUser.Phone;
-        //           user.CreatedBy = inviteUser.InvitedUserID;
-        //           user.Email = inviteUser.Email;
-        //           user.Tier = inviteUser.Tier;
-        //           _context.Users.Update(user);                
-        //           var existingMappings = _context.UserCountryMappings
-        //                   .Where(m => m.UserID == user.UserID && m.AssignedByUserId == inviteUser.InvitedUserID && !m.IsDeleted)
-        //                   .ToList();
-
-        //           var existingCountryIds = existingMappings.Select(m => m.CountryID).ToList();
-
-        //           var newCountryIds = inviteUser.CountryID;
-
-        //           // Add missing countries
-        //           var countriesToAdd = newCountryIds.Except(existingCountryIds).ToList();
-        //           foreach (var cityId in countriesToAdd)
-        //           {
-        //               var newMapping = new UserCountryMapping
-        //{
-        //                   UserID = user.UserID,
-        //                   CountryID = cityId,
-        //                   AssignedByUserId = inviteUser.InvitedUserID,
-        //                   Role = user.Role
-        //               };
-        //               _context.UserCountryMappings.Add(newMapping);
-        //           }
-
-        //           //Delete countries no longer in the new list
-        //           var countriesToDelete = existingMappings
-        //               .Where(m => !newCountryIds.Contains(m.CountryID))
-        //               .ToList();
-        //           foreach (var c in countriesToDelete)
-        //           {
-        //               c.IsDeleted = true;
-        //               _context.UserCountryMappings.Update(c);
-        //           }
-
-        //           // Save all changes
-        //           await _context.SaveChangesAsync();
-
-        //           bool isMailSent = false;
-        //           var msgText = "You are receiving this email because you haven't reset your password";
-        //           string msg = "User updated successfully";
-
-        //           var invitedUser = userList.FirstOrDefault(x => x.UserID == inviteUser.InvitedUserID);
-
-        //           List<int> merged = inviteUser.CountryID.Concat(countriesToDelete.Select(x => x.CountryID)).ToList();
-
-        //           var countries = await _context.Countries
-        //               .Where(c => merged.Contains(c.CountryID))
-        //               .ToListAsync();
-
-        //           if (countriesToAdd.Count > 0)
-        //           {
-        //               isMailSent = true;
-        //               var invitedCountryNames = string.Join(", ",
-        //                   countries.Where(c => countriesToAdd.Contains(c.CountryID)).Select(c => c.CountryName));
-
-        //               msgText = $"You are receiving this email because {invitedUser?.FullName} recently requested country assignment ({invitedCountryNames}) for your PEM account.";
-        //           }
-
-        //           if (countriesToDelete.Count > 0)
-        //           {
-        //               var deleteName = countries
-        //               .Where(c => countriesToDelete.Select(x => x.CountryID).Contains(c.CountryID)).Select(c => c.CountryName);
-        //               var deleteCountryNames = string.Join(", ", deleteName);
-
-        //               if (isMailSent)
-        //               {
-        //                   msgText += $" Additionally, you no longer have access to the countries ({deleteCountryNames}) for your PEM account.";
-        //               }
-        //               else
-        //               {
-        //                   msgText = $"You are receiving this email because {invitedUser?.FullName} recently removed your access to the following countries ({deleteCountryNames}) for your PEM account.";
-        //               }
-        //               isMailSent = true;
-        //           }
-        //           if (!user.IsEmailConfirmed)
-        //           {
-        //               var hash = BCrypt.Net.BCrypt.HashPassword(inviteUser.Email);
-        //               var passwordToken = hash;
-        //               var token = passwordToken.Replace("+", " ");
-        //               string roleName = inviteUser.Role.ToString();
-
-        //               if (inviteUser.Role == UserRole.CountryUser)
-        //               {
-        //                   roleName = "Country User";
-        //               }
-
-        //               string sub = $"{roleName} Access Granted – Peace Enablers Matrix Platform";                    
-        //               var url = user.Role != UserRole.CountryUser ? _appSettings.ApplicationUrl : _appSettings.PublicApplicationUrl;
-        //               string passwordResetLink = url + "/auth/reset-password?PasswordToken=" + token;
-
-        //               var model = new EmailInvitationSendRequestDto
-        //               {
-        //                   ResetPasswordUrl = passwordResetLink,
-        //                   ApiUrl = _appSettings.ApiUrl,
-        //                   ApplicationUrl = url,
-        //                   Title = sub,
-        //                   Mail = _appSettings.AdminMail,
-        //                   Name = "Dear" + " " +user.FullName
-        //               };
-        //               var viewNamePath = inviteUser.Role switch
-        //               {
-        //                   UserRole.Analyst => "~/Views/EmailTemplates/AnalystSendInvitation.cshtml",
-        //                   UserRole.Evaluator => "~/Views/EmailTemplates/EvaluatorSendInvitation.cshtml",
-        //                   UserRole.CountryUser => "~/Views/EmailTemplates/CountryUserSendInvitation.cshtml",
-        //                   _ => "~/Views/EmailTemplates/DefaultInvitation.cshtml"
-        //               };
-
-        //               isMailSent = await _emailService.SendEmailAsync(inviteUser.Email, sub, viewNamePath, model);
-        //               user.ResetToken = token;
-        //               user.ResetTokenDate = DateTime.Now;
-        //               user.IsDeleted = false;
-
-        //               msg = $"User updated and invitation {(isMailSent ? "sent successfully" : "failed to send")}";
-        //               await _context.SaveChangesAsync();
-        //           }
-
-        //           return ResultResponseDto<object>.Success(new { }, new string[] { msg });
-        //       }
-        //       catch (Exception ex)
-        //       {
-        //           await _appLogger.LogAsync("Error Occure in UpdateInviteUser", ex);
-        //           return ResultResponseDto<object>.Failure(new string[] { "There is an error please try later" });
-        //       }
-        //   }
         public async Task<ResultResponseDto<object>> UpdateInviteUser(UpdateInviteUserDto inviteUser)
         {
             try
@@ -555,7 +408,6 @@ namespace PeaceEnablers.Services
                 user.FullName = inviteUser.FullName;
                 user.Phone = inviteUser.Phone;
                 user.CreatedBy = inviteUser.InvitedUserID;
-                user.Email = inviteUser.Email;
                 user.Tier = inviteUser.Tier;
                 _context.Users.Update(user);
 
@@ -664,66 +516,56 @@ namespace PeaceEnablers.Services
                 await _context.SaveChangesAsync();
 
                 // Common email logic
-                bool isMailSent = false;
-                string msgText = "You are receiving this email because you haven't reset your password";
+                bool isMailSent = false;               
                 string msg = "User updated successfully";
 
                 var invitedUser = userList.FirstOrDefault(x => x.UserID == inviteUser.InvitedUserID);
-                var mergedCountries = (inviteUser.CountryID ?? new List<int>()).Concat(countriesToDelete).ToList();
-                var countryDetails = await _context.Countries
-                    .Where(c => mergedCountries.Contains(c.CountryID))
-                    .ToListAsync();
 
-                if (countriesToAdd.Count > 0)
+                if (inviteUser.Email != user.Email || !user.IsEmailConfirmed)
                 {
-                    isMailSent = true;
-                    var addedNames = string.Join(", ", countryDetails.Where(c => countriesToAdd.Contains(c.CountryID)).Select(c => c.CountryName));
-                    msgText = $"You are receiving this email because {invitedUser?.FullName} recently requested country assignment ({addedNames}) for your PEM account.";
-                }
-
-                if (countriesToDelete.Count > 0)
-                {
-                    var removedNames = string.Join(", ", countryDetails.Where(c => countriesToDelete.Contains(c.CountryID)).Select(c => c.CountryName));
-                    msgText = isMailSent
-                        ? msgText + $" Additionally, you no longer have access to the countries ({removedNames}) for your PEM account."
-                        : $"You are receiving this email because {invitedUser?.FullName} recently removed your access to the following countries ({removedNames}) for your PEM account.";
-                    isMailSent = true;
-                }
-
-                if (!user.IsEmailConfirmed)
-                {
+                    var existUser = userList.FirstOrDefault(u => u.Email == inviteUser.Email.Trim() && !u.IsDeleted && u.UserID != inviteUser.UserID);
+                    if (existUser != null)
+                    {
+                        return ResultResponseDto<object>.Failure(new List<string>() { "Email Already Exists" });
+                    }
                     var hash = BCrypt.Net.BCrypt.HashPassword(inviteUser.Email);
                     var token = hash.Replace("+", " ");
-                    string roleName = inviteUser.Role == UserRole.CountryUser ? "Country User" : inviteUser.Role.ToString();
-                    string sub = $"{roleName} Access Granted – Peace Enablers Matrix Platform";
                     var url = user.Role != UserRole.CountryUser ? _appSettings.ApplicationUrl : _appSettings.PublicApplicationUrl;
-                    string passwordResetLink = url + "/auth/reset-password?PasswordToken=" + token;
+                    var passwordResetLink = $"{url}/auth/confirm-mail?PasswordToken={token}";
 
-                    var model = new EmailInvitationSendRequestDto
+                    var emailModel = new EmailInvitationSendRequestDto
                     {
                         ResetPasswordUrl = passwordResetLink,
+                        Title = "Verify Your Email",
                         ApiUrl = _appSettings.ApiUrl,
                         ApplicationUrl = url,
-                        Title = sub,
+                        MsgText = "A request was made to update the Email for your Peace Enablers Matrix (PEM) account. Please verify your email or reset your password.",
                         Mail = _appSettings.AdminMail,
-                        Name = "Dear " + user.FullName
+                        BtnText = "Verify",
+                        Name = "Dear " + user.FullName,
+                        DescriptionAboutBtnText = "Please verify your email address by clicking the button above."
                     };
 
-                    var viewNamePath = inviteUser.Role switch
+                    isMailSent = await _emailService.SendEmailAsync(inviteUser.Email, "Verify Your Email",
+                        "~/Views/EmailTemplates/ChangePassword.cshtml", emailModel
+                    );
+
+                    if (isMailSent)
                     {
-                        UserRole.Analyst => "~/Views/EmailTemplates/AnalystSendInvitation.cshtml",
-                        UserRole.Evaluator => "~/Views/EmailTemplates/EvaluatorSendInvitation.cshtml",
-                        UserRole.CountryUser => "~/Views/EmailTemplates/CountryUserSendInvitation.cshtml",
-                        _ => ""
-                    };
+                        user.TemporaryEmail = inviteUser.Email;
+                        user.IsEmailConfirmed = false; // Require reconfirmation for new email                       
+                        user.ResetToken = token;
+                        user.ResetTokenDate = DateTime.Now;
 
-                    isMailSent = await _emailService.SendEmailAsync(inviteUser.Email, sub, viewNamePath, model);
-                    user.ResetToken = token;
-                    user.ResetTokenDate = DateTime.Now;
-                    user.IsDeleted = false;
-
+                        await _context.SaveChangesAsync();
+                    }
+                    else
+                    {
+                        return ResultResponseDto<object>.Failure(new List<string>()
+                            { "User updated and failed to send email confirmation. Please try again later." }
+                        );
+                    }
                     msg = $"User updated and invitation {(isMailSent ? "sent successfully" : "failed to send")}";
-                    await _context.SaveChangesAsync();
                 }
 
                 return ResultResponseDto<object>.Success(new { }, new[] { msg });
