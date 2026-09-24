@@ -26,5 +26,11 @@ namespace PeaceEnablers.Dtos.AiDto
         public DocumentProcessingStatus ProcessingStatus { get; set; } = DocumentProcessingStatus.Pending;
         public int UploadedByUserID { get; set; }
         public string UploadedBy { get; set; }
+        public string? DocumentLevel { get; set; }
+        public string? Classification { get; set; }
+        public int? RetentionDays { get; set; }
+        public DateTime? IngestedAt { get; set; }
+        public bool LegalHold { get; set; }
+        public string? LifecycleStage { get; set; }
     }
 }

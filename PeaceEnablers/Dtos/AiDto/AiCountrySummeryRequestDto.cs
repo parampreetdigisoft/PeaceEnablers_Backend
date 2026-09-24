@@ -27,11 +27,13 @@ namespace PeaceEnablers.Dtos.AiDto
     public class AiCountryDocumentRequestDto : PaginationRequest
     {
         public int? CountryID { get; set; }
+        public bool? HasDocuments { get; set; }
     }
 
     public class AiCountryPillarDocumentRequestDto 
     {
         public int CountryID { get; set; }
+        public bool PlatformOnly { get; set; }
     }
     public class DeleteCountryDocumentRequestDto 
     {

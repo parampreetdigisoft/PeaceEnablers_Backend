@@ -1932,6 +1932,13 @@ namespace PeaceEnablers.Services
                         new[] { "Failed to Upload Ai Documents, You don't have access." });
                 }
 
+                if (!TryResolveGovernance(request, out var classification, out var retentionDays, out var governanceError))
+                {
+                    return ResultResponseDto<string>.Failure(new[] { governanceError });
+                }
+
+                await PurgeExpiredRawDocuments();
+
                 var basePath = Path.Combine(_env.WebRootPath,"aidocuments");
 
                 if (!Directory.Exists(basePath))
@@ -1940,7 +1947,9 @@ namespace PeaceEnablers.Services
                 for (int i = 0; i < request.Files.Count; i++)
                 {
                     var file = request.Files[i];
-                    var pillarId = request.PillarIDs[i];
+                    var pillarId = request.PillarIDs != null && i < request.PillarIDs.Count
+                        ? request.PillarIDs[i]
+                        : 0;
 
                     var ext = Path.GetExtension(file.FileName).ToLower();
 
@@ -1971,8 +1980,12 @@ namespace PeaceEnablers.Services
                         FileSize = file.Length / 1024,//kb file will be store now
                         ProcessingStatus = DocumentProcessingStatus.Pending,
                         UpdatedAt = DateTime.UtcNow,
+                        IngestedAt = DateTime.UtcNow,
                         UploadedByUserID = userID,
-                        DocumentLevel = GetDocumentLevel(request.CountryID, pillarId)
+                        DocumentLevel = GetDocumentLevel(request.CountryID, pillarId),
+                        Classification = classification,
+                        RetentionDays = retentionDays,
+                        LegalHold = request.LegalHold
                     };
 
                     _context.CountryDocuments.Add(doc);
@@ -1995,18 +2008,121 @@ namespace PeaceEnablers.Services
 
         static string GetDocumentLevel(int? countryID,int? pillarID)
         {
-            if (countryID == null)
+            if (countryID == null || countryID == 0)
             {
                 return "Global";
             }
-            else if(countryID > 0 && (pillarID == null || pillarID == 0))
-            {
-                return "Country_Pillar";
-            }
-            else
+
+            if (pillarID == null || pillarID == 0)
             {
                 return "Country";
             }
+
+            return "Country_Pillar";
+        }
+
+        static readonly string[] DocumentClassifications =
+        {
+            "Public", "Internal", "Confidential", "Secret", "Top Secret"
+        };
+
+        static bool TryResolveGovernance(
+            UploadAiDocumentRequest request,
+            out string classification,
+            out int? retentionDays,
+            out string error)
+        {
+            var requestedClassification = string.IsNullOrWhiteSpace(request.Classification)
+                ? "Internal"
+                : request.Classification.Trim();
+            retentionDays = null;
+            error = "";
+            classification = "";
+
+            string? matched = null;
+            foreach (var item in DocumentClassifications)
+            {
+                if (string.Equals(item, requestedClassification, StringComparison.OrdinalIgnoreCase))
+                {
+                    matched = item;
+                    break;
+                }
+            }
+
+            if (matched == null)
+            {
+                error = "Choose a classification: Public, Internal, Confidential, Secret, or Top Secret.";
+                return false;
+            }
+
+            classification = matched;
+
+            if (request.KeepIndefinitely)
+            {
+                retentionDays = null;
+                return true;
+            }
+
+            retentionDays = request.RetentionDays ?? 90;
+            if (retentionDays < 30)
+            {
+                error = "Keep uploaded files for at least 30 days, or choose to keep them until you delete them.";
+                return false;
+            }
+
+            return true;
+        }
+
+        static string LifecycleStage(DateTime ingestedAt, int? retentionDays, bool legalHold)
+        {
+            if (legalHold)
+            {
+                return "Legal hold";
+            }
+
+            var ageDays = (DateTime.UtcNow - ingestedAt).TotalDays;
+            if (retentionDays.HasValue && ageDays >= retentionDays.Value)
+            {
+                return "Expired";
+            }
+
+            if (ageDays <= 30)
+            {
+                return "Hot";
+            }
+
+            if (ageDays <= 90)
+            {
+                return "Warm";
+            }
+
+            return "Archive";
+        }
+
+        async Task PurgeExpiredRawDocuments()
+        {
+            var now = DateTime.UtcNow;
+            var candidates = await _context.CountryDocuments
+                .Where(x => !x.IsDeleted && !x.LegalHold && x.RetentionDays != null)
+                .ToListAsync();
+
+            var expired = candidates
+                .Where(x => x.IngestedAt.AddDays(x.RetentionDays!.Value) <= now)
+                .ToList();
+
+            if (!expired.Any())
+            {
+                return;
+            }
+
+            foreach (var doc in expired)
+            {
+                doc.IsDeleted = true;
+                doc.UpdatedAt = now;
+                await _iAIAnalayzeService.DeleteDocument(doc.CountryDocumentID);
+            }
+
+            await _context.SaveChangesAsync();
         }
 
         public async Task<PaginationResponse<GetCountryDocumentResponseDto>> GetAICountryDocuments(
@@ -2016,6 +2132,8 @@ namespace PeaceEnablers.Services
         {
             try
             {
+                await PurgeExpiredRawDocuments();
+
                 Expression<Func<UserCountryMapping, bool>> filter = userRole switch
                 {
                     UserRole.Admin => x => !x.IsDeleted,
@@ -2030,7 +2148,7 @@ namespace PeaceEnablers.Services
                     .Distinct()
                     .ToListAsync();
 
-                var query = _context.Countries
+                var countryQuery = _context.Countries
                     .Where(c =>
                         (
                             !request.CountryID.HasValue
@@ -2039,7 +2157,20 @@ namespace PeaceEnablers.Services
                         && (userCountryIds.Contains(c.CountryID) || userRole == UserRole.Admin)
                         && c.IsActive
                         && !c.IsDeleted
-                    )
+                    );
+
+                if (request.HasDocuments == true)
+                {
+                    countryQuery = countryQuery.Where(c =>
+                        _context.CountryDocuments.Any(d => !d.IsDeleted && d.CountryID == c.CountryID));
+                }
+                else if (request.HasDocuments == false)
+                {
+                    countryQuery = countryQuery.Where(c =>
+                        !_context.CountryDocuments.Any(d => !d.IsDeleted && d.CountryID == c.CountryID));
+                }
+
+                var query = countryQuery
                     .Select(x => new GetCountryDocumentResponseDto
                     {
                         CountryID = x.CountryID,
@@ -2098,8 +2229,12 @@ namespace PeaceEnablers.Services
                 var cachedPillars = await _commonService.GetPillars();
                 var pillarNameById = cachedPillars.ToDictionary(p => p.PillarID, p => p.PillarName);
 
-                var result = await _context.CountryDocuments
-                   .Where(x => !x.IsDeleted && (x.CountryID == request.CountryID || x.CountryID == null))
+                var documents = _context.CountryDocuments.Where(x => !x.IsDeleted);
+                documents = request.PlatformOnly
+                    ? documents.Where(x => x.CountryID == null)
+                    : documents.Where(x => x.CountryID == request.CountryID);
+
+                var result = await documents
                    .Select(x => new GetCountryPillarDocumentResponseDto
                    {
                        CountryDocumentID = x.CountryDocumentID,
@@ -2113,16 +2248,34 @@ namespace PeaceEnablers.Services
                        ProcessingStatus = x.ProcessingStatus,
                        StoredFileName = x.StoredFileName,
                        UploadedBy = "",
-                       UploadedByUserID = x.UploadedByUserID ?? 0
+                       UploadedByUserID = x.UploadedByUserID ?? 0,
+                       DocumentLevel = x.DocumentLevel,
+                       Classification = x.Classification,
+                       RetentionDays = x.RetentionDays,
+                       IngestedAt = x.IngestedAt,
+                       LegalHold = x.LegalHold
                    })
-                   .OrderBy(x => x.PillarID)
+                   .OrderByDescending(x => x.IngestedAt)
                    .ToListAsync();
+
+                foreach (var item in result)
+                {
+                    item.LifecycleStage = LifecycleStage(item.IngestedAt ?? DateTime.UtcNow, item.RetentionDays, item.LegalHold);
+                }
 
                 foreach (var r in result)
                 {
-                    if (r.CountryID.HasValue && r.PillarID.HasValue && pillarNameById.TryGetValue(r.PillarID.Value, out var pillarName))
+                    if (!r.CountryID.HasValue)
+                    {
+                        r.PillarName = "Platform";
+                    }
+                    else if (r.PillarID.HasValue && pillarNameById.TryGetValue(r.PillarID.Value, out var pillarName))
                     {
                         r.PillarName = pillarName;
+                    }
+                    else
+                    {
+                        r.PillarName = "Whole country";
                     }
                 }
 
@@ -2152,10 +2305,22 @@ namespace PeaceEnablers.Services
         {
             try
             {
-                var query = _context.CountryDocuments
-                    .Where(x => !x.IsDeleted && x.CountryID == request.CountryID || (!request.CountryDocumentID.HasValue || x.CountryDocumentID == request.CountryDocumentID));
+                var query = _context.CountryDocuments.Where(x => !x.IsDeleted);
 
-                // 🔷 If not admin → only own documents
+                if (request.CountryDocumentID.HasValue && !request.IsAll)
+                {
+                    query = query.Where(x => x.CountryDocumentID == request.CountryDocumentID.Value);
+                }
+                else if (request.IsAll && request.CountryID > 0)
+                {
+                    query = query.Where(x => x.CountryID == request.CountryID);
+                }
+                else
+                {
+                    return ResultResponseDto<string>.Failure(
+                        new[] { "Choose the document to delete." });
+                }
+
                 if (userRole != UserRole.Admin)
                 {
                     query = query.Where(x => x.UploadedByUserID == userID );

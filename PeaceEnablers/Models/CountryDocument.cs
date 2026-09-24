@@ -16,7 +16,11 @@ namespace PeaceEnablers.Models
         public int? UploadedByUserID { get; set; }
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
         public bool IsDeleted { get; set; }
-        public string DocumentLevel { get; set; } // Gloabal,Country,Country_Pillar
+        public string DocumentLevel { get; set; } // Global, Country, Country_Pillar
+        public string Classification { get; set; } = "Internal";
+        public int? RetentionDays { get; set; } = 90;
+        public DateTime IngestedAt { get; set; } = DateTime.UtcNow;
+        public bool LegalHold { get; set; }
     }
 
     public enum DocumentProcessingStatus
