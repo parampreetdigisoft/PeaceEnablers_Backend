@@ -67,8 +67,8 @@ namespace PeaceEnablers.Common.Implementation
             float innerW = barW * 0.62f;
             float barGap = (barW - innerW) / 2f;
 
-            using var gridPaint = new SKPaint { Color = SKColor.Parse("#F2F7F4"), StrokeWidth = 0.6f };
-            using var gridLbl   = new SKPaint { Color = SKColor.Parse("#B0BEC5"), TextSize = 7f, IsAntialias = true, TextAlign = SKTextAlign.Left };
+            using var gridPaint = new SKPaint { Color = SKColor.Parse(ReportThemeColors.SurfaceF2F7F4), StrokeWidth = 0.6f };
+            using var gridLbl   = new SKPaint { Color = SKColor.Parse(ReportThemeColors.BlueGrayLight), TextSize = 7f, IsAntialias = true, TextAlign = SKTextAlign.Left };
             foreach (float pct in new[] { 25f, 50f, 75f, 100f })
             {
                 float gy = tp + chartH - pct / 100f * chartH;
@@ -79,13 +79,13 @@ namespace PeaceEnablers.Common.Implementation
             float y70 = tp + chartH - 0.70f * chartH;
             using var thPaint = new SKPaint
             {
-                Color = SKColor.Parse("#2E7D32").WithAlpha(100), StrokeWidth = 0.9f,
+                Color = SKColor.Parse(ReportThemeColors.SuccessGreen).WithAlpha(100), StrokeWidth = 0.9f,
                 PathEffect = SKPathEffect.CreateDash(new[] { 4f, 3f }, 0), IsAntialias = true
             };
             c.DrawLine(lp, y70, lp + chartW, y70, thPaint);
 
             using var valLbl = new SKPaint { TextSize = 6.5f, IsAntialias = true, TextAlign = SKTextAlign.Center };
-            using var numLbl = new SKPaint { Color = SKColor.Parse("#546E7A"), TextSize = 6.5f, IsAntialias = true, TextAlign = SKTextAlign.Center };
+            using var numLbl = new SKPaint { Color = SKColor.Parse(ReportThemeColors.BlueGray), TextSize = 6.5f, IsAntialias = true, TextAlign = SKTextAlign.Center };
 
             for (int i = 0; i < n; i++)
             {
@@ -118,72 +118,182 @@ namespace PeaceEnablers.Common.Implementation
         }
 
         // ── Radial / concentric-ring pillar chart ────────────────────────────
+        // ── Radial / concentric-ring pillar chart ────────────────────────────
         internal static void DrawPillarsRadialChartCanvas(
             SKCanvas c, QPDF.Size s, List<PillarChartItem> pillars)
         {
-            var data = pillars.Where(p => p.Value.HasValue).Take(23).ToList();
+            var data = pillars.Where(p => p.Value.HasValue).OrderByDescending(x => x.Value).ToList();
             if (!data.Any()) return;
-            float cx = s.Width / 2f, cy = s.Height / 2f;
-            float maxR = Math.Min(cx, cy) - 18f;
-            float minR = maxR * 0.28f;
-            float step = (maxR - minR) / data.Count;
-            float thick = step * 0.68f;
-            float avg   = (float)data.Average(x => x.Value ?? 0);
 
-            using var title = new SKPaint { Color = SKColor.Parse("#12352f"), TextSize = 10f, IsAntialias = true, TextAlign = SKTextAlign.Center, FakeBoldText = true };
-            c.DrawText("Pillar Performance", cx, 14f, title);
+            float avg = (float)data.Average(x => x.Value ?? 0);
+            int n = data.Count;
 
-            for (int i = 0; i < data.Count; i++)
+            const float titleBand = 28f;
+            float cx = s.Width / 2f;
+            float chart = Math.Min(s.Width - 20f, s.Height - titleBand - 12f);
+            if (chart < 40f) chart = Math.Min(s.Width, s.Height);
+            float cy = titleBand + chart / 2f;
+
+            using var title = new SKPaint
             {
-                float v   = (float)(data[i].Value ?? 0);
-                float r   = maxR - i * step;
-                float mid = r - thick / 2f;
-                var rect  = new SKRect(cx - mid, cy - mid, cx + mid, cy + mid);
+                Color = SKColor.Parse(ReportThemeColors.PdfDarkGreen),
+                TextSize = 11f,
+                IsAntialias = true,
+                TextAlign = SKTextAlign.Center,
+                FakeBoldText = true
+            };
+            c.DrawText("Domain Performance", cx, 18f, title);
+
+            float outer = chart / 2f - 6f;
+            float centerR = Math.Clamp(outer * 0.30f, 28f, 46f);
+            float inner = centerR + 10f;
+            float span = Math.Max(8f, outer - inner);
+            float slot = span / n;
+            float thick = Math.Clamp(slot * 0.62f, 5f, 14f);
+
+            for (int i = 0; i < n; i++)
+            {
+                float v = Math.Clamp((float)(data[i].Value ?? 0), 0f, 100f);
+                float mid = outer - slot * i - slot / 2f;
+                var rect = new SKRect(cx - mid, cy - mid, cx + mid, cy + mid);
                 SKColor col = GetColorStatic(v);
 
-                using var track = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = thick, Color = col.WithAlpha(22), IsAntialias = true };
+                using var track = new SKPaint
+                {
+                    Style = SKPaintStyle.Stroke,
+                    StrokeWidth = thick,
+                    Color = col.WithAlpha(40),
+                    IsAntialias = true,
+                    StrokeCap = SKStrokeCap.Butt
+                };
                 c.DrawOval(rect, track);
-                using var arc = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = thick, Color = col, StrokeCap = SKStrokeCap.Round, IsAntialias = true };
-                c.DrawArc(rect, -90f, 360f * v / 100f, false, arc);
 
-                float la = (-90f + 360f * v / 100f) * (float)Math.PI / 180f;
-                using var dot = new SKPaint { Color = col, Style = SKPaintStyle.Fill, IsAntialias = true };
-                c.DrawCircle(cx + mid * (float)Math.Cos(la), cy + mid * (float)Math.Sin(la), thick / 2f + 1.5f, dot);
+                if (v <= 0f)
+                    continue;
+
+                using var arc = new SKPaint
+                {
+                    Style = SKPaintStyle.Stroke,
+                    StrokeWidth = thick,
+                    Color = col,
+                    StrokeCap = SKStrokeCap.Round,
+                    IsAntialias = true
+                };
+                c.DrawArc(rect, -90f, 360f * v / 100f, false, arc);
             }
 
-            float cr = minR - step * 0.6f;
-            using var fill = new SKPaint { Color = SKColor.Parse("#12352f"), Style = SKPaintStyle.Fill, IsAntialias = true };
-            c.DrawCircle(cx, cy, cr, fill);
-            using var numP = new SKPaint { Color = GetColorStatic(avg), TextSize = cr * 0.60f, IsAntialias = true, TextAlign = SKTextAlign.Center, FakeBoldText = true };
-            c.DrawText($"{avg:F0}", cx, cy + numP.TextSize * 0.36f, numP);
+            using var fill = new SKPaint
+            {
+                Color = SKColor.Parse(ReportThemeColors.PdfDarkGreen),
+                Style = SKPaintStyle.Fill,
+                IsAntialias = true
+            };
+            c.DrawCircle(cx, cy, centerR, fill);
+
+            using var numP = new SKPaint
+            {
+                Color = SKColors.White,
+                TextSize = Math.Min(18f, centerR * 0.62f),
+                IsAntialias = true,
+                TextAlign = SKTextAlign.Center,
+                FakeBoldText = true
+            };
+            c.DrawText($"{avg:F1}", cx, cy + numP.TextSize * 0.12f, numP);
+
+            using var avgLbl = new SKPaint
+            {
+                Color = SKColor.Parse(ReportThemeColors.SuccessGreenMuted),
+                TextSize = Math.Min(9f, centerR * 0.28f),
+                IsAntialias = true,
+                TextAlign = SKTextAlign.Center
+            };
+            c.DrawText("avg", cx, cy + numP.TextSize * 0.12f + avgLbl.TextSize + 2f, avgLbl);
         }
 
-        // ── Horizontal bar list for pillars ─────────────────────────────────
+        // ── Horizontal bar list for pillars (same layout as the PDF Domain Overview) ─
         internal static void DrawPillarHorizontalBarsCanvas(
             SKCanvas c, QPDF.Size s, List<PillarChartItem> pillars)
         {
             var sorted = pillars.OrderByDescending(x => x.Value).ToList();
-            float rowH  = s.Height / Math.Max(sorted.Count, 1);
-            float labelW = 110f;
-            float barArea = s.Width - labelW - 50f;
+            if (sorted.Count == 0) return;
 
-            using var lbl = new SKPaint { Color = SKColor.Parse("#37474F"), TextSize = 8.5f, IsAntialias = true };
+            using (var border = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                StrokeWidth = 1.2f,
+                Color = SKColor.Parse(ReportThemeColors.BorderGreenLight),
+                IsAntialias = true
+            })
+            {
+                c.DrawRect(new SKRect(0.6f, 0.6f, s.Width - 0.6f, s.Height - 0.6f), border);
+            }
+
+            const float pad = 12f;
+            using var title = new SKPaint
+            {
+                Color = SKColor.Parse(ReportThemeColors.PdfDarkGreen),
+                TextSize = 13f,
+                IsAntialias = true,
+                FakeBoldText = true,
+                Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold)
+            };
+            c.DrawText("Domain Overview", pad, pad + 12f, title);
+
+            float top = pad + 26f;
+            float rowH = (s.Height - top - 8f) / sorted.Count;
+            float labelW = Math.Min(130f, s.Width * 0.34f);
+            float scoreW = Math.Min(108f, s.Width * 0.28f);
+            float barLeft = pad + labelW;
+            float barRight = s.Width - pad - scoreW;
+            float barH = Math.Clamp(rowH * 0.42f, 8f, 13f);
+
+            using var lbl = new SKPaint
+            {
+                Color = SKColor.Parse(ReportThemeColors.BlueGray),
+                TextSize = 9.5f,
+                IsAntialias = true,
+                Typeface = SKTypeface.FromFamilyName("Arial")
+            };
+            using var track = new SKPaint
+            {
+                Color = SKColor.Parse(ReportThemeColors.SurfaceGreenLight),
+                IsAntialias = true
+            };
+
+            int total = sorted.Count;
             for (int i = 0; i < sorted.Count; i++)
             {
-                float v  = (float)(sorted[i].Value ?? 0);
-                float y  = i * rowH;
-                float bw = v / 100f * barArea;
-                SKColor col = GetColorStatic(v);
+                float v = Math.Clamp((float)(sorted[i].Value ?? 0), 0f, 100f);
+                float midY = top + i * rowH + rowH / 2f;
+                SKColor col = SKColor.Parse(GetBarColor(v));
 
-                if (i % 2 == 0) c.DrawRect(new SKRect(0, y, s.Width, y + rowH), new SKPaint { Color = SKColor.Parse("#F4F7F5") });
+                string name = Shorten(sorted[i].Name ?? sorted[i].ShortName ?? "—", 18);
+                c.DrawText(name, pad, midY + lbl.TextSize * 0.35f, lbl);
 
-                c.DrawText(Shorten(sorted[i].Name ?? "—", 16), 4, y + rowH * 0.65f, lbl);
-                using var shader = SKShader.CreateLinearGradient(new SKPoint(0, 0), new SKPoint(bw, 0),
-                    new[] { col.WithAlpha(210), col }, null, SKShaderTileMode.Clamp);
-                using var bar = new SKPaint { Shader = shader, IsAntialias = true };
-                c.DrawRoundRect(new SKRoundRect(new SKRect(labelW, y + 3, labelW + bw, y + rowH - 3), 3), bar);
-                using var scorePaint = new SKPaint { Color = col, TextSize = 8.5f, IsAntialias = true, TextAlign = SKTextAlign.Left };
-                c.DrawText($"{v:F1}%", labelW + bw + 5, y + rowH * 0.65f, scorePaint);
+                float trackTop = midY - barH / 2f;
+                c.DrawRoundRect(new SKRoundRect(new SKRect(barLeft, trackTop, barRight, trackTop + barH), 2), track);
+
+                float fillW = Math.Max(0f, (barRight - barLeft) * v / 100f);
+                if (fillW > 0.5f)
+                {
+                    using var shader = SKShader.CreateLinearGradient(
+                        new SKPoint(barLeft, 0), new SKPoint(barLeft + fillW, 0),
+                        new[] { col.WithAlpha(210), col }, null, SKShaderTileMode.Clamp);
+                    using var bar = new SKPaint { Shader = shader, IsAntialias = true };
+                    c.DrawRoundRect(
+                        new SKRoundRect(new SKRect(barLeft, trackTop, barLeft + fillW, trackTop + barH), 2), bar);
+                }
+
+                using var score = new SKPaint
+                {
+                    Color = col,
+                    TextSize = 9f,
+                    IsAntialias = true,
+                    FakeBoldText = true,
+                    TextAlign = SKTextAlign.Right,
+                    Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold)
+                };
+                c.DrawText($"{v:F1}, Rank {i + 1}/{total}", s.Width - pad, midY + score.TextSize * 0.35f, score);
             }
         }
 
@@ -196,7 +306,7 @@ namespace PeaceEnablers.Common.Implementation
             long maxPop = (long)(countries.Max(p => p.Population) ?? 1);
             float rowH   = s.Height / Math.Max(countries.Count, 1);
             float labelW = 130f, barArea = s.Width - labelW - 72f;
-            string[] palette = { "F0B429", "4CAF8A", "1E88E5", "FB8C00", "7B61FF", "E05252" };
+            string[] palette = { ReportThemeColors.ChartGoldHex, ReportThemeColors.ChartTealHex, ReportThemeColors.ChartBlueHex, ReportThemeColors.ChartOrangeHex, ReportThemeColors.ChartPurpleHex, ReportThemeColors.ChartRedHex };
 
             for (int i = 0; i < countries.Count; i++)
             {
@@ -204,14 +314,14 @@ namespace PeaceEnablers.Common.Implementation
                 float y  = i * rowH;
                 float bw = (float)((country.Population ?? 0) / (double)maxPop * barArea);
                 bool isMain = IsSameCountryStatic(country.CountryName, countryDetails.CountryName);
-                if (i % 2 == 0) c.DrawRect(new SKRect(0, y, s.Width, y + rowH), new SKPaint { Color = SKColor.Parse("#F4F7F5") });
-                if (isMain)     c.DrawRect(new SKRect(0, y, s.Width, y + rowH), new SKPaint { Color = SKColor.Parse("#FFF8E1") });
+                if (i % 2 == 0) c.DrawRect(new SKRect(0, y, s.Width, y + rowH), new SKPaint { Color = SKColor.Parse(ReportThemeColors.PageBg) });
+                if (isMain)     c.DrawRect(new SKRect(0, y, s.Width, y + rowH), new SKPaint { Color = SKColor.Parse(ReportThemeColors.WarningAmberBg) });
 
-                using var txt = new SKPaint { Color = SKColor.Parse(isMain ? "#12352f" : "#444444"), TextSize = 9f, IsAntialias = true, FakeBoldText = isMain };
+                using var txt = new SKPaint { Color = SKColor.Parse(isMain ? ReportThemeColors.PdfDarkGreen : ReportThemeColors.TextMuted), TextSize = 9f, IsAntialias = true, FakeBoldText = isMain };
                 c.DrawText(country.CountryName, 4, y + rowH * 0.65f, txt);
                 string clr = isMain ? palette[0] : palette[1 + (i % (palette.Length - 1))];
                 c.DrawRoundRect(new SKRoundRect(new SKRect(labelW, y + 4, labelW + bw, y + rowH - 6), 3), new SKPaint { Color = SKColor.Parse(clr), IsAntialias = true });
-                using var num = new SKPaint { Color = SKColor.Parse("#555555"), TextSize = 9f, IsAntialias = true };
+                using var num = new SKPaint { Color = SKColor.Parse(ReportThemeColors.TextMid), TextSize = 9f, IsAntialias = true };
                 c.DrawText(FormatPopStatic(country.Population), labelW + bw + 5, y + rowH * 0.65f, num);
             }
         }
@@ -226,7 +336,7 @@ namespace PeaceEnablers.Common.Implementation
 
             float barH   = s.Height / Math.Max(byRegion.Count, 1);
             float labelW = 120f, barArea = s.Width - labelW - 65f;
-            string[] palette = { "12352F","336B58","4CAF8A","F0B429","E05252","7B61FF","1E88E5" };
+            string[] palette = { ReportThemeColors.PdfDarkGreenHex,ReportThemeColors.PdfMediumGreenHex,ReportThemeColors.ChartTealHex,ReportThemeColors.ChartGoldHex,ReportThemeColors.ChartRedHex,ReportThemeColors.ChartPurpleHex,ReportThemeColors.ChartBlueHex };
 
             for (int i = 0; i < byRegion.Count; i++)
             {
@@ -235,12 +345,12 @@ namespace PeaceEnablers.Common.Implementation
                 float avg = (float)g.Average(country => GetLatestScoreOrZeroStatic(country));
                 if (avg < 0) avg = 0;
                 float bw = avg / 100f * barArea;
-                if (i % 2 == 0) c.DrawRect(new SKRect(0, y, s.Width, y + barH), new SKPaint { Color = SKColor.Parse("#F4F7F5") });
-                using var lbl = new SKPaint { Color = SKColor.Parse("#333333"), TextSize = 9f, IsAntialias = true };
+                if (i % 2 == 0) c.DrawRect(new SKRect(0, y, s.Width, y + barH), new SKPaint { Color = SKColor.Parse(ReportThemeColors.PageBg) });
+                using var lbl = new SKPaint { Color = SKColor.Parse(ReportThemeColors.TextBody), TextSize = 9f, IsAntialias = true };
                 c.DrawText(g.Key, 4, y + barH * 0.65f, lbl);
                 c.DrawRoundRect(new SKRoundRect(new SKRect(labelW, y + 3, labelW + bw, y + barH - 6), 3),
                     new SKPaint { Color = SKColor.Parse(palette[i % palette.Length]), IsAntialias = true });
-                using var sc = new SKPaint { Color = SKColor.Parse("#555555"), TextSize = 9f, IsAntialias = true };
+                using var sc = new SKPaint { Color = SKColor.Parse(ReportThemeColors.TextMid), TextSize = 9f, IsAntialias = true };
                 c.DrawText($"{avg:F1}  (n={g.Count()})", labelW + bw + 5, y + barH * 0.65f, sc);
             }
         }
@@ -258,13 +368,13 @@ namespace PeaceEnablers.Common.Implementation
             float Xp(int yr) => padL + (yr - years.First()) / (float)(years.Last() - years.First()) * w;
             float Yp(float v) => padT + h - Math.Clamp(v, 0, 100) / 100f * h;
 
-            using var grid  = new SKPaint { Color = SKColor.Parse("#e8e8e8"), StrokeWidth = 0.5f };
-            using var glbl  = new SKPaint { Color = SKColor.Parse("#aaaaaa"), TextSize = 7f, IsAntialias = true };
+            using var grid  = new SKPaint { Color = SKColor.Parse(ReportThemeColors.ShadeE8E8E8), StrokeWidth = 0.5f };
+            using var glbl  = new SKPaint { Color = SKColor.Parse(ReportThemeColors.GrayAAAAAA), TextSize = 7f, IsAntialias = true };
             foreach (int sc in new[] { 0, 25, 50, 75, 100 }) { float y = Yp(sc); c.DrawLine(padL, y, padL + w, y, grid); c.DrawText(sc.ToString(), 2, y - 5, glbl); }
-            foreach (int yr in years)                          { float x = Xp(yr); c.DrawLine(x, padT, x, padT + h, new SKPaint { Color = SKColor.Parse("#F0F0F0"), StrokeWidth = 0.5f }); c.DrawText(yr.ToString(), x - 14, padT + h + 7, glbl); }
+            foreach (int yr in years)                          { float x = Xp(yr); c.DrawLine(x, padT, x, padT + h, new SKPaint { Color = SKColor.Parse(ReportThemeColors.SubHeaderBg), StrokeWidth = 0.5f }); c.DrawText(yr.ToString(), x - 14, padT + h + 7, glbl); }
 
             // Peer lines
-            string[] pal = { "F0B429","4CAF8A","1E88E5","FB8C00","7B61FF","E05252" };
+            string[] pal = { ReportThemeColors.ChartGoldHex,ReportThemeColors.ChartTealHex,ReportThemeColors.ChartBlueHex,ReportThemeColors.ChartOrangeHex,ReportThemeColors.ChartPurpleHex,ReportThemeColors.ChartRedHex };
             for (int pi = 0; pi < peers.Count; pi++)
             {
                 var pts = (peers[pi].CountryHistory ?? new()).Where(h => years.Contains(h.Year)).OrderBy(h => h.Year)
@@ -286,14 +396,14 @@ namespace PeaceEnablers.Common.Implementation
             List<PeerCountryPillarHistoryReportDto> pillars)
         {
             if (years.Count < 2) return;
-            string[] pal = { "12352F","336B58","4CAF8A","F0B429","F5A623","E05252","7B61FF","1E88E5","43A047","FB8C00","0097A7","8D6E63","E91E63","607D8B" };
+            string[] pal = { ReportThemeColors.PdfDarkGreenHex,ReportThemeColors.PdfMediumGreenHex,ReportThemeColors.ChartTealHex,ReportThemeColors.ChartGoldHex,ReportThemeColors.ChartAmberHex,ReportThemeColors.ChartRedHex,ReportThemeColors.ChartPurpleHex,ReportThemeColors.ChartBlueHex,ReportThemeColors.ChartLeafHex,ReportThemeColors.ChartOrangeHex,ReportThemeColors.ChartCyanHex,ReportThemeColors.ChartBrownHex,ReportThemeColors.ChartPinkHex,ReportThemeColors.ChartSlateHex };
             const float padL = 36f, padR = 10f, padT = 8f, padB = 20f;
             float w = s.Width - padL - padR, h = s.Height - padT - padB;
             float Xp(int yr) => padL + (yr - years.First()) / (float)(years.Last() - years.First()) * w;
             float Yp(float v) => padT + h - Math.Clamp(v, 0, 100) / 100f * h;
 
-            using var grid = new SKPaint { Color = SKColor.Parse("#e8e8e8"), StrokeWidth = 0.5f };
-            using var glbl = new SKPaint { Color = SKColor.Parse("#aaaaaa"), TextSize = 7f, IsAntialias = true };
+            using var grid = new SKPaint { Color = SKColor.Parse(ReportThemeColors.ShadeE8E8E8), StrokeWidth = 0.5f };
+            using var glbl = new SKPaint { Color = SKColor.Parse(ReportThemeColors.GrayAAAAAA), TextSize = 7f, IsAntialias = true };
             foreach (int sc in new[] { 0, 25, 50, 75, 100 }) { float y = Yp(sc); c.DrawLine(padL, y, padL + w, y, grid); c.DrawText(sc.ToString(), 2, y - 5, glbl); }
             foreach (int yr in years) c.DrawText(yr.ToString(), Xp(yr) - 12, padT + h + 5, glbl);
 
@@ -319,7 +429,7 @@ namespace PeaceEnablers.Common.Implementation
         // ── Private static helpers shared by canvas methods above ─────────────
 
         private static SKColor GetColorStatic(float v)
-            => v >= 70 ? SKColor.Parse("#2E7D32") : v >= 40 ? SKColor.Parse("#F9A825") : SKColor.Parse("#C62828");
+            => v >= 70 ? SKColor.Parse(ReportThemeColors.SuccessGreen) : v >= 40 ? SKColor.Parse(ReportThemeColors.WarningAmber) : SKColor.Parse(ReportThemeColors.DangerRed);
 
         private static bool IsSameCountryStatic(string? a, string? b)
             => string.Equals(a?.Trim(), b?.Trim(), StringComparison.OrdinalIgnoreCase);
@@ -359,7 +469,7 @@ namespace PeaceEnablers.Common.Implementation
         {
             if (!countries.Any()) return;
 
-            string[] palette = { "#F0B429", "#4CAF8A", "#1E88E5", "#FB8C00", "#7B61FF", "#E05252" };
+            string[] palette = { ReportThemeColors.ChartGold, ReportThemeColors.ChartTeal, ReportThemeColors.ChartBlue, ReportThemeColors.ChartOrange, ReportThemeColors.ChartPurple, ReportThemeColors.ChartRed };
 
             const float padL = 42f, padR = 14f, padT = 12f, padB = 28f;
             float w = s.Width - padL - padR;
@@ -373,9 +483,9 @@ namespace PeaceEnablers.Common.Implementation
             float Yp(float v) => padT + h - Math.Clamp(v, 0, 100) / 100f * h;
 
             // Grid + axes
-            using var axis = new SKPaint { Color = SKColor.Parse("#AAAAAA"), StrokeWidth = 0.8f };
-            using var grid = new SKPaint { Color = SKColor.Parse("#EEEEEE"), StrokeWidth = 0.5f };
-            using var glbl = new SKPaint { Color = SKColor.Parse("#999999"), TextSize = 7f, IsAntialias = true };
+            using var axis = new SKPaint { Color = SKColor.Parse(ReportThemeColors.GrayAAAAAA), StrokeWidth = 0.8f };
+            using var grid = new SKPaint { Color = SKColor.Parse(ReportThemeColors.DividerLight), StrokeWidth = 0.5f };
+            using var glbl = new SKPaint { Color = SKColor.Parse(ReportThemeColors.TextPale), TextSize = 7f, IsAntialias = true };
             c.DrawLine(padL, padT, padL, padT + h, axis);
             c.DrawLine(padL, padT + h, padL + w, padT + h, axis);
             foreach (int sc in new[] { 0, 25, 50, 75, 100 })
@@ -400,7 +510,7 @@ namespace PeaceEnablers.Common.Implementation
                 {
                     using var ring = new SKPaint
                     {
-                        Color = SKColor.Parse("#12352F"),
+                        Color = SKColor.Parse(ReportThemeColors.PdfDarkGreen),
                         Style = SKPaintStyle.Stroke,
                         StrokeWidth = 1.8f,
                         IsAntialias = true
@@ -410,8 +520,8 @@ namespace PeaceEnablers.Common.Implementation
             }
 
             // Axis labels
-            using var xlbl = new SKPaint { Color = SKColor.Parse("#666666"), TextSize = 8f, IsAntialias = true, TextAlign = SKTextAlign.Center };
-            using var ylbl = new SKPaint { Color = SKColor.Parse("#666666"), TextSize = 8f, IsAntialias = true };
+            using var xlbl = new SKPaint { Color = SKColor.Parse(ReportThemeColors.TextLabel), TextSize = 8f, IsAntialias = true, TextAlign = SKTextAlign.Center };
+            using var ylbl = new SKPaint { Color = SKColor.Parse(ReportThemeColors.TextLabel), TextSize = 8f, IsAntialias = true };
             c.DrawText(xLabel, padL + w / 2f, padT + h + 20, xlbl);
             c.DrawText(yLabel, 2, padT + h / 2f, ylbl);
         }
@@ -422,7 +532,7 @@ namespace PeaceEnablers.Common.Implementation
             List<PeerCountryHistoryReportDto> all)
         {
             string[] categoryOrder = { "Low Income", "Lower-Middle Income", "Upper-Middle Income", "High Income" };
-            string[] segColors = { "#D9534F", "#F0AD4E", "#5BC0DE", "#2E7D32" };
+            string[] segColors = { ReportThemeColors.PenaltyRed, ReportThemeColors.WarningGold, ReportThemeColors.InfoBlue, ReportThemeColors.SuccessGreen };
 
             var segments = all
                 .GroupBy(x => PdfGeneratorService.GetIncomeCategory(x.Income ?? 0))
@@ -435,8 +545,8 @@ namespace PeaceEnablers.Common.Implementation
             float maxBarH = baseY - 10f;
 
             using var valPaint = new SKPaint { TextSize = 9f, IsAntialias = true, FakeBoldText = true, TextAlign = SKTextAlign.Center };
-            using var catPaint = new SKPaint { Color = SKColor.Parse("#555555"), TextSize = 7f, IsAntialias = true };
-            using var nPaint = new SKPaint { Color = SKColor.Parse("#888888"), TextSize = 7f, IsAntialias = true };
+            using var catPaint = new SKPaint { Color = SKColor.Parse(ReportThemeColors.TextMid), TextSize = 7f, IsAntialias = true };
+            using var nPaint = new SKPaint { Color = SKColor.Parse(ReportThemeColors.TextFaint), TextSize = 7f, IsAntialias = true };
 
             for (int i = 0; i < categoryOrder.Length; i++)
             {
@@ -446,7 +556,7 @@ namespace PeaceEnablers.Common.Implementation
 
                 if (!segments.TryGetValue(label, out var countries) || !countries.Any())
                 {
-                    using var noData = new SKPaint { Color = SKColor.Parse("#DDDDDD"), IsAntialias = true };
+                    using var noData = new SKPaint { Color = SKColor.Parse(ReportThemeColors.Divider), IsAntialias = true };
                     c.DrawRoundRect(new SKRoundRect(new SKRect(barX, baseY - 4, barX + barW, baseY), 4), noData);
                     c.DrawText(label.Length > 14 ? label[..14] + "…" : label, slotX, baseY + 12, catPaint);
                     continue;
@@ -458,7 +568,7 @@ namespace PeaceEnablers.Common.Implementation
                 using var barPaint = new SKPaint { Color = SKColor.Parse(segColors[i]), IsAntialias = true };
                 c.DrawRoundRect(new SKRoundRect(new SKRect(barX, baseY - barH, barX + barW, baseY), 6), barPaint);
 
-                valPaint.Color = SKColor.Parse("#12352F");
+                valPaint.Color = SKColor.Parse(ReportThemeColors.PdfDarkGreen);
                 c.DrawText($"{avg:F1}", barX + barW / 2f, baseY - barH - 5, valPaint);
 
                 string shortLabel = label.Length > 14 ? label[..14] + "…" : label;
@@ -490,8 +600,8 @@ namespace PeaceEnablers.Common.Implementation
                 counts[Math.Clamp((int)(sc / bucket), 0, bins - 1)]++;
             int maxCnt = counts.Max() == 0 ? 1 : counts.Max();
 
-            using var axisLbl = new SKPaint { Color = SKColor.Parse("#888888"), TextSize = 7f, IsAntialias = true };
-            using var cntLbl = new SKPaint { Color = SKColor.Parse("#555555"), TextSize = 7f, IsAntialias = true, TextAlign = SKTextAlign.Center };
+            using var axisLbl = new SKPaint { Color = SKColor.Parse(ReportThemeColors.TextFaint), TextSize = 7f, IsAntialias = true };
+            using var cntLbl = new SKPaint { Color = SKColor.Parse(ReportThemeColors.TextMid), TextSize = 7f, IsAntialias = true, TextAlign = SKTextAlign.Center };
 
             for (int b = 0; b < bins; b++)
             {
@@ -514,7 +624,7 @@ namespace PeaceEnablers.Common.Implementation
             float mx = padL + Math.Clamp(markerValue, 0, 100) / 100f * w;
             using var marker = new SKPaint
             {
-                Color = SKColor.Parse("#F0B429"),
+                Color = SKColor.Parse(ReportThemeColors.ChartGold),
                 StrokeWidth = 2f,
                 PathEffect = SKPathEffect.CreateDash(new[] { 5f, 3f }, 0)
             };
@@ -522,7 +632,7 @@ namespace PeaceEnablers.Common.Implementation
 
             using var mLbl = new SKPaint
             {
-                Color = SKColor.Parse("#F0B429"),
+                Color = SKColor.Parse(ReportThemeColors.ChartGold),
                 TextSize = 7.5f,
                 IsAntialias = true,
                 FakeBoldText = true,

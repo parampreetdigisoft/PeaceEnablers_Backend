@@ -2232,7 +2232,31 @@ namespace PeaceEnablers.Services
             }
         }
 
+
         #endregion ai document
+
+
+
+        public async Task<byte[]> GenerateSelectedPillarsReport(List<AiCountryPillarResponse> pillars, UserRole userRole, int userID, IServices.DocumentFormat format = IServices.DocumentFormat.Pdf)
+        {
+            try
+            {
+                if (pillars == null || pillars.Count == 0)
+                    return Array.Empty<byte>();
+
+                if (pillars.Count == 1)
+                    return await GeneratePillarDetailsReport(pillars[0], userRole, format);
+
+                var year = pillars[0].AIDataYear == 0 ? DateTime.Now.Year : pillars[0].AIDataYear;
+                var pillarRanks = await _commonService.GetCountriesPillarRankingAsync(pillars[0].CountryID, year);
+                return await _documentGeneratorService.GenerateSelectedPillarDetails(pillars, pillarRanks, userRole, format);
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error Occured in GenerateSelectedPillarsReport", ex);
+                return Array.Empty<byte>();
+            }
+        }
 
         #endregion
     }

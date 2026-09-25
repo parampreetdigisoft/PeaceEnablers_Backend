@@ -1030,7 +1030,7 @@ namespace PeaceEnablers.Services
             bool isRanking = request.IsRanking == true;
 
             // ---------------- Header ----------------
-            int totalColumns = isRanking ? 5 : 10;
+            int totalColumns = isRanking ? 5 : 11;
 
             ws.Range(1, 1, 1, totalColumns).Merge().Value = "Countries Progress Report";
             ws.Range(2, 1, 2, totalColumns).Merge().Value = $"Report Year: {DateTime.UtcNow.Year}";
@@ -1047,11 +1047,15 @@ namespace PeaceEnablers.Services
             // ---------------- Column Header ----------------
             ws.Cell(row, 1).Value = "S.No.";
             ws.Cell(row, 2).Value = "Country Name";
-            ws.Cell(row, 3).Value = "Continent";           
+            ws.Cell(row, 3).Value = "Continent";
+
+            int rankColumn = isRanking ? 4 : 10;
+            int countryScoreColumn = isRanking ? 5 : 11;
 
             if (isRanking)
             {
-                ws.Cell(row, 5).Value = "Evaluator - AI Country Score";
+                ws.Cell(row, rankColumn).Value = "Manual Ranking";
+                ws.Cell(row, countryScoreColumn).Value = "Evaluated - AI Country Score";
             }
             else
             {
@@ -1060,7 +1064,8 @@ namespace PeaceEnablers.Services
                 ws.Cell(row, 7).Value = "Total Answers";
                 ws.Cell(row, 8).Value = "Evaluator Pillar Score";
                 ws.Cell(row, 9).Value = "AI Pillar Score";
-                ws.Cell(row, 10).Value = "Evaluator - AI Country Score";
+                ws.Cell(row, rankColumn).Value = "Manual Ranking";
+                ws.Cell(row, countryScoreColumn).Value = "Evaluated - AI Country Score";
             }
 
             var header = ws.Range(row, 1, row, totalColumns);
@@ -1070,7 +1075,7 @@ namespace PeaceEnablers.Services
 
             row++;
             int sno = 1;
-
+            int countryRank = 1;
             // ---------------- Data ----------------
             foreach (var cityGroup in cityGroups)
             {
@@ -1078,7 +1083,8 @@ namespace PeaceEnablers.Services
                 var pillars = cityGroup.OrderBy(x => x.DisplayOrder).ToList();
 
                 var cityProgress = pillars.Average(x => x.PillarProgress);
-
+                string rankValue = cityProgress == 0 ? "N/A" : (countryRank++).ToString();
+                string countryScore = $"{cityProgress:F2} - {cityData.AICountryProgress:F2}";
                 // ========================
                 // ✅ RANK-WISE (1 ROW ONLY)
                 // ========================
@@ -1088,6 +1094,8 @@ namespace PeaceEnablers.Services
                     ws.Cell(row, 2).Value = cityData.CountryName;
                     ws.Cell(row, 3).Value = cityData.Continent;                    
                     ws.Cell(row, 5).Value = $"{cityProgress:F2} - {cityData.AICountryProgress:F2}";
+                    ws.Cell(row, rankColumn).Value = rankValue;
+                    ws.Cell(row, countryScoreColumn).Value = countryScore;
 
                     row++;
                     continue;
@@ -1099,7 +1107,7 @@ namespace PeaceEnablers.Services
                 int startRow = row;
                 bool first = true;
 
-                foreach (var pillar in pillars)
+                foreach (var pillar in pillars.OrderByDescending(x => x.PillarProgress))
                 {
                     ws.Cell(row, 1).Value = sno++;
                     ws.Cell(row, 2).Value = cityData.CountryName;
@@ -1121,15 +1129,20 @@ namespace PeaceEnablers.Services
                 }
 
                 int endRow = row - 1;
-
+                ws.Cell(startRow, rankColumn).Value = rankValue;
+                ws.Cell(startRow, countryScoreColumn).Value = countryScore;
                 // Merge only for pillar mode
                 if (endRow > startRow)
                 {
                     ws.Range(startRow, 2, endRow, 2).Merge();
                     ws.Range(startRow, 3, endRow, 3).Merge();
                     ws.Range(startRow, 4, endRow, 4).Merge();
-                    ws.Range(startRow, 10, endRow, 10).Merge();
+                    ws.Range(startRow, rankColumn, endRow, rankColumn).Merge();
+                    ws.Range(startRow, countryScoreColumn, endRow, countryScoreColumn).Merge();
                 }
+                var summaryCells = ws.Range(startRow, rankColumn, endRow, countryScoreColumn);
+                summaryCells.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+                summaryCells.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
             }
 
             // ---------------- Formatting ----------------

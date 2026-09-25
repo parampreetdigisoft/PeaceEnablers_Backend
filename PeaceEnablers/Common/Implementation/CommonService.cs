@@ -215,5 +215,26 @@ namespace PeaceEnablers.Common.Implementation
                 return ResultResponseDto<bool>.Failure(new[] { "Failed to revoke permission." });
             }
         }
+
+        public async Task<List<CountryPillarRankingResultDto>> GetCountriesPillarRankingAsync(int countryID = 0, int year = 0)
+        {
+            try
+            {
+                return await _context.CountryPillarRankingResults
+                 .FromSqlRaw(
+                     "EXEC usp_getCountryAllPillarsRanking @countryID, @year",
+
+                     new SqlParameter("@countryID", (object?)countryID ?? DBNull.Value),
+                     new SqlParameter("@year", year)
+                 )
+                 .AsNoTracking()
+                 .ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error in Executing usp_getCountryAllPillarsRanking", ex);
+                return new List<CountryPillarRankingResultDto>();
+            }
+        }
     }
 }

@@ -49,6 +49,7 @@ namespace PeaceEnablers.Data
         public DbSet<AIEditPermission> AIEditPermissions { get; set; } = default!;
         public DbSet<AIEditSession> AIEditSessions { get; set; } = default!;
         public DbSet<AIEditChangeLog> AIEditChangeLogs { get; set; } = default!;
+        public DbSet<CountryPillarRankingResultDto> CountryPillarRankingResults { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -138,6 +139,8 @@ namespace PeaceEnablers.Data
             modelBuilder.Entity<CountryRankingResultDto>().HasNoKey().ToView(null); 
             modelBuilder.Entity<GetCountriesProgressAdminDto>().HasNoKey().ToView(null);
             modelBuilder.Entity<EvaluationCountryProgressHistoryResultDto>().HasNoKey().ToView(null);
+            modelBuilder.Entity<CountryPillarRankingResultDto>().HasNoKey().ToView(null);
+
             modelBuilder.Entity<CountryPeer>(entity =>
             {
                 entity.HasKey(e => e.CountryPeerID);
