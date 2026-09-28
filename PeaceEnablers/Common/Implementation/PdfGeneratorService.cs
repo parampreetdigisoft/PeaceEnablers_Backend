@@ -3625,9 +3625,9 @@ namespace PeaceEnablers.Common.Implementation
                             .Text(value).FontSize(11).Bold().FontColor(ReportThemeColors.GrayTailwind900);
                     }
 
-                    Row("Continent Rank", FormatRank(data?.GlobalPillarRank ?? 0, data?.TotalPillarsInAllCountries ?? 0), false);
+                    Row("Pillar Global Rank", FormatRank(data?.GlobalPillarRank ?? 0, data?.TotalPillarsInAllCountries ?? 0), false);
                     Row($"{data?.Region} Region Rank", FormatRank(data?.RegionPillarRank ?? 0, data?.TotalPillarInRegion ?? 0), true);
-                    Row("Country Level Rank", FormatRank(data?.CountryPillarRank ?? 0, data?.TotalPillars ?? 0), false);
+                    Row("Pillar Country Level Rank", FormatRank(data?.CountryPillarRank ?? 0, data?.TotalPillars ?? 0), false);
                 });
         }
         static void DrawTableHeader(TableDescriptor table, string[] headers)

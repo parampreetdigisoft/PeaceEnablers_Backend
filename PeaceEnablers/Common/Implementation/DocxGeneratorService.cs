@@ -3101,9 +3101,9 @@ namespace PeaceEnablers.Common.Implementation
                         new LeftBorder { Val = BorderValues.Single, Color = ReportThemeColors.BorderWarmHex, Size = 4 },
                         new RightBorder { Val = BorderValues.Single, Color = ReportThemeColors.BorderWarmHex, Size = 4 })),
                 new TableRow(Cell("Ranking", true, false, false), Cell("Result", true, true, false)),
-                new TableRow(Cell("Continent Rank", false, false, false), Cell(FormatRank(data?.GlobalPillarRank ?? 0, data?.TotalPillarsInAllCountries ?? 0), false, true, false)),
-                new TableRow(Cell("Region Rank", false, false, true), Cell(FormatRank(data?.RegionPillarRank ?? 0, data?.TotalPillarInRegion ?? 0), false, true, true)),
-                new TableRow(Cell("Country Level Rank", false, false, false), Cell(FormatRank(data?.CountryPillarRank ?? 0, data?.TotalPillars ?? 0), false, true, false)));
+                new TableRow(Cell("Pillar Global Rank", false, false, false), Cell(FormatRank(data?.GlobalPillarRank ?? 0, data?.TotalPillarsInAllCountries ?? 0), false, true, false)),
+                new TableRow(Cell($"{data?.Region} Region Rank", false, false, true), Cell(FormatRank(data?.RegionPillarRank ?? 0, data?.TotalPillarInRegion ?? 0), false, true, true)),
+                new TableRow(Cell("Pillar Country Level Rank", false, false, false), Cell(FormatRank(data?.CountryPillarRank ?? 0, data?.TotalPillars ?? 0), false, true, false)));
         }
         
 

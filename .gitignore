@@ -19,3 +19,5 @@ appsettings.Development.json
 # ASP.NET Core configuration
 appsettings.json
 appsettings.*.json
+config.bat
+node_modules
