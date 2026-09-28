@@ -19,6 +19,7 @@ using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 using PeaceEnablers.Common.Interface;
 using PeaceEnablers.Dtos.AiDto;
+using PeaceEnablers.Dtos.CountryDto;
 using PeaceEnablers.IServices;
 using PeaceEnablers.Models;
 using PeaceEnablers.Services;
@@ -47,9 +48,9 @@ namespace PeaceEnablers.Common.Implementation
         private const int    ContentDxa      = (int)(PageWidthDxa - 2 * MarginDxa); // 10 466 DXA
         private const long   ContentWidthEmu = 6_645_000L;   // ≈ 7.27 inch in EMU
         private const long   HalfWidthEmu    = 3_220_000L;   // ≈ 3.52 inch in EMU
-        private const string DarkBlue       = "1B2F44";
-        private const string MedBlue        = "2C6EA3";
-        private const string White           = "FFFFFF";
+        private const string DarkBlue       = ReportThemeColors.DarkBlueHex;
+        private const string MedBlue        = ReportThemeColors.MedBlueHex;
+        private const string White           = ReportThemeColors.WhiteHex;
 
         // Unique image ID counter — reset per document
         private uint _imgId;
@@ -151,6 +152,52 @@ namespace PeaceEnablers.Common.Implementation
                 return Array.Empty<byte>();
             }
         }
+        public async Task<byte[]> GenerateSelectedPillarsDetailsDocx(List<AiCountryPillarResponse> pillars, List<CountryPillarRankingResultDto> pillarRanks, UserRole userRole)
+        {
+            try
+            {
+                if (pillars == null || pillars.Count == 0)
+                    return Array.Empty<byte>();
+
+                var first = pillars[0];
+                var countryDetails = new AiCountrySummeryDto
+                {
+                    CountryID = first.CountryID,
+                    CountryName = first.CountryName,
+                    Continent = first.Continent,
+                    Year = first.AIDataYear,
+                    AIProgress = pillars.Average(x => x.AIProgress ?? 0)
+                };
+                var pillarChartItems = pillars.Select(p => new PillarChartItem(
+                    (p.PillarName?.Length > 20 ? p.PillarName[..20] : p.PillarName) ?? "-",
+                    p.PillarName ?? "-",
+                    p.AIProgress)).ToList();
+
+                return BuildDocument(mainPart =>
+                {
+                    var body = mainPart.Document.Body!;
+                    _imgId = 1;
+
+                    AppendCountryHeader(mainPart, countryDetails, "Domain Performance Overview");
+                    AddPillarOverviewSection(body, mainPart, pillarChartItems);
+
+                    foreach (var pillarData in pillars)
+                    {
+                        AppendCountryHeader(mainPart, countryDetails, pillarData.PillarName);
+                        var pillarRank = pillarRanks?.FirstOrDefault(p =>
+                            p.PillarID == pillarData.PillarID && p.CountryID == pillarData.CountryID);
+                        AddSelectedPillarMarkedSection(body, pillarData, pillarRank);
+                    }
+
+                    FinalizeLastSection(mainPart);
+                });
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error in GenerateSelectedPillarsDetailsDocx", ex);
+                return Array.Empty<byte>();
+            }
+        }
 
         // ════════════════════════════════════════════════════════════════════
         //  DOCUMENT SHELL HELPER
@@ -247,7 +294,7 @@ namespace PeaceEnablers.Common.Implementation
             if (!isAllCountries && !string.IsNullOrEmpty(countryDetails.Recommendations))
             {
                 AppendCountryHeader(mainPart, countryDetails, "Recommendations");
-                AppendContentSection(body, "Recommendations", countryDetails.Recommendations, "b2dfdb");
+                AppendContentSection(body, "Recommendations", countryDetails.Recommendations, ReportThemeColors.CB2DFDBHex);
             }
 
             FinalizeLastSection(mainPart);
@@ -409,10 +456,10 @@ namespace PeaceEnablers.Common.Implementation
                     new BottomMargin { Width = "80", Type = TableWidthUnitValues.Dxa },
                     new LeftMargin { Width = "80", Type = TableWidthUnitValues.Dxa },
                     new RightMargin { Width = "80", Type = TableWidthUnitValues.Dxa }),
-                new Shading { Val = ShadingPatternValues.Clear, Color = "auto", Fill = "FFFFFF" }));
+                new Shading { Val = ShadingPatternValues.Clear, Color = "auto", Fill = ReportThemeColors.WhiteHex }));
 
             // ── Heading ──
-            cell.Append(CenteredBoldPara("Overall Country Score", "212529", "20"));
+            cell.Append(CenteredBoldPara("Overall Country Score", ReportThemeColors.TextInkHex, "20"));
             // ── Ranking Labels ──
             var globalRankLabel = country.Rank.HasValue && country.TotalCountry.HasValue && country.TotalCountry >=1
                 ? $"Global Rank: {country.Rank} / {country.TotalCountry}"
@@ -438,12 +485,12 @@ namespace PeaceEnablers.Common.Implementation
                 cell.Append(
                     BuildDualBadgeRow(
                         $"▲ {Shorten(best.Name, 16)} ({best.Value:F0})",
-                        "E8F5E9",
-                        "1B5E20",
+                        ReportThemeColors.SuccessGreenBgHex,
+                        ReportThemeColors.SuccessGreenDarkHex,
 
                         globalRankLabel,
-                        "E8F0EC",
-                        "12352f"
+                        ReportThemeColors.SurfaceGreenHex,
+                        ReportThemeColors.PdfDarkGreenHex
                     ));
             }
 
@@ -455,12 +502,12 @@ namespace PeaceEnablers.Common.Implementation
                 cell.Append(
                     BuildDualBadgeRow(
                         $"▼ {Shorten(worst.Name, 16)} ({worst.Value:F0})",
-                        "FDECEA",
-                        "B71C1C",
+                        ReportThemeColors.DangerRedBgHex,
+                        ReportThemeColors.DangerRedDarkHex,
 
                         regionRankLabel,
-                        "FFF3E0",
-                        "5D3B00"
+                        ReportThemeColors.WarningOrangeBgHex,
+                        ReportThemeColors.WarningOrangeTextHex
                     ));
             }
             return cell;
@@ -591,10 +638,10 @@ namespace PeaceEnablers.Common.Implementation
                     new BottomMargin { Width = "80", Type = TableWidthUnitValues.Dxa },
                     new LeftMargin { Width = "80", Type = TableWidthUnitValues.Dxa },
                     new RightMargin { Width = "80", Type = TableWidthUnitValues.Dxa }),
-                new Shading { Val = ShadingPatternValues.Clear, Color = "auto", Fill = "FFFFFF" }));
+                new Shading { Val = ShadingPatternValues.Clear, Color = "auto", Fill = ReportThemeColors.WhiteHex }));
 
             // ── Heading ──
-            cell.Append(CenteredBoldPara("Pillar Performance Radar", "12352f", "20"));
+            cell.Append(CenteredBoldPara("Pillar Performance Radar", ReportThemeColors.PdfDarkGreenHex, "20"));
 
             // ── Radar image ──
             cell.Append(EmbedImage(mainPart, radarPng, imgEmuW, imgEmuH));
@@ -618,12 +665,12 @@ namespace PeaceEnablers.Common.Implementation
                     new Paragraph(new ParagraphProperties(
                             new Justification { Val = JustificationValues.Center }),
                         new Run(new RunProperties(
-                                new Bold(), new Color { Val = "336b58" }, new FontSize { Val = "36" }),
+                                new Bold(), new Color { Val = ReportThemeColors.PdfMediumGreenHex }, new FontSize { Val = "36" }),
                             new Text(number))),
                     new Paragraph(new ParagraphProperties(
                             new Justification { Val = JustificationValues.Center }),
                         new Run(new RunProperties(
-                                new Color { Val = "757575" }, new FontSize { Val = "16" }),
+                                new Color { Val = ReportThemeColors.Gray757575Hex }, new FontSize { Val = "16" }),
                             new Text(label))));
 
             return new Table(
@@ -635,7 +682,7 @@ namespace PeaceEnablers.Common.Implementation
                         new LeftBorder { Val = BorderValues.None },
                         new RightBorder { Val = BorderValues.None },
                         new InsideHorizontalBorder { Val = BorderValues.None },
-                        new InsideVerticalBorder { Val = BorderValues.Single, Color = "E0E0E0", Size = 4 })),
+                        new InsideVerticalBorder { Val = BorderValues.Single, Color = ReportThemeColors.GrayE0E0E0Hex, Size = 4 })),
                 new TableRow(
                     CountCell(pillarCount.ToString(), "Pillars"),
                     CountCell(kpiCount.ToString(), "KPIs")));
@@ -705,91 +752,91 @@ namespace PeaceEnablers.Common.Implementation
             body.AppendChild(CreateRankingHeader("Rankings"));
 
             body.AppendChild(CreateRankRow("Global Rank",
-                data.Rank, data.TotalCountry, "16A34A"));
+                data.Rank, data.TotalCountry, ReportThemeColors.AccentGreenHex));
 
             body.AppendChild(CreateRankRow("Region Rank",
-                data.RegionRank, data.RegionTotalCountry, "2563EB"));
+                data.RegionRank, data.RegionTotalCountry, ReportThemeColors.AccentBlueHex));
 
             body.AppendChild(Gap(160));
 
             // =========================
             // EXECUTIVE SUMMARY
             // =========================
-            AppendContentSection(body, "Executive Summary", data.EvidenceSummary, "163329");
+            AppendContentSection(body, "Executive Summary", data.EvidenceSummary, ReportThemeColors.C163329Hex);
 
             if (!isAllCountries)
             {
                 // =====================================================
                 // current situation
                 // =====================================================
-                AppendContentSection(body, "Key Developments", data.KeyDevelopments, "e6ccff");
-                AppendContentSection(body, "Critical Risks", data.CriticalRisks, "c2f0f0");
-                AppendContentSection(body, "Gaps", data.Gaps, "ffe6cc");
+                AppendContentSection(body, "Key Developments", data.KeyDevelopments, ReportThemeColors.CE6CCFFHex);
+                AppendContentSection(body, "Critical Risks", data.CriticalRisks, ReportThemeColors.CC2F0F0Hex);
+                AppendContentSection(body, "Gaps", data.Gaps, ReportThemeColors.CFFE6CCHex);
 
                 // =====================================================
                 // EVIDENCE SECTION
                 // =====================================================
-                AppendContentSection(body, "Structural Evidence", data.StructuralEvidence, "e6ccff");
-                AppendContentSection(body, "Operational Evidence", data.OperationalEvidence, "c2f0f0");
+                AppendContentSection(body, "Structural Evidence", data.StructuralEvidence, ReportThemeColors.CE6CCFFHex);
+                AppendContentSection(body, "Operational Evidence", data.OperationalEvidence, ReportThemeColors.CC2F0F0Hex);
 
                 //body.AppendChild(PageBreak());
 
-                AppendContentSection(body, "Outcome Evidence", data.OutcomeEvidence, "ffe6cc");
-                AppendContentSection(body, "Perception Evidence", data.PerceptionEvidence, "e6f7ff");
+                AppendContentSection(body, "Outcome Evidence", data.OutcomeEvidence, ReportThemeColors.CFFE6CCHex);
+                AppendContentSection(body, "Perception Evidence", data.PerceptionEvidence, ReportThemeColors.CE6F7FFHex);
 
                 // =====================================================
                 // INTEGRITY CHECKS
                 // =====================================================
                 //body.AppendChild(PageBreak());
 
-                AppendContentSection(body, "Temporal Scope", data.TemporalScope, "d9e6ff");
-                AppendContentSection(body, "Distortion Screening", data.DistortionScreening, "f2d9e6");
-                AppendContentSection(body, "Relational Integrity", data.RelationalIntegrity, "f0ffe6");
+                AppendContentSection(body, "Temporal Scope", data.TemporalScope, ReportThemeColors.CD9E6FFHex);
+                AppendContentSection(body, "Distortion Screening", data.DistortionScreening, ReportThemeColors.CF2D9E6Hex);
+                AppendContentSection(body, "Relational Integrity", data.RelationalIntegrity, ReportThemeColors.CF0FFE6Hex);
 
                 // =====================================================
                 // STRESS TESTS
                 // =====================================================
                 //body.AppendChild(PageBreak());
 
-                AppendContentSection(body, "Political Shock", data.PoliticalShock, "ffd9cc");
-                AppendContentSection(body, "Economic Shock", data.EconomicShock, "fff2cc");
-                AppendContentSection(body, "Narrative Shock", data.NarrativeShock, "e6f2ff");
+                AppendContentSection(body, "Political Shock", data.PoliticalShock, ReportThemeColors.CFFD9CCHex);
+                AppendContentSection(body, "Economic Shock", data.EconomicShock, ReportThemeColors.CFFF2CCHex);
+                AppendContentSection(body, "Narrative Shock", data.NarrativeShock, ReportThemeColors.CE6F2FFHex);
 
                 //body.AppendChild(PageBreak());
 
-                //AppendContentSection(body, "Overall Stress Resilience", data.OverallStressResilience, "e6ffe6");
-                AppendContentSection(body, "Stress Score Adjustment", data.StressScoreAdjustment, "ffe6f2");
+                //AppendContentSection(body, "Overall Stress Resilience", data.OverallStressResilience, ReportThemeColors.CE6FFE6Hex);
+                AppendContentSection(body, "Stress Score Adjustment", data.StressScoreAdjustment, ReportThemeColors.CFFE6F2Hex);
 
                 // =====================================================
                 // GOVERNANCE ADJUSTMENTS
                 // =====================================================
                 //body.AppendChild(PageBreak());
 
-                AppendContentSection(body, "Inequality Adjustment", data.InequalityAdjustment, "f9e6ff");
-                AppendContentSection(body, "Opacity Risk", data.OpacityRisk, "fff0e6");
-                AppendContentSection(body, "Non Compensation Note", data.NonCompensationNote, "e6fff9");
+                AppendContentSection(body, "Inequality Adjustment", data.InequalityAdjustment, ReportThemeColors.CF9E6FFHex);
+                AppendContentSection(body, "Opacity Risk", data.OpacityRisk, ReportThemeColors.CFFF0E6Hex);
+                AppendContentSection(body, "Non Compensation Note", data.NonCompensationNote, ReportThemeColors.CE6FFF9Hex);
 
                 // =====================================================
                 // SYSTEM ANALYSIS
                 // =====================================================
                 //body.AppendChild(PageBreak());
 
-                AppendContentSection(body, "Cross-Pillar System Dynamics", data.CrossPillarPatterns, "6e9688");
-                AppendContentSection(body, "Institutional Capacity Assessment", data.InstitutionalCapacity, "0d8057");
+                AppendContentSection(body, "Cross-Pillar System Dynamics", data.CrossPillarPatterns, ReportThemeColors.C6E9688Hex);
+                AppendContentSection(body, "Institutional Capacity Assessment", data.InstitutionalCapacity, ReportThemeColors.C0D8057Hex);
 
                 //body.AppendChild(PageBreak());
 
-                AppendContentSection(body, "Equity Assessment", data.EquityAssessment, "e8f5e9");
-                AppendContentSection(body, "Conflict Risk Outlook", data.ConflictRiskOutlook, "fce4ec");
+                AppendContentSection(body, "Equity Assessment", data.EquityAssessment, ReportThemeColors.SuccessGreenBgHex);
+                AppendContentSection(body, "Conflict Risk Outlook", data.ConflictRiskOutlook, ReportThemeColors.CFCE4ECHex);
 
                 // =====================================================
                 // STRATEGIC OUTPUT
                 // =====================================================
                 //body.AppendChild(PageBreak());
 
-                AppendContentSection(body, "Strategic Policy Priorities", data.StrategicRecommendation, "2e9975");
-                AppendContentSection(body, "Why This Assessment Matters", data.DataTransparencyNote, "63a68f");
-                AppendContentSection(body, "Key Findings", data.KeyFindings, "bbdefb");
+                AppendContentSection(body, "Strategic Policy Priorities", data.StrategicRecommendation, ReportThemeColors.C2E9975Hex);
+                AppendContentSection(body, "Why This Assessment Matters", data.DataTransparencyNote, ReportThemeColors.C63A68FHex);
+                AppendContentSection(body, "Key Findings", data.KeyFindings, ReportThemeColors.CBBDEFBHex);
             }     
         }
 
@@ -798,7 +845,7 @@ namespace PeaceEnablers.Common.Implementation
             return new Paragraph(
                 new ParagraphProperties(new SpacingBetweenLines { Before = "120" }),
                 new Run(
-                    new RunProperties(new Bold(), new Color { Val = "374151" }, new FontSize { Val = "22" }),
+                    new RunProperties(new Bold(), new Color { Val = ReportThemeColors.Gray374151Hex }, new FontSize { Val = "22" }),
                     new Text(text)));
         }
         private static Table CreateRankRow(string label, int? rank, int? total, string color)
@@ -813,7 +860,7 @@ namespace PeaceEnablers.Common.Implementation
                 new TableCellProperties(noBorder.CloneNode(true)),
                 new Paragraph(
                     new Run(
-                        new RunProperties(new Color { Val = "4B5563" }, new FontSize { Val = "20" }),
+                        new RunProperties(new Color { Val = ReportThemeColors.Gray4B5563Hex }, new FontSize { Val = "20" }),
                         new Text(label))));
 
             var rightPara = new Paragraph(
@@ -824,7 +871,7 @@ namespace PeaceEnablers.Common.Implementation
                 rightPara.Append(
                     new Run(new RunProperties(new Bold(), new Color { Val = color }),
                         new Text((rank ?? 0).ToString())),
-                    new Run(new RunProperties(new Color { Val = "6B7280" }),
+                    new Run(new RunProperties(new Color { Val = ReportThemeColors.Gray6B7280Hex }),
                         new Text($" / {total}"))
                 );
             }
@@ -865,6 +912,15 @@ namespace PeaceEnablers.Common.Implementation
         // ════════════════════════════════════════════════════════════════════
         //  PER-PILLAR SECTION
         // ════════════════════════════════════════════════════════════════════
+        private void AddSelectedPillarMarkedSection(Body body, AiCountryPillarResponse data, CountryPillarRankingResultDto? pillarRank)
+        {
+            body.AppendChild(SectionHeading("Domain Score", DarkBlue));
+            body.AppendChild(CreateProgressBar("Score", (float)(data.AIProgress ?? 0), MedBlue));
+            body.AppendChild(Gap(160));
+            body.AppendChild(CreateRankTable(pillarRank));
+            body.AppendChild(Gap(160));
+            AppendContentSection(body, "Executive Summary", data.EvidenceSummary, ReportThemeColors.PdfDarkGreenHex);
+        }
 
         private void AddPillarSection(
     Body body, MainDocumentPart mainPart,
@@ -880,71 +936,71 @@ namespace PeaceEnablers.Common.Implementation
             // =========================
             // EVIDENCE SUMMARY
             // =========================
-            AppendContentSection(body, "Executive Summary", data.EvidenceSummary, "163329");
+            AppendContentSection(body, "Executive Summary", data.EvidenceSummary, ReportThemeColors.C163329Hex);
 
             // =====================================================
             // EVIDENCE SECTION
             // =====================================================
-            AppendContentSection(body, "Structural Evidence", data.StructuralEvidence, "1f4e79");
-            AppendContentSection(body, "Operational Evidence", data.OperationalEvidence, "2e75b6");
+            AppendContentSection(body, "Structural Evidence", data.StructuralEvidence, ReportThemeColors.HeaderBlueHex);
+            AppendContentSection(body, "Operational Evidence", data.OperationalEvidence, ReportThemeColors.HeaderBlueMidHex);
 
             //body.AppendChild(PageBreak());
 
-            AppendContentSection(body, "Outcome Evidence", data.OutcomeEvidence, "5b9bd5");
-            AppendContentSection(body, "Perception Evidence", data.PerceptionEvidence, "9dc3e6");
+            AppendContentSection(body, "Outcome Evidence", data.OutcomeEvidence, ReportThemeColors.HeaderBlueLightHex);
+            AppendContentSection(body, "Perception Evidence", data.PerceptionEvidence, ReportThemeColors.HeaderBluePaleHex);
 
             // =====================================================
             // INTEGRITY CHECKS
             // =====================================================
             //body.AppendChild(PageBreak());
 
-            AppendContentSection(body, "Temporal Scope", data.TemporalScope, "5f497a");
-            AppendContentSection(body, "Distortion Screening", data.DistortionScreening, "8064a2");
-            AppendContentSection(body, "Relational Integrity", data.RelationalIntegrity, "b1a0c7");
+            AppendContentSection(body, "Temporal Scope", data.TemporalScope, ReportThemeColors.C5F497AHex);
+            AppendContentSection(body, "Distortion Screening", data.DistortionScreening, ReportThemeColors.C8064A2Hex);
+            AppendContentSection(body, "Relational Integrity", data.RelationalIntegrity, ReportThemeColors.CB1A0C7Hex);
 
             // =====================================================
             // STRESS TEST
             // =====================================================
             //body.AppendChild(PageBreak());
 
-            AppendContentSection(body, "Stress Political Shock", data.StressPoliticalShock, "7f6000");
-            AppendContentSection(body, "Stress Economic Shock", data.StressEconomicShock, "bf9000");
-            AppendContentSection(body, "Stress Narrative Shock", data.StressNarrativeShock, "ffd966");
+            AppendContentSection(body, "Stress Political Shock", data.StressPoliticalShock, ReportThemeColors.C7F6000Hex);
+            AppendContentSection(body, "Stress Economic Shock", data.StressEconomicShock, ReportThemeColors.CBF9000Hex);
+            AppendContentSection(body, "Stress Narrative Shock", data.StressNarrativeShock, ReportThemeColors.CFFD966Hex);
 
             //body.AppendChild(PageBreak());
 
-            //AppendContentSection(body, "Stress Overall Resilience", data.StressOverallResilience, "c55a11");
-            AppendContentSection(body, "Stress Score Adjustment", data.StressScoreAdjustment, "e26b0a");
+            //AppendContentSection(body, "Stress Overall Resilience", data.StressOverallResilience, ReportThemeColors.CC55A11Hex);
+            AppendContentSection(body, "Stress Score Adjustment", data.StressScoreAdjustment, ReportThemeColors.CE26B0AHex);
 
             // =====================================================
             // GOVERNANCE ADJUSTMENTS
             // =====================================================
             //body.AppendChild(PageBreak());
 
-            AppendContentSection(body, "Inequality Adjustment", data.InequalityAdjustment, "274e13");
-            AppendContentSection(body, "Opacity Risk", data.OpacityRisk, "38761d");
-            AppendContentSection(body, "Non-Compensation Note", data.NonCompensationNote, "6aa84f");
+            AppendContentSection(body, "Inequality Adjustment", data.InequalityAdjustment, ReportThemeColors.C274E13Hex);
+            AppendContentSection(body, "Opacity Risk", data.OpacityRisk, ReportThemeColors.C38761DHex);
+            AppendContentSection(body, "Non-Compensation Note", data.NonCompensationNote, ReportThemeColors.C6AA84FHex);
 
             // =====================================================
             // ALERTS & EQUITY
             // =====================================================
             //body.AppendChild(PageBreak());
 
-            AppendContentSection(body, "Red Flags", data.RedFlag, "ED561A", "eb4634");
-            AppendContentSection(body, "Geographic Equity Note", data.GeographicEquityNote, "0d8057");
+            AppendContentSection(body, "Red Flags", data.RedFlag, ReportThemeColors.AccentOrangeHex, ReportThemeColors.AccentRedHex);
+            AppendContentSection(body, "Geographic Equity Note", data.GeographicEquityNote, ReportThemeColors.C0D8057Hex);
 
             // =====================================================
             // INSTITUTIONAL ANALYSIS
             // =====================================================
             //body.AppendChild(PageBreak());
 
-            AppendContentSection(body, "Institutional Assessment", data.InstitutionalAssessment, "2e9975");
+            AppendContentSection(body, "Institutional Assessment", data.InstitutionalAssessment, ReportThemeColors.C2E9975Hex);
 
             AppendContentSection(
                 body,
                 "Analytical Foundations and Data Integration",
                 data.DataGapAnalysis,
-                "a4bab2"
+                ReportThemeColors.CA4BAB2Hex
             );
 
             // =====================================================
@@ -963,17 +1019,17 @@ namespace PeaceEnablers.Common.Implementation
 
         private void AppendDataSourcesSection(Body body, List<AIDataSourceCitation> sources)
         {
-            body.AppendChild(SectionHeading("Data Source Citations", "396154"));
+            body.AppendChild(SectionHeading("Data Source Citations", ReportThemeColors.C396154Hex));
             foreach (var src in sources.Take(10))
             {
-                body.AppendChild(BoldParagraph(src.SourceName ?? "", "2C423B", 22));
+                body.AppendChild(BoldParagraph(src.SourceName ?? "", ReportThemeColors.C2C423BHex, 22));
                 body.AppendChild(NormalParagraph(
                     $"Trust Level: {src.TrustLevel}/7  |  Year: {src.DataYear}  |  Type: {src.SourceType ?? "—"}",
-                    "757575", 18));
+                    ReportThemeColors.Gray757575Hex, 18));
                 if (!string.IsNullOrEmpty(src.DataExtract))
-                    body.AppendChild(NormalParagraph(TruncateText(src.DataExtract, 200), "616161", 18, italic: true));
+                    body.AppendChild(NormalParagraph(TruncateText(src.DataExtract, 200), ReportThemeColors.Gray616161Hex, 18, italic: true));
                 if (!string.IsNullOrEmpty(src.SourceURL))
-                    body.AppendChild(NormalParagraph(src.SourceURL, "305246", 16));
+                    body.AppendChild(NormalParagraph(src.SourceURL, ReportThemeColors.C305246Hex, 16));
                 body.AppendChild(Gap(120));
             }
         }
@@ -1123,7 +1179,7 @@ namespace PeaceEnablers.Common.Implementation
             var leftCell = new TableCell(
                 new TableCellProperties(
                     new TableCellWidth { Width = leftColW.ToString(), Type = TableWidthUnitValues.Dxa },
-                    new Shading { Fill = "003160" },
+                    new Shading { Fill = ReportThemeColors.HeaderNavyHex },
                     new TableCellVerticalAlignment { Val = TableVerticalAlignmentValues.Center },
                     new TableCellMargin(
                         new TopMargin { Width = "200", Type = TableWidthUnitValues.Dxa },
@@ -1135,9 +1191,9 @@ namespace PeaceEnablers.Common.Implementation
             );
 
             leftCell.Append(
-                HeaderParagraph(title, "42", "FFFFFF", true, "40"),
-                HeaderParagraph($"{data.CountryName}, {data.Continent} | Data Year: {data.Year}", "20", "E8F3F0", false, "20"),
-                HeaderParagraph($"Generated: {DateTime.Now:MMM dd, yyyy}", "16", "CFE3DD", false, "0")
+                HeaderParagraph(title, "42", ReportThemeColors.WhiteHex, true, "40"),
+                HeaderParagraph($"{data.CountryName}, {data.Continent} | Data Year: {data.Year}", "20", ReportThemeColors.SurfaceE8F3F0Hex, false, "20"),
+                HeaderParagraph($"Generated: {DateTime.Now:MMM dd, yyyy}", "16", ReportThemeColors.SurfaceCFE3DDHex, false, "0")
             );
 
             mainRow.Append(leftCell);
@@ -1146,7 +1202,7 @@ namespace PeaceEnablers.Common.Implementation
             var rightCell = new TableCell(
                 new TableCellProperties(
                     new TableCellWidth { Width = logoColW.ToString(), Type = TableWidthUnitValues.Dxa },
-                    new Shading { Fill = "003160" },
+                    new Shading { Fill = ReportThemeColors.HeaderNavyHex },
                     new TableCellVerticalAlignment { Val = TableVerticalAlignmentValues.Center },
                     new TableCellMargin(
                         new TopMargin { Width = "200", Type = TableWidthUnitValues.Dxa },
@@ -1168,7 +1224,7 @@ namespace PeaceEnablers.Common.Implementation
 
             var innerCell = new TableCell(
                 new TableCellProperties(
-                    new Shading { Fill = "FFFFFF" },
+                    new Shading { Fill = ReportThemeColors.WhiteHex },
                     new TableCellVerticalAlignment { Val = TableVerticalAlignmentValues.Center },
                     new TableCellMargin(
                         new TopMargin { Width = "120", Type = TableWidthUnitValues.Dxa },   // ✅ FIX
@@ -1222,7 +1278,7 @@ namespace PeaceEnablers.Common.Implementation
                         {
                             Val = BorderValues.Single,
                             Size = 6,
-                            Color = "d9e2df"
+                            Color = ReportThemeColors.SurfaceD9E2DFHex
                         }
                     )
                 )
@@ -1349,7 +1405,7 @@ namespace PeaceEnablers.Common.Implementation
                         noBorders.CloneNode(true)),
                     new Paragraph(
                         new Run(new RunProperties(
-                            new Color { Val = "424242" }, new FontSize { Val = "22" }),
+                            new Color { Val = ReportThemeColors.TextDarkHex }, new FontSize { Val = "22" }),
                             new Text(label)))));
 
             // Bar row
@@ -1370,7 +1426,7 @@ namespace PeaceEnablers.Common.Implementation
                 ? new TableCell(
                     new TableCellProperties(
                         new TableCellWidth { Width = empty.ToString(), Type = TableWidthUnitValues.Dxa },
-                        new Shading { Val = ShadingPatternValues.Clear, Fill = "F5F5F5" },
+                        new Shading { Val = ShadingPatternValues.Clear, Fill = ReportThemeColors.ShadeLightHex },
                         noBorders.CloneNode(true)),
                     new Paragraph(new ParagraphProperties(
                         new SpacingBetweenLines { After = "0" })))
@@ -1405,7 +1461,7 @@ namespace PeaceEnablers.Common.Implementation
 
         /// <summary>Two-column content block: accent bar on left, title + body text on right.</summary>
         /// 
-        private static void AppendContentSection(Body body, string title, string? content, string accentHex, string bgColor = "444444")
+        private static void AppendContentSection(Body body, string title, string? content, string accentHex, string bgColor = ReportThemeColors.TextMutedHex)
         {
             if (string.IsNullOrWhiteSpace(content)) return;
 
@@ -1419,10 +1475,10 @@ namespace PeaceEnablers.Common.Implementation
                 new TableProperties(
                     new TableWidth { Width = ContentDxa.ToString(), Type = TableWidthUnitValues.Dxa },
                     new TableBorders(
-                        new TopBorder { Val = BorderValues.Single, Color = "D9D9D9", Size = 6 },
-                        new BottomBorder { Val = BorderValues.Single, Color = "D9D9D9", Size = 6 },
-                        new LeftBorder { Val = BorderValues.Single, Color = "D9D9D9", Size = 6 },
-                        new RightBorder { Val = BorderValues.Single, Color = "D9D9D9", Size = 6 }
+                        new TopBorder { Val = BorderValues.Single, Color = ReportThemeColors.BorderD9D9D9Hex, Size = 6 },
+                        new BottomBorder { Val = BorderValues.Single, Color = ReportThemeColors.BorderD9D9D9Hex, Size = 6 },
+                        new LeftBorder { Val = BorderValues.Single, Color = ReportThemeColors.BorderD9D9D9Hex, Size = 6 },
+                        new RightBorder { Val = BorderValues.Single, Color = ReportThemeColors.BorderD9D9D9Hex, Size = 6 }
                     )
                 )
             );
@@ -1432,7 +1488,7 @@ namespace PeaceEnablers.Common.Implementation
             // ─────────────────────────────────────────
             var titleCell = new TableCell(
                 new TableCellProperties(
-                    new Shading { Val = ShadingPatternValues.Clear, Fill = "EAEAEA" },
+                    new Shading { Val = ShadingPatternValues.Clear, Fill = ReportThemeColors.ShadeGrayHex },
                     new TableCellMargin(
                         new LeftMargin { Width = "200", Type = TableWidthUnitValues.Dxa },
                         new TopMargin { Width = "120", Type = TableWidthUnitValues.Dxa },
@@ -1452,7 +1508,7 @@ namespace PeaceEnablers.Common.Implementation
                     new Run(
                         new RunProperties(
                             new Bold(),
-                            new Color { Val = "2E2E2E" },
+                            new Color { Val = ReportThemeColors.TextCharcoalHex },
                             new FontSize { Val = "28" }
                         ),
                         new Text(title)
@@ -1467,7 +1523,7 @@ namespace PeaceEnablers.Common.Implementation
             // ─────────────────────────────────────────
             var contentCell = new TableCell(
                 new TableCellProperties(
-                    new Shading { Val = ShadingPatternValues.Clear, Fill = "F7F7F7" },
+                    new Shading { Val = ShadingPatternValues.Clear, Fill = ReportThemeColors.RowAltHex },
                     new TableCellMargin(
                         new TopMargin { Width = "160", Type = TableWidthUnitValues.Dxa },
                         new BottomMargin { Width = "160", Type = TableWidthUnitValues.Dxa },
@@ -1487,7 +1543,7 @@ namespace PeaceEnablers.Common.Implementation
                         new Shading
                         {
                             Val = ShadingPatternValues.Clear,
-                            Fill = "FFFFFF"
+                            Fill = ReportThemeColors.WhiteHex
                         },
 
                         new SpacingBetweenLines
@@ -1602,10 +1658,10 @@ namespace PeaceEnablers.Common.Implementation
                     new TableWidth { Width = ContentDxa.ToString(), Type = TableWidthUnitValues.Dxa }
                 ),
                 new TableRow(
-                    Stat(green.ToString(), "Performing ≥70%", "E8F5E9", "2E7D32"),
-                    Stat(amber.ToString(), "Developing 40–69%", "FFF8E1", "E65100"),
-                    Stat(red.ToString(), "Needs Improvement < 40 %", "FDECEA", "C62828"),
-                    Stat(total.ToString(), "Total KPIs", "EEF5F1", "12352F")
+                    Stat(green.ToString(), "Performing ≥70%", ReportThemeColors.SuccessGreenBgHex, ReportThemeColors.SuccessGreenHex),
+                    Stat(amber.ToString(), "Developing 40–69%", ReportThemeColors.WarningAmberBgHex, ReportThemeColors.CostOrangeHex),
+                    Stat(red.ToString(), "Needs Improvement < 40 %", ReportThemeColors.DangerRedBgHex, ReportThemeColors.DangerRedHex),
+                    Stat(total.ToString(), "Total KPIs", ReportThemeColors.SurfaceMintHex, ReportThemeColors.PdfDarkGreenHex)
                 )
             );
         }
@@ -1616,7 +1672,7 @@ namespace PeaceEnablers.Common.Implementation
             int total, int green, int amber, int red, float avg)
         {
             int cellW = ContentDxa / 5;
-            string avgColor = avg >= 70 ? "4CAF50" : avg >= 40 ? "FFC107" : "EF5350";
+            string avgColor = avg >= 70 ? ReportThemeColors.BarGreenHex : avg >= 40 ? ReportThemeColors.BarAmberHex : ReportThemeColors.BarRedHex;
 
             TableCell Pill(string val, string label, string fg)
             {
@@ -1624,7 +1680,7 @@ namespace PeaceEnablers.Common.Implementation
                 return new TableCell(
                     new TableCellProperties(
                         new TableCellWidth { Width = cellW.ToString(), Type = TableWidthUnitValues.Dxa },
-                        new Shading { Val = ShadingPatternValues.Clear, Fill = "12352F" },
+                        new Shading { Val = ShadingPatternValues.Clear, Fill = ReportThemeColors.PdfDarkGreenHex },
                         new TableCellBorders(
                             new TopBorder    { Val = noBorder }, new BottomBorder { Val = noBorder },
                             new LeftBorder   { Val = noBorder }, new RightBorder  { Val = noBorder })),
@@ -1642,10 +1698,10 @@ namespace PeaceEnablers.Common.Implementation
                 new TableProperties(
                     new TableWidth { Width = ContentDxa.ToString(), Type = TableWidthUnitValues.Dxa }),
                 new TableRow(
-                    Pill(total.ToString(),  "Total KPIs",        "4CAF50"),
-                    Pill(green.ToString(),  "Performing ≥70%",   "4CAF50"),
-                    Pill(amber.ToString(),  "Developing 40–69%", "FFC107"),
-                    Pill(red.ToString(), "Needs Improvement < 40 %", "EF5350"),
+                    Pill(total.ToString(),  "Total KPIs",        ReportThemeColors.BarGreenHex),
+                    Pill(green.ToString(),  "Performing ≥70%",   ReportThemeColors.BarGreenHex),
+                    Pill(amber.ToString(),  "Developing 40–69%", ReportThemeColors.BarAmberHex),
+                    Pill(red.ToString(), "Needs Improvement < 40 %", ReportThemeColors.BarRedHex),
                     Pill($"{avg:F1}%",      "Average Score",     avgColor)));
         }
 
@@ -1827,7 +1883,7 @@ namespace PeaceEnablers.Common.Implementation
             nameCell.AppendChild(new Paragraph(
                 new ParagraphProperties(new SpacingBetweenLines { Before = "0", After = "0" }),
                 new Run(
-                    new RunProperties(new Color { Val = "DDDDDD" }, new FontSize { Val = "11" }),
+                    new RunProperties(new Color { Val = ReportThemeColors.DividerHex }, new FontSize { Val = "11" }),
                     new Text(kpi.Name ?? "") { Space = SpaceProcessingModeValues.Preserve })));
 
             hRow.AppendChild(nameCell);
@@ -1885,7 +1941,7 @@ namespace PeaceEnablers.Common.Implementation
                 defPara.AppendChild(new Run(
                     new RunProperties(
                         new Italic(),
-                        new Color { Val = "444444" },
+                        new Color { Val = ReportThemeColors.TextMutedHex },
                         new FontSize { Val = "11" },          // 5.5 pt
                         new RunFonts { Ascii = "Arial", HighAnsi = "Arial" }),
                     new Text(kpi.Definition) { Space = SpaceProcessingModeValues.Preserve }));
@@ -1906,12 +1962,12 @@ namespace PeaceEnablers.Common.Implementation
                             {
                                 Val = BorderValues.Single,
                                 Size = 2,
-                                Color = "DDDDDD",
+                                Color = ReportThemeColors.DividerHex,
                                 Space = 0
                             },
                             new LeftBorder { Val = BorderValues.None },
                             new RightBorder { Val = BorderValues.None }),
-                        new Shading { Val = ShadingPatternValues.Clear, Fill = "F2F6F4" },
+                        new Shading { Val = ShadingPatternValues.Clear, Fill = ReportThemeColors.SurfacePaleHex },
                         new TableCellVerticalAlignment { Val = TableVerticalAlignmentValues.Center },
                         new TableCellMargin(
                             new LeftMargin { Width = "80", Type = TableWidthUnitValues.Dxa },
@@ -1927,8 +1983,8 @@ namespace PeaceEnablers.Common.Implementation
 
             // ── ROW 3: Sub-header (Range | Condition) ────────────────────────────────
             var subHdrRow = new TableRow();
-            subHdrRow.AppendChild(MakeInterpCell("Range", rangeColW, "F0F0F0", "666666", "11", bold: true, bottomDivider: false));
-            subHdrRow.AppendChild(MakeInterpCell("Condition", condColW, "F0F0F0", "666666", "11", bold: true, bottomDivider: false));
+            subHdrRow.AppendChild(MakeInterpCell("Range", rangeColW, ReportThemeColors.SubHeaderBgHex, ReportThemeColors.TextLabelHex, "11", bold: true, bottomDivider: false));
+            subHdrRow.AppendChild(MakeInterpCell("Condition", condColW, ReportThemeColors.SubHeaderBgHex, ReportThemeColors.TextLabelHex, "11", bold: true, bottomDivider: false));
             card.AppendChild(subHdrRow);
 
             // ── ROWS 4+: Interpretation rows ─────────────────────────────────────────
@@ -1938,9 +1994,9 @@ namespace PeaceEnablers.Common.Implementation
                 bool isHit = interp == matched;
                 bool isLast = i == interps.Count - 1;
 
-                string rowBg = isHit ? accent : (i % 2 == 0 ? "FFFFFF" : "F7F7F7");
-                string rangeFg = isHit ? White : "888888";
-                string condFg = isHit ? White : "333333";
+                string rowBg = isHit ? accent : (i % 2 == 0 ? ReportThemeColors.WhiteHex : ReportThemeColors.RowAltHex);
+                string rangeFg = isHit ? White : ReportThemeColors.TextFaintHex;
+                string condFg = isHit ? White : ReportThemeColors.TextBodyHex;
 
                 string rangeStr = interp.MinRange.HasValue && interp.MaxRange.HasValue
                     ? $"{Math.Round(interp.MinRange.Value, 0)}–{Math.Round(interp.MaxRange.Value, 0)}"
@@ -1973,7 +2029,7 @@ namespace PeaceEnablers.Common.Implementation
                 {
                     Val = bottomDivider ? BorderValues.Single : BorderValues.None,
                     Size = 2,
-                    Color = "E0E0E0"
+                    Color = ReportThemeColors.GrayE0E0E0Hex
                 });
 
             var rp = new RunProperties(
@@ -2038,11 +2094,11 @@ namespace PeaceEnablers.Common.Implementation
                     new TableWidth { Width = ContentDxa.ToString(), Type = TableWidthUnitValues.Dxa }),
                 new TableRow(
                     Cell(new[] { $"{avg:F1}", "Average Score" },
-                         new[] { GetBarColor(avg).TrimStart('#'), "A5D6A7" }, "12352F"),
+                         new[] { GetBarColor(avg).TrimStart('#'), ReportThemeColors.SuccessGreenLightHex }, ReportThemeColors.PdfDarkGreenHex),
                     Cell(new[] { $"▲ {Shorten(best.Name ?? "—", 22)}", $"{best.Value:F1}%" },
-                         new[] { "1B5E20", "2E7D32" }, "E8F5E9"),
+                         new[] { ReportThemeColors.SuccessGreenDarkHex, ReportThemeColors.SuccessGreenHex }, ReportThemeColors.SuccessGreenBgHex),
                     Cell(new[] { $"▼ {Shorten(worst.Name ?? "—", 22)}", $"{worst.Value:F1}%" },
-                         new[] { "B71C1C", "C62828" }, "FDECEA")));
+                         new[] { ReportThemeColors.DangerRedDarkHex, ReportThemeColors.DangerRedHex }, ReportThemeColors.DangerRedBgHex)));
         }
 
         // ════════════════════════════════════════════════════════════════════
@@ -2280,11 +2336,11 @@ namespace PeaceEnablers.Common.Implementation
         /// <summary>Green insight band matching the PDF DrawInsightBand strip.</summary>
         private static Paragraph CreateInsightBand(string text) =>
             new(new ParagraphProperties(
-                    new Shading { Val = ShadingPatternValues.Clear, Fill = "E8F5E9" },
+                    new Shading { Val = ShadingPatternValues.Clear, Fill = ReportThemeColors.SuccessGreenBgHex },
                     new SpacingBetweenLines { Before = "60", After = "80" }),
                 new Run(
                     new RunProperties(
-                        new Color { Val = "12352F" },
+                        new Color { Val = ReportThemeColors.PdfDarkGreenHex },
                         new FontSize { Val = "17" },
                         new RunFonts { Ascii = "Arial" }),
                     new Text(text) { Space = SpaceProcessingModeValues.Preserve }));
@@ -2323,20 +2379,20 @@ namespace PeaceEnablers.Common.Implementation
             row.AppendChild(new TableCell(
                 new TableCellProperties(
                     new TableCellWidth { Width = leftW.ToString(), Type = TableWidthUnitValues.Dxa },
-                    new Shading { Val = ShadingPatternValues.Clear, Fill = "12352F" },
+                    new Shading { Val = ShadingPatternValues.Clear, Fill = ReportThemeColors.PdfDarkGreenHex },
                     NoBorders()),
                 new Paragraph(
                     new ParagraphProperties(new SpacingBetweenLines { Before = "60", After = "20" }),
                     new Run(
                         new RunProperties(
-                            new Bold(), new Color { Val = "F0B429" },
+                            new Bold(), new Color { Val = ReportThemeColors.ChartGoldHex },
                             new FontSize { Val = "64" }, new RunFonts { Ascii = "Arial" }),
                         new Text($"#{rank} of {total}"))),
                 new Paragraph(
                     new ParagraphProperties(new SpacingBetweenLines { Before = "0", After = "80" }),
                     new Run(
                         new RunProperties(
-                            new Color { Val = "A5D6C2" },
+                            new Color { Val = ReportThemeColors.TrackGreenHex },
                             new FontSize { Val = "22" }, new RunFonts { Ascii = "Arial" }),
                         new Text($"{countryDetails.CountryName}  ·  {countryDetails.Continent}")))));
 
@@ -2344,7 +2400,7 @@ namespace PeaceEnablers.Common.Implementation
             row.AppendChild(new TableCell(
                 new TableCellProperties(
                     new TableCellWidth { Width = "1900", Type = TableWidthUnitValues.Dxa },
-                    new Shading { Val = ShadingPatternValues.Clear, Fill = "12352F" },
+                    new Shading { Val = ShadingPatternValues.Clear, Fill = ReportThemeColors.PdfDarkGreenHex },
                     NoBorders()),
                 new Paragraph(
                     new ParagraphProperties(
@@ -2352,7 +2408,7 @@ namespace PeaceEnablers.Common.Implementation
                         new SpacingBetweenLines { Before = "60", After = "20" }),
                     new Run(
                         new RunProperties(
-                            new Color { Val = "A5A8AD" },
+                            new Color { Val = ReportThemeColors.GrayA5A8ADHex },
                             new FontSize { Val = "18" }, new RunFonts { Ascii = "Arial" }),
                         new Text("Score"))),
                 new Paragraph(
@@ -2361,7 +2417,7 @@ namespace PeaceEnablers.Common.Implementation
                         new SpacingBetweenLines { Before = "0", After = "20" }),
                     new Run(
                         new RunProperties(
-                            new Bold(), new Color { Val = "FFFFFF" },
+                            new Bold(), new Color { Val = ReportThemeColors.WhiteHex },
                             new FontSize { Val = "56" }, new RunFonts { Ascii = "Arial" }),
                         new Text($"{score:F1}"))),
                 new Paragraph(
@@ -2370,7 +2426,7 @@ namespace PeaceEnablers.Common.Implementation
                         new SpacingBetweenLines { Before = "0", After = "80" }),
                     new Run(
                         new RunProperties(
-                            new Color { Val = "4CAF8A" },
+                            new Color { Val = ReportThemeColors.ChartTealHex },
                             new FontSize { Val = "18" }, new RunFonts { Ascii = "Arial" }),
                         new Text($"Top {100 - pctile:F0}% of peers")))));
 
@@ -2419,7 +2475,7 @@ namespace PeaceEnablers.Common.Implementation
         private static Table CreateCountryLegendTable(
             List<PeerCountryHistoryReportDto> allCountries, AiCountrySummeryDto countryDetails)
         {
-            string[] palette = { "F0B429", "4CAF8A", "1E88E5", "FB8C00", "7B61FF", "E05252" };
+            string[] palette = { ReportThemeColors.ChartGoldHex, ReportThemeColors.ChartTealHex, ReportThemeColors.ChartBlueHex, ReportThemeColors.ChartOrangeHex, ReportThemeColors.ChartPurpleHex, ReportThemeColors.ChartRedHex };
             var rows = new List<string[]>();
             for (int i = 0; i < allCountries.Count; i++)
             {
@@ -2440,7 +2496,7 @@ namespace PeaceEnablers.Common.Implementation
         {
             var borderSingle = new EnumValue<BorderValues>(BorderValues.Single);
             TableCellBorders DataBorders() => new TableCellBorders(
-                new BottomBorder { Val = borderSingle, Size = 4, Color = "E0E0E0" });
+                new BottomBorder { Val = borderSingle, Size = 4, Color = ReportThemeColors.GrayE0E0E0Hex });
 
             var table = new Table(new TableProperties(
                 new TableWidth { Width = colWidthsDxa.Sum().ToString(), Type = TableWidthUnitValues.Dxa }));
@@ -2452,7 +2508,7 @@ namespace PeaceEnablers.Common.Implementation
                 hRow.AppendChild(new TableCell(
                     new TableCellProperties(
                         new TableCellWidth { Width = colWidthsDxa[c].ToString(), Type = TableWidthUnitValues.Dxa },
-                        new Shading { Val = ShadingPatternValues.Clear, Fill = "12352F" }),
+                        new Shading { Val = ShadingPatternValues.Clear, Fill = ReportThemeColors.PdfDarkGreenHex }),
                     new Paragraph(
                         new Run(new RunProperties(
                             new Bold(), new Color { Val = White }, new FontSize { Val = "16" }),
@@ -2464,7 +2520,7 @@ namespace PeaceEnablers.Common.Implementation
             for (int r = 0; r < rows.Length; r++)
             {
                 bool highlight = highlightRow?.Invoke(r) ?? false;
-                string rowBg = highlight ? "FFF9E6" : (r % 2 == 0 ? "FFFFFF" : "FAFAFA");
+                string rowBg = highlight ? ReportThemeColors.HighlightBgHex : (r % 2 == 0 ? ReportThemeColors.WhiteHex : ReportThemeColors.RowPaleHex);
                 var dRow = new TableRow();
                 for (int c = 0; c < rows[r].Length && c < headers.Length; c++)
                 {
@@ -2475,7 +2531,7 @@ namespace PeaceEnablers.Common.Implementation
                             DataBorders()),
                         new Paragraph(
                             new Run(new RunProperties(
-                                new Color { Val = highlight ? "12352F" : "333333" },
+                                new Color { Val = highlight ? ReportThemeColors.PdfDarkGreenHex : ReportThemeColors.TextBodyHex },
                                 new FontSize { Val = "16" }),
                                 new Text(rows[r][c])))));
                 }
@@ -2498,7 +2554,7 @@ namespace PeaceEnablers.Common.Implementation
             TableCell HdrCell(string txt, bool first = false) =>
                 new(new TableCellProperties(
                     new TableCellWidth { Width = (first ? 1300 : yearW).ToString(), Type = TableWidthUnitValues.Dxa },
-                    new Shading { Val = ShadingPatternValues.Clear, Fill = "12352F" }),
+                    new Shading { Val = ShadingPatternValues.Clear, Fill = ReportThemeColors.PdfDarkGreenHex }),
                     new Paragraph(new Run(
                         new RunProperties(new Bold(), new Color { Val = White }, new FontSize { Val = "16" }),
                         new Text(txt))));
@@ -2516,7 +2572,7 @@ namespace PeaceEnablers.Common.Implementation
                         new TableCellWidth { Width = "1300", Type = TableWidthUnitValues.Dxa },
                         new Shading { Val = ShadingPatternValues.Clear, Fill = bg }),
                     new Paragraph(new Run(
-                        new RunProperties(new Color { Val = "333333" }, new FontSize { Val = "16" }),
+                        new RunProperties(new Color { Val = ReportThemeColors.TextBodyHex }, new FontSize { Val = "16" }),
                         new Text(label)))));
                 foreach (var yr in years)
                     row.AppendChild(new TableCell(
@@ -2534,7 +2590,7 @@ namespace PeaceEnablers.Common.Implementation
             DataRow("Score",
                 yr => { float s = (float)(mainHistory.FirstOrDefault(h => h.Year == yr)?.ScoreProgress ?? 0); return $"{s:F1}"; },
                 yr => { float s = (float)(mainHistory.FirstOrDefault(h => h.Year == yr)?.ScoreProgress ?? 0); return GetBarColor(s).TrimStart('#'); },
-                "F4F7F5");
+                ReportThemeColors.PageBgHex);
 
             DataRow("YoY Δ",
                 yr =>
@@ -2548,12 +2604,12 @@ namespace PeaceEnablers.Common.Implementation
                 yr =>
                 {
                     int idx = years.IndexOf(yr);
-                    if (idx == 0) return "888888";
+                    if (idx == 0) return ReportThemeColors.TextFaintHex;
                     float prev = (float)(mainHistory.FirstOrDefault(h => h.Year == years[idx - 1])?.ScoreProgress ?? 0);
                     float curr = (float)(mainHistory.FirstOrDefault(h => h.Year == yr)?.ScoreProgress ?? 0);
-                    return curr >= prev ? "336B58" : "E05252";
+                    return curr >= prev ? ReportThemeColors.PdfMediumGreenHex : ReportThemeColors.ChartRedHex;
                 },
-                "FFFFFF");
+                ReportThemeColors.WhiteHex);
 
             DataRow("vs Peers",
                 yr =>
@@ -2566,9 +2622,9 @@ namespace PeaceEnablers.Common.Implementation
                 {
                     float mine = (float)(mainHistory.FirstOrDefault(h => h.Year == yr)?.ScoreProgress ?? 0);
                     float peer = peerAvg.FirstOrDefault(p => p.Year == yr).Avg;
-                    return mine >= peer ? "336B58" : "E05252";
+                    return mine >= peer ? ReportThemeColors.PdfMediumGreenHex : ReportThemeColors.ChartRedHex;
                 },
-                "F4F7F5");
+                ReportThemeColors.PageBgHex);
 
             return table;
         }
@@ -2589,7 +2645,7 @@ namespace PeaceEnablers.Common.Implementation
             hRow.AppendChild(new TableCell(
                 new TableCellProperties(
                     new TableCellWidth { Width = "1600", Type = TableWidthUnitValues.Dxa },
-                    new Shading { Val = ShadingPatternValues.Clear, Fill = "12352F" }),
+                    new Shading { Val = ShadingPatternValues.Clear, Fill = ReportThemeColors.PdfDarkGreenHex }),
                 new Paragraph(new Run(
                     new RunProperties(new Bold(), new Color { Val = White }, new FontSize { Val = "16" }),
                     new Text("Pillar")))));
@@ -2597,7 +2653,7 @@ namespace PeaceEnablers.Common.Implementation
                 hRow.AppendChild(new TableCell(
                     new TableCellProperties(
                         new TableCellWidth { Width = yearW.ToString(), Type = TableWidthUnitValues.Dxa },
-                        new Shading { Val = ShadingPatternValues.Clear, Fill = "12352F" }),
+                        new Shading { Val = ShadingPatternValues.Clear, Fill = ReportThemeColors.PdfDarkGreenHex }),
                     new Paragraph(
                         new ParagraphProperties(new Justification { Val = JustificationValues.Center }),
                         new Run(new RunProperties(new Bold(), new Color { Val = White }, new FontSize { Val = "14" }),
@@ -2607,14 +2663,14 @@ namespace PeaceEnablers.Common.Implementation
             // Data rows
             foreach (var (pillar, pi) in pillars.Select((p, i) => (p, i)))
             {
-                string rowBg = pi % 2 == 0 ? "F4F7F5" : "FFFFFF";
+                string rowBg = pi % 2 == 0 ? ReportThemeColors.PageBgHex : ReportThemeColors.WhiteHex;
                 var row = new TableRow();
                 row.AppendChild(new TableCell(
                     new TableCellProperties(
                         new TableCellWidth { Width = "1600", Type = TableWidthUnitValues.Dxa },
                         new Shading { Val = ShadingPatternValues.Clear, Fill = rowBg }),
                     new Paragraph(new Run(
-                        new RunProperties(new Bold(), new Color { Val = "12352F" }, new FontSize { Val = "14" }),
+                        new RunProperties(new Bold(), new Color { Val = ReportThemeColors.PdfDarkGreenHex }, new FontSize { Val = "14" }),
                         new Text(pillar.PillarName)))));
 
                 foreach (var yr in allYears)
@@ -2623,8 +2679,8 @@ namespace PeaceEnablers.Common.Implementation
                     var ps = h?.Pillars?.FirstOrDefault(p2 => p2.PillarID == pillar.PillarID);
                     bool hasData = ps != null;
                     float score  = hasData ? (float)ps!.ScoreProgress : -1f;
-                    string cellBg = !hasData ? "F0F0F0"
-                        : InterpolateColor("FFFFFF", "12352F", score / 100f).TrimStart('#');
+                    string cellBg = !hasData ? ReportThemeColors.SubHeaderBgHex
+                        : InterpolateColor(ReportThemeColors.WhiteHex, ReportThemeColors.PdfDarkGreenHex, score / 100f).TrimStart('#');
 
                     row.AppendChild(new TableCell(
                         new TableCellProperties(
@@ -2633,7 +2689,7 @@ namespace PeaceEnablers.Common.Implementation
                         new Paragraph(
                             new ParagraphProperties(new Justification { Val = JustificationValues.Center }),
                             new Run(new RunProperties(
-                                new Color { Val = score >= 50 ? White : "333333" },
+                                new Color { Val = score >= 50 ? White : ReportThemeColors.TextBodyHex },
                                 new FontSize { Val = "14" }),
                                 new Text(!hasData ? "—" : $"{score:F1}")))));
                 }
@@ -2789,7 +2845,7 @@ namespace PeaceEnablers.Common.Implementation
 
         private static Paragraph NormalParagraph(
             string text, string hexColor, int halfPtSize,
-            bool italic = false, string bg = "FFFFFF")
+            bool italic = false, string bg = ReportThemeColors.WhiteHex)
         {
             var rPr = new RunProperties(
                 new Color { Val = hexColor },
@@ -2831,11 +2887,11 @@ namespace PeaceEnablers.Common.Implementation
 
         static string GetBarColor(float value)
         {
-            if (value >= 80) return "#C62828";
-            else if (value >= 60) return "#c66528";
-            else if (value >= 40) return "#F9A825";
-            else if (value >= 20) return "#469449";
-            return "#2E7D32";
+            if (value >= 80) return ReportThemeColors.DangerRed;
+            else if (value >= 60) return ReportThemeColors.WarningOrange;
+            else if (value >= 40) return ReportThemeColors.WarningAmber;
+            else if (value >= 20) return ReportThemeColors.SuccessGreenMid;
+            return ReportThemeColors.SuccessGreen;
         }
 
         private static string Shorten(string text, int max) =>
@@ -2927,7 +2983,7 @@ namespace PeaceEnablers.Common.Implementation
             {
                 Italic = new Italic(),
                 FontSize = new FontSize { Val = "16" },   // 8pt
-                Color = new Color { Val = "555555" }
+                Color = new Color { Val = ReportThemeColors.TextMidHex }
             });
             run.AppendChild(new Text(text));
             para.AppendChild(run);
@@ -2946,7 +3002,7 @@ namespace PeaceEnablers.Common.Implementation
             {
                 Italic = new Italic(),
                 FontSize = new FontSize { Val = "14" },   // 7pt
-                Color = new Color { Val = "999999" }
+                Color = new Color { Val = ReportThemeColors.TextPaleHex }
             });
             run.AppendChild(new Text(text));
             para.AppendChild(run);
@@ -2962,11 +3018,11 @@ namespace PeaceEnablers.Common.Implementation
 
             var signals = new[]
             {
-        ("Strong PPP Advantage ≥2×",  "2E7D32"),
-        ("Moderate Advantage ≥1.3×",  "0277BD"),
-        ("Near-Parity 0.9–1.3×",      "555555"),
-        ("Cost Pressure 0.7–0.9×",    "E65100"),
-        ("High Cost Penalty <0.7×",   "D9534F"),
+        ("Strong PPP Advantage ≥2×",  ReportThemeColors.SuccessGreenHex),
+        ("Moderate Advantage ≥1.3×",  ReportThemeColors.ModerateBlueHex),
+        ("Near-Parity 0.9–1.3×",      ReportThemeColors.TextMidHex),
+        ("Cost Pressure 0.7–0.9×",    ReportThemeColors.CostOrangeHex),
+        ("High Cost Penalty <0.7×",   ReportThemeColors.PenaltyRedHex),
     };
 
             // Label prefix
@@ -2975,7 +3031,7 @@ namespace PeaceEnablers.Common.Implementation
             {
                 Bold = new Bold(),
                 FontSize = new FontSize { Val = "14" },
-                Color = new Color { Val = "777777" }
+                Color = new Color { Val = ReportThemeColors.TextSoftHex }
             });
             prefix.AppendChild(new Text("PPP Signals:  ") { Space = SpaceProcessingModeValues.Preserve });
             para.AppendChild(prefix);
@@ -2998,7 +3054,7 @@ namespace PeaceEnablers.Common.Implementation
                 lbl.AppendChild(new RunProperties
                 {
                     FontSize = new FontSize { Val = "14" },
-                    Color = new Color { Val = "555555" }
+                    Color = new Color { Val = ReportThemeColors.TextMidHex }
                 });
                 lbl.AppendChild(new Text(label + "   ") { Space = SpaceProcessingModeValues.Preserve });
                 para.AppendChild(lbl);
@@ -3006,124 +3062,50 @@ namespace PeaceEnablers.Common.Implementation
 
             return para;
         }
+        private static Table CreateRankTable(CountryPillarRankingResultDto? data)
+        {
+            var border = new TableCellBorders(
+                new TopBorder { Val = BorderValues.Single, Color = ReportThemeColors.BorderWarmHex, Size = 4 },
+                new BottomBorder { Val = BorderValues.Single, Color = ReportThemeColors.BorderWarmHex, Size = 4 },
+                new LeftBorder { Val = BorderValues.Single, Color = ReportThemeColors.BorderWarmHex, Size = 4 },
+                new RightBorder { Val = BorderValues.Single, Color = ReportThemeColors.BorderWarmHex, Size = 4 });
 
-        // ══════════════════════════════════════════════════════════════════
-        // NEW HELPER — CreatePppComparisonTable
-        // ══════════════════════════════════════════════════════════════════
+            TableCell Cell(string text, bool header, bool right, bool shade)
+            {
+                var props = new TableCellProperties(border.CloneNode(true));
+                if (header || shade)
+                    props.Append(new Shading { Val = ShadingPatternValues.Clear, Fill = header ? ReportThemeColors.SurfaceWarmHex : ReportThemeColors.SurfaceWarmLightHex });
 
-        //private static Table CreatePppComparisonTable(
-        //    List<PeerCountryHistoryReportDto> countries,
-        //    AiCountrySummeryDto countryDetails)
-        //{
-        //    var orderedCities = countries
-        //        .OrderByDescending(c => c.PPP ?? 0)
-        //        .ToList();
+                var runProps = new RunProperties(new FontSize { Val = "22" }, new Color { Val = ReportThemeColors.TextSlateHex });
+                if (header || right)
+                    runProps.Append(new Bold());
 
-        //    var rows = orderedCities.Select(city =>
-        //    {
-        //        float score = GetLatestScoreOrZero(city);
-        //        decimal nominal = city.Income ?? 0;
-        //        decimal ppp = city.PPP ?? 0;
-        //        decimal diff = ppp - nominal;
-        //        decimal ratio = nominal > 0 ? Math.Round(ppp / nominal, 2) : 1m;
+                var paragraph = new Paragraph(
+                    new ParagraphProperties(new Justification { Val = right ? JustificationValues.Right : JustificationValues.Left }),
+                    new Run(runProps, new Text(text) { Space = SpaceProcessingModeValues.Preserve }));
 
-        //        string nomCat = PdfGeneratorService.GetIncomeCategory(nominal);
-        //        string pppCat = PdfGeneratorService.GetIncomeCategory(ppp);
-        //        bool upgraded = pppCat != nomCat && ppp > nominal;
-        //        bool downgraded = pppCat != nomCat && ppp < nominal;
+                return new TableCell(props, paragraph);
+            }
 
-        //        string signalLabel = ratio switch
-        //        {
-        //            >= 2.0m => "Strong PPP Advantage",
-        //            >= 1.3m => "Moderate PPP Advantage",
-        //            >= 0.9m => "Near-Parity",
-        //            >= 0.7m => "Cost Pressure",
-        //            _ => "High Cost Penalty"
-        //        };
+            static string FormatRank(int rank, int total) =>
+                rank > 0 && total > 0 ? $"{rank} / {total}" : "-";
 
-        //        string diffStr = diff >= 0
-        //            ? $"+{FormatPop(diff)}"
-        //            : $"-{FormatPop(Math.Abs(diff))}";
-
-        //        string pppDisplay = FormatPop(ppp) + (upgraded ? " ▲" : downgraded ? " ▼" : "");
-
-        //        return new[]
-        //        {
-        //    city.CityName,
-        //    city.Country ?? "—",
-        //    score < 0 ? "—" : $"{score:F1}",
-        //    FormatPop(nominal),
-        //    pppDisplay,
-        //    diffStr,
-        //    signalLabel
-        //};
-        //    }).ToArray();
-
-        //    // Column widths: City, Country, Score, Nominal, PPP, Diff, Signal
-        //    var table = CreateStyledTableWithCellColors(
-        //        headers: new[] { "City", "Country", "Score", "Nominal (USD)", "PPP (Int'l $)", "Δ Difference", "Signal" },
-        //        widths: new[] { 1800, 1000, 700, 1300, 1300, 1100, 1600 },
-        //        rows: rows,
-        //        highlightRow: i => IsSameCountry(orderedCities[i].CityName, countryDetails.CountryName),
-        //        cellColor: (rowIdx, colIdx) =>
-        //        {
-        //            var city = orderedCities[rowIdx];
-        //            decimal nominal = city.Income ?? 0;
-        //            decimal ppp = city.PPP ?? 0;
-        //            decimal ratio = nominal > 0 ? Math.Round(ppp / nominal, 2) : 1m;
-
-        //            // PPP column (col 4) — green if up, red if down
-        //            if (colIdx == 4)
-        //                return ppp > nominal ? "E8F5E9" : ppp < nominal ? "FFEBEE" : null;
-
-        //            // Diff column (col 5)
-        //            if (colIdx == 5)
-        //                return ppp >= nominal ? "E8F5E9" : "FFEBEE";
-
-        //            // Signal column (col 6)
-        //            if (colIdx == 6)
-        //                return ratio switch
-        //                {
-        //                    >= 2.0m => "E8F5E9",  // light green
-        //                    >= 1.3m => "E3F2FD",  // light blue
-        //                    >= 0.9m => "F5F5F5",  // light grey
-        //                    >= 0.7m => "FFF8E1",  // light amber
-        //                    _ => "FFEBEE"   // light red
-        //                };
-
-        //            return null;
-        //        },
-        //        cellFontColor: (rowIdx, colIdx) =>
-        //        {
-        //            var city = orderedCities[rowIdx];
-        //            decimal nominal = city.Income ?? 0;
-        //            decimal ppp = city.PPP ?? 0;
-        //            decimal ratio = nominal > 0 ? Math.Round(ppp / nominal, 2) : 1m;
-
-        //            if (colIdx == 4 || colIdx == 5)
-        //                return ppp >= nominal ? "2E7D32" : "D9534F";
-
-        //            if (colIdx == 6)
-        //                return ratio switch
-        //                {
-        //                    >= 2.0m => "2E7D32",
-        //                    >= 1.3m => "0277BD",
-        //                    >= 0.9m => "555555",
-        //                    >= 0.7m => "E65100",
-        //                    _ => "D9534F"
-        //                };
-
-        //            return null;
-        //        });
-
-        //    return table;
-        //}
-
-
-        // ══════════════════════════════════════════════════════════════════
-        // UPDATED — CreateStyledTableWithCellColors
-        // (if you only have CreateStyledTable, add this overload)
-        // ══════════════════════════════════════════════════════════════════
+            return new Table(
+                new TableProperties(
+                    new TableWidth { Width = ContentDxa.ToString(), Type = TableWidthUnitValues.Dxa },
+                    new TableBorders(
+                        new InsideHorizontalBorder { Val = BorderValues.Single, Color = ReportThemeColors.BorderWarmHex, Size = 4 },
+                        new InsideVerticalBorder { Val = BorderValues.Single, Color = ReportThemeColors.BorderWarmHex, Size = 4 },
+                        new TopBorder { Val = BorderValues.Single, Color = ReportThemeColors.BorderWarmHex, Size = 4 },
+                        new BottomBorder { Val = BorderValues.Single, Color = ReportThemeColors.BorderWarmHex, Size = 4 },
+                        new LeftBorder { Val = BorderValues.Single, Color = ReportThemeColors.BorderWarmHex, Size = 4 },
+                        new RightBorder { Val = BorderValues.Single, Color = ReportThemeColors.BorderWarmHex, Size = 4 })),
+                new TableRow(Cell("Ranking", true, false, false), Cell("Result", true, true, false)),
+                new TableRow(Cell("Continent Rank", false, false, false), Cell(FormatRank(data?.GlobalPillarRank ?? 0, data?.TotalPillarsInAllCountries ?? 0), false, true, false)),
+                new TableRow(Cell("Region Rank", false, false, true), Cell(FormatRank(data?.RegionPillarRank ?? 0, data?.TotalPillarInRegion ?? 0), false, true, true)),
+                new TableRow(Cell("Country Level Rank", false, false, false), Cell(FormatRank(data?.CountryPillarRank ?? 0, data?.TotalPillars ?? 0), false, true, false)));
+        }
+        
 
         private static Table CreateStyledTableWithCellColors(
             string[] headers,
@@ -3138,12 +3120,12 @@ namespace PeaceEnablers.Common.Implementation
             // Table properties
             var tblPr = new TableProperties(
                 new TableBorders(
-                    new TopBorder { Val = BorderValues.Single, Size = 4, Color = "D0D8D0" },
-                    new BottomBorder { Val = BorderValues.Single, Size = 4, Color = "D0D8D0" },
-                    new LeftBorder { Val = BorderValues.Single, Size = 4, Color = "D0D8D0" },
-                    new RightBorder { Val = BorderValues.Single, Size = 4, Color = "D0D8D0" },
-                    new InsideHorizontalBorder { Val = BorderValues.Single, Size = 2, Color = "E0E0E0" },
-                    new InsideVerticalBorder { Val = BorderValues.Single, Size = 2, Color = "E0E0E0" }),
+                    new TopBorder { Val = BorderValues.Single, Size = 4, Color = ReportThemeColors.BorderD0D8D0Hex },
+                    new BottomBorder { Val = BorderValues.Single, Size = 4, Color = ReportThemeColors.BorderD0D8D0Hex },
+                    new LeftBorder { Val = BorderValues.Single, Size = 4, Color = ReportThemeColors.BorderD0D8D0Hex },
+                    new RightBorder { Val = BorderValues.Single, Size = 4, Color = ReportThemeColors.BorderD0D8D0Hex },
+                    new InsideHorizontalBorder { Val = BorderValues.Single, Size = 2, Color = ReportThemeColors.GrayE0E0E0Hex },
+                    new InsideVerticalBorder { Val = BorderValues.Single, Size = 2, Color = ReportThemeColors.GrayE0E0E0Hex }),
                 new TableWidth { Width = "5000", Type = TableWidthUnitValues.Pct });
             table.AppendChild(tblPr);
 
@@ -3163,7 +3145,7 @@ namespace PeaceEnablers.Common.Implementation
                 var cell = new TableCell();
                 cell.AppendChild(new TableCellProperties(
                     new TableCellWidth { Width = widths[col].ToString(), Type = TableWidthUnitValues.Dxa },
-                    new Shading { Val = ShadingPatternValues.Clear, Fill = "12352F" }));
+                    new Shading { Val = ShadingPatternValues.Clear, Fill = ReportThemeColors.PdfDarkGreenHex }));
 
                 var p = new Paragraph();
                 var pp = new ParagraphProperties();
@@ -3175,7 +3157,7 @@ namespace PeaceEnablers.Common.Implementation
                 {
                     Bold = new Bold(),
                     FontSize = new FontSize { Val = "16" },  // 8pt
-                    Color = new Color { Val = "FFFFFF" }
+                    Color = new Color { Val = ReportThemeColors.WhiteHex }
                 });
                 run.AppendChild(new Text(headers[col]));
                 p.AppendChild(run);
@@ -3188,7 +3170,7 @@ namespace PeaceEnablers.Common.Implementation
             for (int rowIdx = 0; rowIdx < rows.Length; rowIdx++)
             {
                 bool isHighlight = highlightRow(rowIdx);
-                string defaultBg = isHighlight ? "FFF9E6" : "FFFFFF";
+                string defaultBg = isHighlight ? ReportThemeColors.HighlightBgHex : ReportThemeColors.WhiteHex;
 
                 var tr = new TableRow();
                 tr.AppendChild(new TableRowProperties(
@@ -3214,7 +3196,7 @@ namespace PeaceEnablers.Common.Implementation
                     var rPr = new RunProperties
                     {
                         FontSize = new FontSize { Val = "16" },  // 8pt
-                        Color = new Color { Val = fontColor ?? (isHighlight && col == 0 ? "12352F" : "333333") }
+                        Color = new Color { Val = fontColor ?? (isHighlight && col == 0 ? ReportThemeColors.PdfDarkGreenHex : ReportThemeColors.TextBodyHex) }
                     };
                     if (isBold) rPr.AppendChild(new Bold());
                     run.AppendChild(rPr);

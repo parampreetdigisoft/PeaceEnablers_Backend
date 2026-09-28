@@ -1,6 +1,7 @@
 
 
 using PeaceEnablers.Dtos.AiDto;
+using PeaceEnablers.Dtos.CountryDto;
 using PeaceEnablers.Models;
 using static PeaceEnablers.Services.AIComputationService;
 
@@ -28,6 +29,11 @@ namespace PeaceEnablers.Common.Interface
             List<AiCountrySummeryDto> countries,
             Dictionary<int, List<AiCountryPillarResponse>> pillarsDict,
             List<KpiChartItem> kpis,
+            UserRole userRole);
+
+        Task<byte[]> GenerateSelectedPillarsDetailsDocx(
+            List<AiCountryPillarResponse> pillars,
+            List<CountryPillarRankingResultDto> pillarRankings,
             UserRole userRole);
     }
 }

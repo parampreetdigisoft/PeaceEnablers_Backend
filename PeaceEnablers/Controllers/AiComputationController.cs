@@ -176,25 +176,42 @@ namespace PeaceEnablers.Controllers
 
 
                 var pillars = await _aIComputationService.GetAICountryPillars(request.CountryID, userId.Value, userRole, request.Year);
+                var pillarList = pillars.Result?.Pillars ?? new List<AiCountryPillarResponse>();
 
-                var pillarDetails = pillars.Result.Pillars.FirstOrDefault(x => x.PillarID == request.PillarID);
-                if (pillarDetails != null)
+                List<AiCountryPillarResponse> selectedPillars;
+                if (request.PillarIDs != null && request.PillarIDs.Count > 0)
+                {
+                    var selectedIds = request.PillarIDs.ToHashSet();
+                    selectedPillars = pillarList
+                        .Where(x => selectedIds.Contains(x.PillarID) && x.IsAccess)
+                        .ToList();
+                }
+                else
+                {
+                    var pillarDetails = pillarList.FirstOrDefault(x => x.PillarID == request.PillarID);
+                    selectedPillars = pillarDetails == null
+                        ? new List<AiCountryPillarResponse>()
+                        : new List<AiCountryPillarResponse> { pillarDetails };
+                }
+
+                if (selectedPillars.Count > 0)
                 {
                     string contentType;
                     string fileName;
-
-                    // Generate PDF
-                    var fileBytes = await _aIComputationService.GeneratePillarDetailsReport(pillarDetails, userRole, request.Format);
+                    var fileBytes = await _aIComputationService.GenerateSelectedPillarsReport(selectedPillars, userRole, userId.Value, request.Format);
+                    var reportName = selectedPillars.Count == 1
+                        ? selectedPillars[0].PillarName
+                        : $"{selectedPillars[0].CountryName}_Domains";
 
                     if (request.Format == IServices.DocumentFormat.Docx)
                     {
                         contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-                        fileName = $"{pillarDetails.PillarName}_Details_{DateTime.Now:yyyyMMdd}.docx";
+                        fileName = $"{reportName}_Details_{DateTime.Now:yyyyMMdd}.docx";
                     }
                     else
                     {
                         contentType = "application/pdf";
-                        fileName = $"{pillarDetails.PillarName}_Details_{DateTime.Now:yyyyMMdd}.pdf";
+                        fileName = $"{reportName}_Details_{DateTime.Now:yyyyMMdd}.pdf";
                     }
 
                     return File(fileBytes, contentType, fileName);

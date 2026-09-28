@@ -1,6 +1,7 @@
-﻿
+
 using PeaceEnablers.Common.Interface;
 using PeaceEnablers.Dtos.AiDto;
+using PeaceEnablers.Dtos.CountryDto;
 using PeaceEnablers.IServices;
 using PeaceEnablers.Models;
 using QuestPDF.Fluent;
@@ -93,7 +94,7 @@ namespace PeaceEnablers.Common.Implementation
                     {
                         page.Size(PageSizes.A4);
                         page.Margin(25);
-                        page.PageColor("#FAFAFA");
+                        page.PageColor(ReportThemeColors.RowPale);
                         page.DefaultTextStyle(x => x.FontSize(10).FontFamily("Segoe UI"));
                         page.Header().Element(header => PillarComposeHeader(header, pillarData));
                         page.Content().Element(content =>
@@ -110,7 +111,65 @@ namespace PeaceEnablers.Common.Implementation
                 return Array.Empty<byte>();
             }
         }
+        public async Task<byte[]> GenerateSelectedPillarsDetailsPdf(List<AiCountryPillarResponse> pillars, List<CountryPillarRankingResultDto> pillarRankings, UserRole userRole)
+        {
+            try
+            {
+                if (pillars == null || pillars.Count == 0)
+                    return Array.Empty<byte>();
 
+                QuestPDF.Settings.EnableDebugging = true;
+                _pillarCount = (await _commonService.GetPillars()).Count;
+
+                var first = pillars[0];
+                var countryDetails = new AiCountrySummeryDto
+                {
+                    CountryID = first.CountryID,
+                    CountryName = first.CountryName,
+                    Continent = first.Continent,
+                    Year = first.AIDataYear,
+                    AIProgress = pillars.Average(x => x.AIProgress ?? 0)
+                };
+
+                var pillarChartItems = pillars.Select(p => new PillarChartItem(SanitizeText(p.PillarName)?.Length > 20 ? SanitizeText(p.PillarName)[..20] : SanitizeText(p.PillarName) ?? "-", SanitizeText(p.PillarName) ?? "-", p.AIProgress)).ToList();
+
+                var document = Document.Create(container =>
+                {
+                    container.Page(page =>
+                    {
+                        ApplyPageDefaults(page);
+                        page.Header().Element(header =>
+                            CountryComposeHeader(header, countryDetails, userRole, "Domain Performance Overview"));
+                        page.Content().Element(content => PillarLineChartPage(content, pillarChartItems));
+                        PageFooter(page);
+                    });
+
+                    foreach (var pillarData in pillars)
+                    {
+                        var pillarRank = pillarRankings?.FirstOrDefault(p =>
+                            p.PillarID == pillarData.PillarID && p.CountryID == pillarData.CountryID);
+                        container.Page(page =>
+                        {
+                            page.Size(PageSizes.A4);
+                            page.Margin(25);
+                            page.PageColor(ReportThemeColors.PageBg);
+                            page.DefaultTextStyle(x => x.FontSize(10).FontFamily("Segoe UI"));
+                            page.Header().Element(header => PillarComposeHeader(header, pillarData));
+                            page.Content().Element(content =>
+                                SelectedPillarMarkedContent(content, pillarData, pillarRank, userRole));
+                            page.Footer().Element(PillarComposeFooter);
+                        });
+                    }
+                });
+
+                return document.GeneratePdf();
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error Occured in GenerateSelectedPillarsDetailsPdf", ex);
+                return Array.Empty<byte>();
+            }
+        }
         public void AddCountryDetailsPdf(IDocumentContainer container, AiCountrySummeryDto countryDetails, List<AiCountryPillarResponse> pillars, List<KpiChartItem> kpis,
             List<PeerCountryHistoryReportDto> peerCountries, UserRole userRole, bool isAllCountries = false)
         {
@@ -344,7 +403,7 @@ namespace PeaceEnablers.Common.Implementation
             container
                 .Background(Colors.White)
                 .Border(1)
-                .BorderColor("#D8E8E2")
+                .BorderColor(ReportThemeColors.CD8E8E2)
                 .Padding(8)
                 .Column(col =>
                 {
@@ -358,7 +417,7 @@ namespace PeaceEnablers.Common.Implementation
                         .Text("Overall Country Score")
                         .FontSize(10)
                         .Bold()
-                        .FontColor("#12352f");
+                        .FontColor(ReportThemeColors.PdfDarkGreen);
 
                     // ─────────────────────────────────────────────
                     // Donut chart
@@ -371,7 +430,7 @@ namespace PeaceEnablers.Common.Implementation
                     // Divider
                     col.Item()
                         .Height(1)
-                        .Background("#E8F0EC");
+                        .Background(ReportThemeColors.SurfaceGreen);
 
                     // ─────────────────────────────────────────────
                     // Pillars + KPI Counts
@@ -390,18 +449,18 @@ namespace PeaceEnablers.Common.Implementation
                                         .Text(pillarCount.ToString())
                                         .FontSize(16)
                                         .Bold()
-                                        .FontColor("#336b58");
+                                        .FontColor(ReportThemeColors.PdfMediumGreen);
 
                                     c.Item()
                                         .AlignCenter()
                                         .Text("Pillars")
                                         .FontSize(8)
-                                        .FontColor("#757575");
+                                        .FontColor(ReportThemeColors.Gray757575);
                                 });
 
                             // Divider
                             row.ConstantItem(1)
-                                .Background("#E0E0E0");
+                                .Background(ReportThemeColors.GrayE0E0E0);
 
                             // KPIs
                             row.RelativeItem()
@@ -413,13 +472,13 @@ namespace PeaceEnablers.Common.Implementation
                                         .Text(kpiCount.ToString())
                                         .FontSize(16)
                                         .Bold()
-                                        .FontColor("#336b58");
+                                        .FontColor(ReportThemeColors.PdfMediumGreen);
 
                                     c.Item()
                                         .AlignCenter()
                                         .Text("KPIs")
                                         .FontSize(8)
-                                        .FontColor("#757575");
+                                        .FontColor(ReportThemeColors.Gray757575);
                                 });
                         });
 
@@ -434,25 +493,25 @@ namespace PeaceEnablers.Common.Implementation
                             {
                                 // Best pillar
                                 row.RelativeItem()
-                                    .Background("#E8F5E9")
+                                    .Background(ReportThemeColors.SuccessGreenBg)
                                     .PaddingVertical(3)
                                     .PaddingHorizontal(5)
                                     .Text(
                                         $"▲ {Shorten(best.Name, 16)} ({best.Value:F0})")
                                     .FontSize(7)
-                                    .FontColor("#1B5E20");
+                                    .FontColor(ReportThemeColors.SuccessGreenDark);
 
                                 row.ConstantItem(4);
 
                                 // Global rank
                                 row.AutoItem()
-                                    .Background("#E8F0EC")
+                                    .Background(ReportThemeColors.SurfaceGreen)
                                     .PaddingVertical(3)
                                     .PaddingHorizontal(5)
                                     .Text(globalRankLabel)
                                     .FontSize(7)
                                     .Bold()
-                                    .FontColor("#12352f");
+                                    .FontColor(ReportThemeColors.PdfDarkGreen);
                             });
                     }
 
@@ -467,25 +526,25 @@ namespace PeaceEnablers.Common.Implementation
                             {
                                 // Worst pillar
                                 row.RelativeItem()
-                                    .Background("#FDECEA")
+                                    .Background(ReportThemeColors.DangerRedBg)
                                     .PaddingVertical(3)
                                     .PaddingHorizontal(5)
                                     .Text(
                                         $"▼ {Shorten(worst.Name, 16)} ({worst.Value:F0})")
                                     .FontSize(7)
-                                    .FontColor("#B71C1C");
+                                    .FontColor(ReportThemeColors.DangerRedDark);
 
                                 row.ConstantItem(4);
 
                                 // Region rank
                                 row.AutoItem()
-                                    .Background("#FFF3E0")
+                                    .Background(ReportThemeColors.WarningOrangeBg)
                                     .PaddingVertical(3)
                                     .PaddingHorizontal(5)
                                     .Text(regionRankLabel)
                                     .FontSize(7)
                                     .Bold()
-                                    .FontColor("#5D3B00");
+                                    .FontColor(ReportThemeColors.WarningOrangeText);
                             });
                     }
                 });
@@ -507,7 +566,7 @@ namespace PeaceEnablers.Common.Implementation
             {
                 Style = SKPaintStyle.Stroke,
                 StrokeWidth = thick,
-                Color = SKColor.Parse("#EEF5F1"),
+                Color = SKColor.Parse(ReportThemeColors.SurfaceMint),
                 IsAntialias = true
             };
             canvas.DrawOval(rect, bgPaint);
@@ -517,7 +576,7 @@ namespace PeaceEnablers.Common.Implementation
             {
                 Style = SKPaintStyle.Stroke,
                 StrokeWidth = thick,
-                Color = SKColor.Parse("#003160"),
+                Color = SKColor.Parse(ReportThemeColors.HeaderNavy),
                 IsAntialias = true,
                 StrokeCap = SKStrokeCap.Round
             };
@@ -528,7 +587,7 @@ namespace PeaceEnablers.Common.Implementation
             {
                 Style = SKPaintStyle.Stroke,
                 StrokeWidth = 1f,
-                Color = SKColor.Parse("#D0E8DC"),
+                Color = SKColor.Parse(ReportThemeColors.CD0E8DC),
                 IsAntialias = true
             };
             canvas.DrawOval(
@@ -539,7 +598,7 @@ namespace PeaceEnablers.Common.Implementation
             // Center: score value
             using var bigTxt = new SKPaint
             {
-                Color = SKColor.Parse("#003160"),
+                Color = SKColor.Parse(ReportThemeColors.HeaderNavy),
                 TextSize = 26,
                 IsAntialias = true,
                 TextAlign = SKTextAlign.Center,
@@ -550,7 +609,7 @@ namespace PeaceEnablers.Common.Implementation
             // Center: sub-label
             using var subTxt = new SKPaint
             {
-                Color = SKColor.Parse("#9E9E9E"),
+                Color = SKColor.Parse(ReportThemeColors.Gray9E9E9E),
                 TextSize = 8,
                 IsAntialias = true,
                 TextAlign = SKTextAlign.Center
@@ -566,13 +625,13 @@ namespace PeaceEnablers.Common.Implementation
         {
             container
                 .Background(Colors.White)
-                .Border(1).BorderColor("#afc4db")
+                .Border(1).BorderColor(ReportThemeColors.CAFC4DB)
                 .Padding(4)
                 .Column(col =>
                 {
                     col.Item().AlignCenter()
                         .Text("Pillar Performance Radar")
-                        .FontSize(10).Bold().FontColor("#12352f");
+                        .FontSize(10).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
 
                     col.Item().Height(230).Canvas((canvas, size) =>
                         PaintSpiderChart(canvas, size, pillars));
@@ -593,13 +652,13 @@ namespace PeaceEnablers.Common.Implementation
             using var ringPaint = new SKPaint
             {
                 Style = SKPaintStyle.Stroke,
-                Color = SKColor.Parse("#D6E3F0"),
+                Color = SKColor.Parse(ReportThemeColors.HeaderBlueBg),
                 StrokeWidth = 0.7f,
                 IsAntialias = true
             };
             using var ringLblPaint = new SKPaint
             {
-                Color = SKColor.Parse("#C0C0C0"),
+                Color = SKColor.Parse(ReportThemeColors.GraySilver),
                 TextSize = 7,
                 IsAntialias = true,
                 TextAlign = SKTextAlign.Left
@@ -617,7 +676,7 @@ namespace PeaceEnablers.Common.Implementation
             // ── spoke axes ──────────────────────────────────────────────────────
             using var axisPaint = new SKPaint
             {
-                Color = SKColor.Parse("#B8CCE0"),
+                Color = SKColor.Parse(ReportThemeColors.HeaderBlueWash),
                 StrokeWidth = 0.7f,
                 IsAntialias = true
             };
@@ -641,14 +700,14 @@ namespace PeaceEnablers.Common.Implementation
             using var fillPaint = new SKPaint
             {
                 Style = SKPaintStyle.Fill,
-                Color = SKColor.Parse("#2C6EA3").WithAlpha(55),
+                Color = SKColor.Parse(ReportThemeColors.MedBlue).WithAlpha(55),
                 IsAntialias = true
             };
             using var edgePaint = new SKPaint
             {
                 Style = SKPaintStyle.Stroke,
                 StrokeWidth = 2f,
-                Color = SKColor.Parse("#1F4E79"),
+                Color = SKColor.Parse(ReportThemeColors.HeaderBlue),
                 IsAntialias = true
             };
             canvas.DrawPath(dataPath, fillPaint);
@@ -658,7 +717,7 @@ namespace PeaceEnablers.Common.Implementation
             using var dotPaint = new SKPaint
             {
                 Style = SKPaintStyle.Fill,
-                Color = SKColor.Parse("#1F4E79"),
+                Color = SKColor.Parse(ReportThemeColors.HeaderBlue),
                 IsAntialias = true
             };
             using var dotBorder = new SKPaint
@@ -679,14 +738,14 @@ namespace PeaceEnablers.Common.Implementation
             // ── axis labels ──────────────────────────────────────────────────────
             using var lblPaint = new SKPaint
             {
-                Color = SKColor.Parse("#1B2F44"),
+                Color = SKColor.Parse(ReportThemeColors.DarkBlue),
                 TextSize = 8f,
                 IsAntialias = true,
                 TextAlign = SKTextAlign.Center
             };
             using var valPaint = new SKPaint
             {
-                Color = SKColor.Parse("#4F7FA8"),
+                Color = SKColor.Parse(ReportThemeColors.SteelBlue),
                 TextSize = 7f,
                 IsAntialias = true,
                 TextAlign = SKTextAlign.Center
@@ -731,27 +790,27 @@ namespace PeaceEnablers.Common.Implementation
         {
             container
                 .Background(Colors.White)
-                .Border(1).BorderColor("#afc4db")
+                .Border(1).BorderColor(ReportThemeColors.CAFC4DB)
                 .Padding(10)
                 .Column(col =>
                 {
                     col.Item()
                         .Text("KPI Performance Distribution")
-                        .FontSize(9).Bold().FontColor("#12352f");
+                        .FontSize(9).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
 
                     col.Item().PaddingTop(7).Row(row =>
                     {
                         DashboardStatCard(row.RelativeItem(),
-                            green.ToString(), "Performing ≥70%", "#E8F5E9", "#2E7D32");
+                            green.ToString(), "Performing ≥70%", ReportThemeColors.SuccessGreenBg, ReportThemeColors.SuccessGreen);
                         row.ConstantItem(8);
                         DashboardStatCard(row.RelativeItem(),
-                            amber.ToString(), "Developing 40–69%", "#FFF8E1", "#E65100");
+                            amber.ToString(), "Developing 40–69%", ReportThemeColors.WarningAmberBg, ReportThemeColors.CostOrange);
                         row.ConstantItem(8);
                         DashboardStatCard(row.RelativeItem(),
-                            red.ToString(), "Needs Improvement < 40 %", "#FDECEA", "#C62828");
+                            red.ToString(), "Needs Improvement < 40 %", ReportThemeColors.DangerRedBg, ReportThemeColors.DangerRed);
                         row.ConstantItem(8);
                         DashboardStatCard(row.RelativeItem(),
-                            total.ToString(), "Total KPIs", "#EEF5F1", "#12352f");
+                            total.ToString(), "Total KPIs", ReportThemeColors.SurfaceMint, ReportThemeColors.PdfDarkGreen);
                     });
                 });
         }
@@ -783,7 +842,7 @@ namespace PeaceEnablers.Common.Implementation
 
             container
                 .Background(Colors.White)
-                .Border(1).BorderColor("#afc4db")
+                .Border(1).BorderColor(ReportThemeColors.CAFC4DB)
                 .Padding(10)
                 .Column(col =>
                 {
@@ -791,7 +850,7 @@ namespace PeaceEnablers.Common.Implementation
                     {
                         hdr.RelativeItem()
                             .Text("KPI Overview — All Indicators (sorted high → low)")
-                            .FontSize(9).Bold().FontColor("#12352f");
+                            .FontSize(9).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
                         hdr.AutoItem()
                             .Text($"Avg: {avg:F1}%")
                             .FontSize(9).Bold().FontColor(GetBarColor(avg));
@@ -818,10 +877,10 @@ namespace PeaceEnablers.Common.Implementation
             float sx = w / (n - 1);
 
             // Grid lines
-            using var gp = new SKPaint { Color = SKColor.Parse("#F0F4F1"), StrokeWidth = 0.7f };
+            using var gp = new SKPaint { Color = SKColor.Parse(ReportThemeColors.SurfaceF0F4F1), StrokeWidth = 0.7f };
             using var gl = new SKPaint
             {
-                Color = SKColor.Parse("#C0C0C0"),
+                Color = SKColor.Parse(ReportThemeColors.GraySilver),
                 TextSize = 7,
                 TextAlign = SKTextAlign.Right,
                 IsAntialias = true
@@ -844,8 +903,8 @@ namespace PeaceEnablers.Common.Implementation
 
             using var shader = SKShader.CreateLinearGradient(
                 new SKPoint(0, tp), new SKPoint(0, tp + h),
-                new[] { SKColor.Parse("#336b58").WithAlpha(95),
-                SKColor.Parse("#336b58").WithAlpha(8) },
+                new[] { SKColor.Parse(ReportThemeColors.PdfMediumGreen).WithAlpha(95),
+                SKColor.Parse(ReportThemeColors.PdfMediumGreen).WithAlpha(8) },
                 null, SKShaderTileMode.Clamp);
             using var fp = new SKPaint { Shader = shader, Style = SKPaintStyle.Fill };
             canvas.DrawPath(fPath, fp);
@@ -862,7 +921,7 @@ namespace PeaceEnablers.Common.Implementation
             {
                 Style = SKPaintStyle.Stroke,
                 StrokeWidth = 1.6f,
-                Color = SKColor.Parse("#336b58"),
+                Color = SKColor.Parse(ReportThemeColors.PdfMediumGreen),
                 IsAntialias = true
             };
             canvas.DrawPath(lPath, lPaint);
@@ -871,7 +930,7 @@ namespace PeaceEnablers.Common.Implementation
             float y70 = tp + h - 0.70f * h;
             using var thPaint = new SKPaint
             {
-                Color = SKColor.Parse("#2E7D32").WithAlpha(140),
+                Color = SKColor.Parse(ReportThemeColors.SuccessGreen).WithAlpha(140),
                 StrokeWidth = 0.9f,
                 PathEffect = SKPathEffect.CreateDash(new[] { 4f, 3f }, 0)
             };
@@ -879,7 +938,7 @@ namespace PeaceEnablers.Common.Implementation
 
             using var thLbl = new SKPaint
             {
-                Color = SKColor.Parse("#2E7D32"),
+                Color = SKColor.Parse(ReportThemeColors.SuccessGreen),
                 TextSize = 7,
                 IsAntialias = true
             };
@@ -947,21 +1006,21 @@ namespace PeaceEnablers.Common.Implementation
             int total, int green, int amber, int red, float avg)
         {
             container
-                .Background("#12352f")
+                .Background(ReportThemeColors.PdfDarkGreen)
                 .Padding(10)
                 .Row(row =>
                 {
-                    KpiStatPill(row.RelativeItem(), total.ToString(), "Total KPIs", "#4CAF50", "#4CAF5025");
+                    KpiStatPill(row.RelativeItem(), total.ToString(), "Total KPIs", ReportThemeColors.BarGreen, ReportThemeColors.BarGreenAlpha);
                     row.ConstantItem(6);
-                    KpiStatPill(row.RelativeItem(), green.ToString(), "Performing ≥ 70 %", "#4CAF50", "#4CAF5025");
+                    KpiStatPill(row.RelativeItem(), green.ToString(), "Performing ≥ 70 %", ReportThemeColors.BarGreen, ReportThemeColors.BarGreenAlpha);
                     row.ConstantItem(6);
-                    KpiStatPill(row.RelativeItem(), amber.ToString(), "Developing 40–69 %", "#FFC107", "#FFC10725");
+                    KpiStatPill(row.RelativeItem(), amber.ToString(), "Developing 40–69 %", ReportThemeColors.BarAmber, ReportThemeColors.BarAmberAlpha);
                     row.ConstantItem(6);
-                    KpiStatPill(row.RelativeItem(), red.ToString(), "Needs Improvement < 40 %", "#EF5350", "#EF535025");
+                    KpiStatPill(row.RelativeItem(), red.ToString(), "Needs Improvement < 40 %", ReportThemeColors.BarRed, ReportThemeColors.BarRedAlpha);
                     row.ConstantItem(6);
                     KpiStatPill(row.RelativeItem(), $"{avg:F1}%", "Average Score",
-                        avg >= 70 ? "#4CAF50" : avg >= 40 ? "#FFC107" : "#EF5350",
-                        "#4CAF5025");
+                        avg >= 70 ? ReportThemeColors.BarGreen : avg >= 40 ? ReportThemeColors.BarAmber : ReportThemeColors.BarRed,
+                        ReportThemeColors.BarGreenAlpha);
                 });
         }
 
@@ -973,14 +1032,14 @@ namespace PeaceEnablers.Common.Implementation
         void DrawKpiGroupSection(IContainer container, List<KpiChartItem> group, int offset, bool isAllCountries = false)
         {
             container
-            .Border(1).BorderColor("#C5D9D0")
+            .Border(1).BorderColor(ReportThemeColors.CC5D9D0)
             .Column(col =>
             {
                 // bar chart — numbers printed below each bar
                 col.Item().Height(148).Element(x => DrawKpiBarChart(x, group, offset));
 
                 // hairline separator between chart and table
-                col.Item().Height(1).Background("#C5D9D0");
+                col.Item().Height(1).Background(ReportThemeColors.CC5D9D0);
 
                 // two-column reference table
                 if(!isAllCountries)
@@ -1017,13 +1076,13 @@ namespace PeaceEnablers.Common.Implementation
                     // ── background grid lines ─────────────────────────────────────
                     using var gridPaint = new SKPaint
                     {
-                        Color = SKColor.Parse("#F2F7F4"),
+                        Color = SKColor.Parse(ReportThemeColors.SurfaceF2F7F4),
                         StrokeWidth = 0.6f,
                         IsAntialias = false
                     };
                     using var gridLblPaint = new SKPaint
                     {
-                        Color = SKColor.Parse("#B0BEC5"),
+                        Color = SKColor.Parse(ReportThemeColors.BlueGrayLight),
                         TextSize = 7f,
                         IsAntialias = true,
                         TextAlign = SKTextAlign.Left
@@ -1040,7 +1099,7 @@ namespace PeaceEnablers.Common.Implementation
                     float y70 = tp + chartH - 0.70f * chartH;
                     using var threshPaint = new SKPaint
                     {
-                        Color = SKColor.Parse("#2E7D32").WithAlpha(100),
+                        Color = SKColor.Parse(ReportThemeColors.SuccessGreen).WithAlpha(100),
                         StrokeWidth = 0.9f,
                         PathEffect = SKPathEffect.CreateDash(new[] { 4f, 3f }, 0),
                         IsAntialias = true
@@ -1052,7 +1111,7 @@ namespace PeaceEnablers.Common.Implementation
                     { TextSize = 6.5f, IsAntialias = true, TextAlign = SKTextAlign.Center };
                     using var numLblPaint = new SKPaint
                     {
-                        Color = SKColor.Parse("#546E7A"),
+                        Color = SKColor.Parse(ReportThemeColors.BlueGray),
                         TextSize = 6.5f,
                         IsAntialias = true,
                         TextAlign = SKTextAlign.Center
@@ -1193,10 +1252,10 @@ namespace PeaceEnablers.Common.Implementation
                              // Number bubble
                              h.ConstantItem(16)
                               .AlignMiddle()
-                              .Background("#00000022")
+                              .Background(ReportThemeColors.OverlayBlackAlpha)
                               .AlignCenter()
                               .Text($"{num}")
-                              .FontSize(6f).Bold().FontColor("#FFFFFF");
+                              .FontSize(6f).Bold().FontColor(ReportThemeColors.White);
 
                              // Code + Name
                              h.RelativeItem()
@@ -1206,17 +1265,17 @@ namespace PeaceEnablers.Common.Implementation
                               {
                                   nc.Item()
                                     .Text(kpi.ShortName ?? "")
-                                    .FontSize(7.5f).Bold().FontColor("#FFFFFF");
+                                    .FontSize(7.5f).Bold().FontColor(ReportThemeColors.White);
                                   nc.Item()
                                     .Text(kpi.Name ?? "")
-                                    .FontSize(5f).FontColor("#FFFFFFBB");
+                                    .FontSize(5f).FontColor(ReportThemeColors.WhiteAlpha73);
                               });
 
                              // Score
                              h.ConstantItem(34)
                               .AlignMiddle().AlignRight()
                               .Text($"{v}%")
-                              .FontSize(9.5f).Bold().FontColor("#FFFFFF");
+                              .FontSize(9.5f).Bold().FontColor(ReportThemeColors.White);
                          });
 
                     // ── 2. Definition strip ─────────────────────────────────────────
@@ -1224,9 +1283,9 @@ namespace PeaceEnablers.Common.Implementation
                     if (!string.IsNullOrWhiteSpace(kpi.Definition))
                     {
                         inner.Item()
-                             .Background("#F2F6F4")                      // very pale green-grey
+                             .Background(ReportThemeColors.SurfacePale)                      // very pale green-grey
                              .BorderTop(0.3f).BorderColor(accent)
-                             .BorderBottom(0.3f).BorderColor("#DDDDDD")
+                             .BorderBottom(0.3f).BorderColor(ReportThemeColors.Divider)
                              .PaddingHorizontal(5).PaddingVertical(3)
                              .Row(dr =>
                              {
@@ -1242,23 +1301,23 @@ namespace PeaceEnablers.Common.Implementation
                                  dr.RelativeItem()
                                    .Text(kpi.Definition)
                                    .FontSize(5.5f).Italic()
-                                   .FontColor("#444444")
+                                   .FontColor(ReportThemeColors.TextMuted)
                                    .LineHeight(1.25f);
                              });
                     }
 
                     // ── 3. Interpretation column sub-header ─────────────────────────
                     inner.Item()
-                         .Background("#EBEBEB")
+                         .Background(ReportThemeColors.ShadeEBEBEB)
                          .PaddingHorizontal(4).PaddingVertical(2)
                          .Row(sh =>
                          {
                              sh.ConstantItem(46)
                                .Text("Range")
-                               .FontSize(5.5f).Bold().FontColor("#666666");
+                               .FontSize(5.5f).Bold().FontColor(ReportThemeColors.TextLabel);
                              sh.RelativeItem()
                                .Text("Condition")
-                               .FontSize(5.5f).Bold().FontColor("#666666");
+                               .FontSize(5.5f).Bold().FontColor(ReportThemeColors.TextLabel);
                          });
 
                     // ── 4. Five interpretation rows ─────────────────────────────────
@@ -1267,16 +1326,16 @@ namespace PeaceEnablers.Common.Implementation
                         var interp = interps[i];
                         bool isHit = interp == matched;
 
-                        string rowBg = isHit ? accent : (i % 2 == 0 ? "#FFFFFF" : "#F7F7F7");
-                        string rangeFg = isHit ? "#FFFFFF" : "#888888";
-                        string condFg = isHit ? "#FFFFFF" : "#333333";
+                        string rowBg = isHit ? accent : (i % 2 == 0 ? ReportThemeColors.White : ReportThemeColors.RowAlt);
+                        string rangeFg = isHit ? ReportThemeColors.White : ReportThemeColors.TextFaint;
+                        string condFg = isHit ? ReportThemeColors.White : ReportThemeColors.TextBody;
 
                         string rangeStr = (interp.MinRange.HasValue && interp.MaxRange.HasValue)
                             ? $"{Math.Round(interp.MinRange.Value, 0)}–{Math.Round(interp.MaxRange.Value, 0)}"
                             : "—";
 
                         inner.Item()
-                             .BorderBottom(0.3f).BorderColor("#E0E0E0")
+                             .BorderBottom(0.3f).BorderColor(ReportThemeColors.GrayE0E0E0)
                              .Background(rowBg)
                              .PaddingHorizontal(4).PaddingVertical(2)
                              .Row(r =>
@@ -1306,7 +1365,7 @@ namespace PeaceEnablers.Common.Implementation
                     c.Item().AlignCenter()
                         .Text(value).FontSize(15).Bold().FontColor(valueColor);
                     c.Item().AlignCenter()
-                        .Text(label).FontSize(6.5f).FontColor("#FFFFFFBB");
+                        .Text(label).FontSize(6.5f).FontColor(ReportThemeColors.WhiteAlpha73);
                 });
         }
 
@@ -1328,7 +1387,7 @@ namespace PeaceEnablers.Common.Implementation
                 col.Spacing(10);
 
                 // ── two-column layout: ring chart (left) + bar list (right) ──────
-                col.Item().Height(500).Row(row =>
+                col.Item().Height(420).Row(row =>
                 {
                     // Left: radial ring chart
                     row.RelativeItem(5).Element(x => DrawPillarsRadialChart(x, data));
@@ -1354,12 +1413,12 @@ namespace PeaceEnablers.Common.Implementation
 
             container
                 .Background(Colors.White)
-                .Border(1).BorderColor("#DDE8E3")
+                .Border(1).BorderColor(ReportThemeColors.CDDE8E3)
                 .Padding(14)
                 .Column(col =>
                 {
                     col.Item().PaddingBottom(8)
-                        .Text("Pillar Overview").FontSize(11).Bold().FontColor("#12352f");
+                        .Text("Pillar Overview").FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
 
                     col.Spacing(6);
                     int index = 1;
@@ -1373,11 +1432,11 @@ namespace PeaceEnablers.Common.Implementation
                             // Pillar label
                             row.ConstantItem(102).AlignMiddle()
                                 .Text(Shorten(item.Name ?? item.ShortName ?? "—", 18))
-                                .FontSize(8).FontColor("#37474F");
+                                .FontSize(8).FontColor(ReportThemeColors.BlueGrayDark);
 
                             // Bar track
                             row.RelativeItem().AlignMiddle().Height(13)
-                                .Background("#F0F4F1")
+                                .Background(ReportThemeColors.SurfaceF0F4F1)
                                 .Canvas((canvas, size) =>
                                 {
                                     // filled portion with gradient
@@ -1415,63 +1474,63 @@ namespace PeaceEnablers.Common.Implementation
             {
                 // Average score
                 row.RelativeItem(2)
-                    .Background("#12352f")
+                    .Background(ReportThemeColors.PdfDarkGreen)
                     .Padding(12)
                     .Column(c =>
                     {
                         c.Item().AlignCenter()
-                            .Text("Average Score").FontSize(9).FontColor("#A5D6A7");
+                            .Text("Average Score").FontSize(9).FontColor(ReportThemeColors.SuccessGreenLight);
                         c.Item().AlignCenter()
                             .Text($"{avg:F1}")
                             .FontSize(22).Bold()
-                            .FontColor(GetBarColor(avg) == "#2E7D32" ? "#66BB6A"
-                                     : GetBarColor(avg) == "#F9A825" ? "#FFD54F" : "#EF5350");
+                            .FontColor(GetBarColor(avg) == ReportThemeColors.SuccessGreen ? ReportThemeColors.SuccessGreenBright
+                                     : GetBarColor(avg) == ReportThemeColors.WarningAmber ? ReportThemeColors.WarningAmberLight : ReportThemeColors.BarRed);
                     });
 
                 row.ConstantItem(6);
 
                 // Best pillar
                 row.RelativeItem(3)
-                    .Background("#E8F5E9")
-                    .Border(1).BorderColor("#C8E6C9")
+                    .Background(ReportThemeColors.SuccessGreenBg)
+                    .Border(1).BorderColor(ReportThemeColors.SuccessGreenSoft)
                     .Padding(10)
                     .Column(c =>
                     {
                         c.Item().Row(r =>
                         {
                             r.AutoItem()
-                                .Background("#2E7D32").Padding(3)
+                                .Background(ReportThemeColors.SuccessGreen).Padding(3)
                                 .Text("▲ BEST").FontSize(7).Bold().FontColor(Colors.White);
                             r.ConstantItem(6);
                             r.RelativeItem()
                                 .Text(Shorten(best.Name ?? "—", 26))
-                                .FontSize(9).Bold().FontColor("#1B5E20");
+                                .FontSize(9).Bold().FontColor(ReportThemeColors.SuccessGreenDark);
                         });
                         c.Item().PaddingTop(4)
-                            .Text($"{best.Value:F1}").FontSize(16).Bold().FontColor("#2E7D32");
+                            .Text($"{best.Value:F1}").FontSize(16).Bold().FontColor(ReportThemeColors.SuccessGreen);
                     });
 
                 row.ConstantItem(6);
 
                 // Worst pillar
                 row.RelativeItem(3)
-                    .Background("#FDECEA")
-                    .Border(1).BorderColor("#FFCDD2")
+                    .Background(ReportThemeColors.DangerRedBg)
+                    .Border(1).BorderColor(ReportThemeColors.DangerRedSoft)
                     .Padding(10)
                     .Column(c =>
                     {
                         c.Item().Row(r =>
                         {
                             r.AutoItem()
-                                .Background("#C62828").Padding(3)
+                                .Background(ReportThemeColors.DangerRed).Padding(3)
                                 .Text("▼ LOWEST").FontSize(7).Bold().FontColor(Colors.White);
                             r.ConstantItem(6);
                             r.RelativeItem()
                                 .Text(Shorten(worst.Name ?? "—", 26))
-                                .FontSize(9).Bold().FontColor("#B71C1C");
+                                .FontSize(9).Bold().FontColor(ReportThemeColors.DangerRedDark);
                         });
                         c.Item().PaddingTop(4)
-                            .Text($"{worst.Value:F1}").FontSize(16).Bold().FontColor("#C62828");
+                            .Text($"{worst.Value:F1}").FontSize(16).Bold().FontColor(ReportThemeColors.DangerRed);
                     });
             });
         }
@@ -1487,123 +1546,8 @@ namespace PeaceEnablers.Common.Implementation
 
             container
                 .Background(Colors.White)
-                .Border(1).BorderColor("#DDE8E3")
-                .Canvas((canvas, size) =>
-                {
-                    float cx = size.Width / 2f;
-                    float cy = size.Height / 2f;
-
-                    // Use concentric rings: outermost = first pillar
-                    int n = data.Count;
-                    float maxRadius = Math.Min(cx, cy) - 18f;
-                    float minRadius = maxRadius * 0.28f;
-                    float ringStep = (maxRadius - minRadius) / n;
-                    float ringThick = ringStep * 0.68f;
-
-                    // Chart title
-                    using var titlePaint = new SKPaint
-                    {
-                        Color = SKColor.Parse("#12352f"),
-                        TextSize = 10f,
-                        IsAntialias = true,
-                        TextAlign = SKTextAlign.Center,
-                        FakeBoldText = true
-                    };
-                    canvas.DrawText("Pillar Performance", cx, 14f, titlePaint);
-
-                    for (int i = 0; i < n; i++)
-                    {
-                        float v = (float)(data[i].Value ?? 0);
-                        float r = maxRadius - i * ringStep;
-                        float mid = r - ringThick / 2f;
-
-                        var rect = new SKRect(cx - mid, cy - mid, cx + mid, cy + mid);
-
-                        SKColor barCol = GetColor(v);
-
-                        // Track ring
-                        using var trackPaint = new SKPaint
-                        {
-                            Style = SKPaintStyle.Stroke,
-                            StrokeWidth = ringThick,
-                            Color = barCol.WithAlpha(22),
-                            IsAntialias = true
-                        };
-                        canvas.DrawOval(rect, trackPaint);
-
-                        // Filled arc
-                        using var arcPaint = new SKPaint
-                        {
-                            Style = SKPaintStyle.Stroke,
-                            StrokeWidth = ringThick,
-                            Color = barCol,
-                            StrokeCap = SKStrokeCap.Round,
-                            IsAntialias = true
-                        };
-                        float sweep = 360f * v / 100f;
-                        canvas.DrawArc(rect, -90f, sweep, false, arcPaint);
-
-                        // Label at end of arc
-                        float labelAngle = (-90f + sweep) * (float)Math.PI / 180f;
-                        float labelR = mid + ringThick / 2f + 6f;
-                        float lx = cx + labelR * (float)Math.Cos(labelAngle);
-                        float ly = cy + labelR * (float)Math.Sin(labelAngle);
-
-                        // dot at arc end
-                        using var dotPaint = new SKPaint
-                        {
-                            Color = barCol,
-                            Style = SKPaintStyle.Fill,
-                            IsAntialias = true
-                        };
-                        canvas.DrawCircle(
-                            cx + mid * (float)Math.Cos(labelAngle),
-                            cy + mid * (float)Math.Sin(labelAngle),
-                            ringThick / 2f + 1.5f, dotPaint);
-                    }
-
-                    // ── centre: average score ──────────────────────────────────
-                    using var circleFill = new SKPaint
-                    {
-                        Color = SKColor.Parse("#12352f"),
-                        Style = SKPaintStyle.Fill,
-                        IsAntialias = true
-                    };
-                    float cr = minRadius - ringStep * 0.6f;
-                    canvas.DrawCircle(cx, cy, cr, circleFill);
-
-                    using var circleRing = new SKPaint
-                    {
-                        Color = GetColor(avg).WithAlpha(180),
-                        Style = SKPaintStyle.Stroke,
-                        StrokeWidth = 2f,
-                        IsAntialias = true
-                    };
-                    canvas.DrawCircle(cx, cy, cr, circleRing);
-
-                    using var avgNumPaint = new SKPaint
-                    {
-                        Color = GetColor(avg),
-                        TextSize = cr * 0.60f,
-                        IsAntialias = true,
-                        TextAlign = SKTextAlign.Center,
-                        FakeBoldText = true
-                    };
-                    canvas.DrawText($"{avg:F1}", cx, cy + avgNumPaint.TextSize * 0.36f, avgNumPaint);
-
-                    using var avgLblPaint = new SKPaint
-                    {
-                        Color = SKColor.Parse("#A5D6A7"),
-                        TextSize = cr * 0.26f,
-                        IsAntialias = true,
-                        TextAlign = SKTextAlign.Center
-                    };
-                    canvas.DrawText("avg", cx, cy + avgNumPaint.TextSize * 0.36f + avgLblPaint.TextSize + 1f, avgLblPaint);
-
-                    // ── legend on the right side ───────────────────────────────
-                    float legendX = cx + Math.Min(cx, cy) + 2f;  // just outside chart — won't fit; draw below instead
-                                                                 // (legend is in the horizontal bar panel on the right; no need to repeat here)
-                });
+                .Border(1).BorderColor(ReportThemeColors.CDDE8E3)
+                            .Canvas((canvas, size) => DrawPillarsRadialChartCanvas(canvas, size, data));
         }
 
         // ─────────────────────────────────────────────────────────────────────────────
@@ -1621,7 +1565,7 @@ namespace PeaceEnablers.Common.Implementation
 
             container.Column(column =>
             {
-                column.Item().Background("#003160").Padding(8).Row(row =>
+                column.Item().Background(ReportThemeColors.HeaderNavy).Padding(8).Row(row =>
                 {
                     // Left content
                     row.RelativeItem().Column(col =>
@@ -1637,11 +1581,11 @@ namespace PeaceEnablers.Common.Implementation
 
                         col.Item().Text($"{data.CountryName}, {data.Continent} | Data Year: {data.Year}")
                             .FontSize(10)
-                            .FontColor("#E8F3F0");
+                            .FontColor(ReportThemeColors.SurfaceE8F3F0);
 
                         col.Item().Text($"Generated: {DateTime.Now:MMM dd, yyyy}")
                             .FontSize(8)
-                            .FontColor("#CFE3DD");
+                            .FontColor(ReportThemeColors.SurfaceCFE3DD);
                     });
 
                     // Right logo
@@ -1655,7 +1599,7 @@ namespace PeaceEnablers.Common.Implementation
                 });
 
                 // Divider
-                column.Item().LineHorizontal(1).LineColor("#d9e2df");
+                column.Item().LineHorizontal(1).LineColor(ReportThemeColors.SurfaceD9E2DF);
             });
         }        
 
@@ -1667,7 +1611,7 @@ namespace PeaceEnablers.Common.Implementation
 
             container.Column(column =>
             {
-                column.Item().Background("#003160").Padding(12).Row(row =>
+                column.Item().Background(ReportThemeColors.HeaderNavy).Padding(12).Row(row =>
                 {
                     // Left content
                     row.RelativeItem().Column(col =>
@@ -1681,11 +1625,11 @@ namespace PeaceEnablers.Common.Implementation
 
                         col.Item().Text($"{data.CountryName}, {data.Continent} | Data Year: {data.AIDataYear}")
                             .FontSize(10)
-                            .FontColor("#E8F3F0");
+                            .FontColor(ReportThemeColors.SurfaceE8F3F0);
 
                         col.Item().Text($"Generated: {DateTime.Now:MMM dd, yyyy}")
                             .FontSize(8)
-                            .FontColor("#CFE3DD");
+                            .FontColor(ReportThemeColors.SurfaceCFE3DD);
                     });
 
                     // Logo
@@ -1698,7 +1642,7 @@ namespace PeaceEnablers.Common.Implementation
                         .FitArea();
                 });
 
-                column.Item().LineHorizontal(1).LineColor("#d9e2df");
+                column.Item().LineHorizontal(1).LineColor(ReportThemeColors.SurfaceD9E2DF);
             });
         }
 
@@ -1714,7 +1658,7 @@ namespace PeaceEnablers.Common.Implementation
                         text.Span(" of "); text.TotalPages();
                     });
                     col.Item().PaddingTop(5).AlignCenter()
-                        .Text("Country Assessment Platform").FontSize(8).FontColor("#9E9E9E");
+                        .Text("Country Assessment Platform").FontSize(8).FontColor(ReportThemeColors.Gray9E9E9E);
                 });
             });
         }
@@ -1749,7 +1693,7 @@ namespace PeaceEnablers.Common.Implementation
                 // EXECUTIVE SUMMARY
                 // =========================
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Executive Summary", SanitizeText(data.EvidenceSummary), "#163329"));
+                    PillarContentSection(c, "Executive Summary", SanitizeText(data.EvidenceSummary), ReportThemeColors.C163329));
 
                 if (!isAllCountries) {
                     // =====================================================
@@ -1757,13 +1701,13 @@ namespace PeaceEnablers.Common.Implementation
                     // =====================================================
                     if (!string.IsNullOrEmpty(data.KeyDevelopments))
                         column.Item().PaddingTop(8).Element(c =>
-                            PillarContentSection(c, "Key Developments", SanitizeText(data.KeyDevelopments), "#1f4e79"));
+                            PillarContentSection(c, "Key Developments", SanitizeText(data.KeyDevelopments), ReportThemeColors.HeaderBlue));
                     if (!string.IsNullOrEmpty(data.CriticalRisks))
                         column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Critical Risks", SanitizeText(data.CriticalRisks), "#2e75b6"));
+                        PillarContentSection(c, "Critical Risks", SanitizeText(data.CriticalRisks), ReportThemeColors.HeaderBlueMid));
                     if (!string.IsNullOrEmpty(data.Gaps))
                         column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Gaps", SanitizeText(data.Gaps), "#5b9bd5"));
+                        PillarContentSection(c, "Gaps", SanitizeText(data.Gaps), ReportThemeColors.HeaderBlueLight));
 
 
 
@@ -1775,16 +1719,16 @@ namespace PeaceEnablers.Common.Implementation
 
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Structural Evidence", SanitizeText(data.StructuralEvidence), "#e6ccff"));
+                        PillarContentSection(c, "Structural Evidence", SanitizeText(data.StructuralEvidence), ReportThemeColors.CE6CCFF));
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Operational Evidence", SanitizeText(data.OperationalEvidence), "#c2f0f0"));
+                        PillarContentSection(c, "Operational Evidence", SanitizeText(data.OperationalEvidence), ReportThemeColors.CC2F0F0));
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Outcome Evidence", SanitizeText(data.OutcomeEvidence), "#ffe6cc"));
+                        PillarContentSection(c, "Outcome Evidence", SanitizeText(data.OutcomeEvidence), ReportThemeColors.CFFE6CC));
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Perception Evidence", SanitizeText(data.PerceptionEvidence), "#e6f7ff"));
+                        PillarContentSection(c, "Perception Evidence", SanitizeText(data.PerceptionEvidence), ReportThemeColors.CE6F7FF));
 
                     // =====================================================
                     // INTEGRITY CHECKS
@@ -1795,13 +1739,13 @@ namespace PeaceEnablers.Common.Implementation
                     //    .FontSize(16).Bold();
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Temporal Scope", SanitizeText(data.TemporalScope), "#d9e6ff"));
+                        PillarContentSection(c, "Temporal Scope", SanitizeText(data.TemporalScope), ReportThemeColors.CD9E6FF));
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Distortion Screening", SanitizeText(data.DistortionScreening), "#f2d9e6"));
+                        PillarContentSection(c, "Distortion Screening", SanitizeText(data.DistortionScreening), ReportThemeColors.CF2D9E6));
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Relational Integrity", SanitizeText(data.RelationalIntegrity), "#f0ffe6"));
+                        PillarContentSection(c, "Relational Integrity", SanitizeText(data.RelationalIntegrity), ReportThemeColors.CF0FFE6));
 
                     // =====================================================
                     // STRESS TESTS
@@ -1812,20 +1756,20 @@ namespace PeaceEnablers.Common.Implementation
                     //    .FontSize(16).Bold();
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Political Shock", SanitizeText(data.PoliticalShock), "#ffd9cc"));
+                        PillarContentSection(c, "Political Shock", SanitizeText(data.PoliticalShock), ReportThemeColors.CFFD9CC));
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Economic Shock", SanitizeText(data.EconomicShock), "#fff2cc"));
+                        PillarContentSection(c, "Economic Shock", SanitizeText(data.EconomicShock), ReportThemeColors.CFFF2CC));
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Narrative Shock", SanitizeText(data.NarrativeShock), "#e6f2ff"));
+                        PillarContentSection(c, "Narrative Shock", SanitizeText(data.NarrativeShock), ReportThemeColors.CE6F2FF));
                     //column.Item().PageBreak();
 
                     //column.Item().PaddingTop(8).Element(c =>
-                    //    PillarContentSection(c, "Overall Stress Resilience", SanitizeText(data.OverallStressResilience), "#e6ffe6"));
+                    //    PillarContentSection(c, "Overall Stress Resilience", SanitizeText(data.OverallStressResilience), ReportThemeColors.CE6FFE6));
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Stress Score Adjustment", SanitizeText(data.StressScoreAdjustment), "#ffe6f2"));
+                        PillarContentSection(c, "Stress Score Adjustment", SanitizeText(data.StressScoreAdjustment), ReportThemeColors.CFFE6F2));
 
                     // =====================================================
                     // GOVERNANCE ADJUSTMENTS
@@ -1836,13 +1780,13 @@ namespace PeaceEnablers.Common.Implementation
                     //    .FontSize(16).Bold();
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Inequality Adjustment", SanitizeText(data.InequalityAdjustment), "#f9e6ff"));
+                        PillarContentSection(c, "Inequality Adjustment", SanitizeText(data.InequalityAdjustment), ReportThemeColors.CF9E6FF));
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Opacity Risk", SanitizeText(data.OpacityRisk), "#fff0e6"));
+                        PillarContentSection(c, "Opacity Risk", SanitizeText(data.OpacityRisk), ReportThemeColors.CFFF0E6));
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Non Compensation Note", SanitizeText(data.NonCompensationNote), "#e6fff9"));
+                        PillarContentSection(c, "Non Compensation Note", SanitizeText(data.NonCompensationNote), ReportThemeColors.CE6FFF9));
 
                     // =====================================================
                     // SYSTEM ANALYSIS
@@ -1853,17 +1797,17 @@ namespace PeaceEnablers.Common.Implementation
                     //    .FontSize(16).Bold();
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Cross-Pillar System Dynamics", SanitizeText(data.CrossPillarPatterns), "#6e9688"));
+                        PillarContentSection(c, "Cross-Pillar System Dynamics", SanitizeText(data.CrossPillarPatterns), ReportThemeColors.C6E9688));
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Institutional Capacity Assessment", SanitizeText(data.InstitutionalCapacity), "#0d8057"));
+                        PillarContentSection(c, "Institutional Capacity Assessment", SanitizeText(data.InstitutionalCapacity), ReportThemeColors.C0D8057));
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Equity Assessment", SanitizeText(data.EquityAssessment), "#e8f5e9"));
+                        PillarContentSection(c, "Equity Assessment", SanitizeText(data.EquityAssessment), ReportThemeColors.SuccessGreenBg));
 
                     //column.Item().PageBreak();
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Conflict Risk Outlook", SanitizeText(data.ConflictRiskOutlook), "#fce4ec"));
+                        PillarContentSection(c, "Conflict Risk Outlook", SanitizeText(data.ConflictRiskOutlook), ReportThemeColors.CFCE4EC));
 
                     // =====================================================
                     // STRATEGIC OUTPUT
@@ -1871,11 +1815,11 @@ namespace PeaceEnablers.Common.Implementation
                     //column.Item().PageBreak();                
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Strategic Policy Priorities", SanitizeText(data.StrategicRecommendation), "#2e9975"));
+                        PillarContentSection(c, "Strategic Policy Priorities", SanitizeText(data.StrategicRecommendation), ReportThemeColors.C2E9975));
 
                     if (!string.IsNullOrEmpty(data.KeyFindings))
                         column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Key Findings", SanitizeText(data.KeyFindings), "#0d47a1"));
+                        PillarContentSection(c, "Key Findings", SanitizeText(data.KeyFindings), ReportThemeColors.C0D47A1));
                 }                
             
             });
@@ -1889,7 +1833,7 @@ namespace PeaceEnablers.Common.Implementation
 
                     if (!string.IsNullOrEmpty(data.Recommendations))
                         column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Recommendations", SanitizeText(data.Recommendations), "#00695c"));
+                        PillarContentSection(c, "Recommendations", SanitizeText(data.Recommendations), ReportThemeColors.C00695C));
                 }
             });
         }
@@ -1909,23 +1853,23 @@ namespace PeaceEnablers.Common.Implementation
                 // EXECUTIVE SUMMARY
                 // =========================
                 column.Item().PaddingTop(10).Element(c =>
-                    PillarContentSection(c, "Executive Summary", SanitizeText(data.EvidenceSummary), "#163329"));
+                    PillarContentSection(c, "Executive Summary", SanitizeText(data.EvidenceSummary), ReportThemeColors.C163329));
 
                
                 // =====================================================
                 // EVIDENCE SECTION
                 // =====================================================
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Structural Evidence", SanitizeText(data.StructuralEvidence), "#1f4e79"));
+                    PillarContentSection(c, "Structural Evidence", SanitizeText(data.StructuralEvidence), ReportThemeColors.HeaderBlue));
 
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Operational Evidence", SanitizeText(data.OperationalEvidence), "#2e75b6"));
+                    PillarContentSection(c, "Operational Evidence", SanitizeText(data.OperationalEvidence), ReportThemeColors.HeaderBlueMid));
 
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Outcome Evidence", SanitizeText(data.OutcomeEvidence), "#5b9bd5"));
+                    PillarContentSection(c, "Outcome Evidence", SanitizeText(data.OutcomeEvidence), ReportThemeColors.HeaderBlueLight));
 
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Perception Evidence", SanitizeText(data.PerceptionEvidence), "#9dc3e6"));
+                    PillarContentSection(c, "Perception Evidence", SanitizeText(data.PerceptionEvidence), ReportThemeColors.HeaderBluePale));
 
                 // =====================================================
                 // INTEGRITY CHECKS
@@ -1933,13 +1877,13 @@ namespace PeaceEnablers.Common.Implementation
                 //column.Item().PageBreak();
 
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Temporal Scope", SanitizeText(data.TemporalScope), "#5f497a"));
+                    PillarContentSection(c, "Temporal Scope", SanitizeText(data.TemporalScope), ReportThemeColors.C5F497A));
 
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Distortion Screening", SanitizeText(data.DistortionScreening), "#8064a2"));
+                    PillarContentSection(c, "Distortion Screening", SanitizeText(data.DistortionScreening), ReportThemeColors.C8064A2));
 
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Relational Integrity", SanitizeText(data.RelationalIntegrity), "#b1a0c7"));
+                    PillarContentSection(c, "Relational Integrity", SanitizeText(data.RelationalIntegrity), ReportThemeColors.CB1A0C7));
 
                 // =====================================================
                 // STRESS TESTS
@@ -1947,21 +1891,21 @@ namespace PeaceEnablers.Common.Implementation
                 //column.Item().PageBreak();
 
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Political Shock", SanitizeText(data.StressPoliticalShock), "#7f6000"));
+                    PillarContentSection(c, "Political Shock", SanitizeText(data.StressPoliticalShock), ReportThemeColors.C7F6000));
 
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Economic Shock", SanitizeText(data.StressEconomicShock), "#bf9000"));
+                    PillarContentSection(c, "Economic Shock", SanitizeText(data.StressEconomicShock), ReportThemeColors.CBF9000));
 
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Narrative Shock", SanitizeText(data.StressNarrativeShock), "#ffd966"));
+                    PillarContentSection(c, "Narrative Shock", SanitizeText(data.StressNarrativeShock), ReportThemeColors.CFFD966));
 
                 //column.Item().PageBreak();
 
                 //column.Item().PaddingTop(8).Element(c =>
-                //    PillarContentSection(c, "Overall Stress Resilience", SanitizeText(data.StressOverallResilience), "#c55a11"));
+                //    PillarContentSection(c, "Overall Stress Resilience", SanitizeText(data.StressOverallResilience), ReportThemeColors.CC55A11));
 
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Stress Score Adjustment", SanitizeText(data.StressScoreAdjustment), "#e26b0a"));
+                    PillarContentSection(c, "Stress Score Adjustment", SanitizeText(data.StressScoreAdjustment), ReportThemeColors.CE26B0A));
 
                 // =====================================================
                 // GOVERNANCE ADJUSTMENTS
@@ -1969,13 +1913,13 @@ namespace PeaceEnablers.Common.Implementation
                 //column.Item().PageBreak();
 
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Inequality Adjustment", SanitizeText(data.InequalityAdjustment), "#274e13"));
+                    PillarContentSection(c, "Inequality Adjustment", SanitizeText(data.InequalityAdjustment), ReportThemeColors.C274E13));
 
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Opacity Risk", SanitizeText(data.OpacityRisk), "#38761d"));
+                    PillarContentSection(c, "Opacity Risk", SanitizeText(data.OpacityRisk), ReportThemeColors.C38761D));
 
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Non Compensation Note", SanitizeText(data.NonCompensationNote), "#6aa84f"));
+                    PillarContentSection(c, "Non Compensation Note", SanitizeText(data.NonCompensationNote), ReportThemeColors.C6AA84F));
 
                 // =====================================================
                 // ALERTS & EQUITY
@@ -1983,10 +1927,10 @@ namespace PeaceEnablers.Common.Implementation
                 //column.Item().PageBreak();
 
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Red Flags", SanitizeText(data.RedFlag), "#ED561A", "#eb4634"));
+                    PillarContentSection(c, "Red Flags", SanitizeText(data.RedFlag), ReportThemeColors.AccentOrange, ReportThemeColors.AccentRed));
 
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Geographic Equity Note", SanitizeText(data.GeographicEquityNote), "#0d8057"));
+                    PillarContentSection(c, "Geographic Equity Note", SanitizeText(data.GeographicEquityNote), ReportThemeColors.C0D8057));
 
                 // =====================================================
                 // SYSTEM / INSTITUTIONAL ANALYSIS
@@ -1994,10 +1938,10 @@ namespace PeaceEnablers.Common.Implementation
                 //column.Item().PageBreak();
 
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Institutional Assessment", SanitizeText(data.InstitutionalAssessment), "#2e9975"));
+                    PillarContentSection(c, "Institutional Assessment", SanitizeText(data.InstitutionalAssessment), ReportThemeColors.C2E9975));
 
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Analytical Foundations and Data Integration", SanitizeText(data.DataGapAnalysis), "#a4bab2"));
+                    PillarContentSection(c, "Analytical Foundations and Data Integration", SanitizeText(data.DataGapAnalysis), ReportThemeColors.CA4BAB2));
 
                 // =====================================================
                 // DATA SOURCES
@@ -2016,7 +1960,7 @@ namespace PeaceEnablers.Common.Implementation
         {
             container
                 .Background(Colors.White)
-                .Border(1).BorderColor("#E5E7EB")
+                .Border(1).BorderColor(ReportThemeColors.GrayE5E7EB)
                 .Padding(18)
                 .Column(column =>
                 {
@@ -2024,17 +1968,17 @@ namespace PeaceEnablers.Common.Implementation
                     column.Item().Text("Overview")
                         .FontSize(16)
                         .SemiBold()
-                        .FontColor("#1F2937");
+                        .FontColor(ReportThemeColors.Gray1F2937);
 
                     column.Item().PaddingTop(8).Column(col =>
                     {
                         // Score Section
-                        PillarProgressBar(col, "Total Score", data.AIProgress, "#22A06B");
+                        PillarProgressBar(col, "Total Score", data.AIProgress, ReportThemeColors.AccentTeal);
 
                         col.Item().PaddingVertical(12);
 
                         // Divider
-                        col.Item().Height(1).Background("#F0F0F0");
+                        col.Item().Height(1).Background(ReportThemeColors.SubHeaderBg);
 
                         col.Item().PaddingTop(12);
 
@@ -2042,15 +1986,15 @@ namespace PeaceEnablers.Common.Implementation
                         col.Item().Text("Rankings")
                             .FontSize(13)
                             .SemiBold()
-                            .FontColor("#374151");
+                            .FontColor(ReportThemeColors.Gray374151);
 
                         col.Item().PaddingTop(8);
 
-                        RankRowModern(col, "Global Rank", data.Rank, data.TotalCountry, "#16A34A");
+                        RankRowModern(col, "Global Rank", data.Rank, data.TotalCountry, ReportThemeColors.AccentGreen);
 
                         col.Item().PaddingTop(2);
 
-                        RankRowModern(col, $"{data.Region} Region Rank", data.RegionRank, data.RegionTotalCountry, "#2563EB");
+                        RankRowModern(col, $"{data.Region} Region Rank", data.RegionRank, data.RegionTotalCountry, ReportThemeColors.AccentBlue);
                     });
                 });
         }
@@ -2061,16 +2005,16 @@ namespace PeaceEnablers.Common.Implementation
                 row.RelativeItem()
                     .Text(label)
                     .FontSize(11)
-                    .FontColor("#4B5563");
+                    .FontColor(ReportThemeColors.Gray4B5563);
 
                 row.AutoItem().AlignRight().Element(e =>
                 {
                     e.PaddingHorizontal(10)
                      .PaddingVertical(4)
                      .Padding(2)
-                     .Background("#F9FAFB")
+                     .Background(ReportThemeColors.GrayF9FAFB)
                      .Border(1)
-                     .BorderColor("#E5E7EB")
+                     .BorderColor(ReportThemeColors.GrayE5E7EB)
                      .Text(txt =>
                      {
                          if (rank.HasValue && total.HasValue)
@@ -2080,11 +2024,11 @@ namespace PeaceEnablers.Common.Implementation
                                 .FontColor(color);
 
                              txt.Span($" / {total}")
-                                .FontColor("#6B7280");
+                                .FontColor(ReportThemeColors.Gray6B7280);
                          }
                          else
                          {
-                             txt.Span("-").FontColor("#9CA3AF");
+                             txt.Span("-").FontColor(ReportThemeColors.Gray9CA3AF);
                          }
                      });
                 });
@@ -2096,18 +2040,18 @@ namespace PeaceEnablers.Common.Implementation
         {
             container
                 .Background(Colors.White)
-                .Border(1).BorderColor("#E5E7EB")
+                .Border(1).BorderColor(ReportThemeColors.GrayE5E7EB)
                 .Padding(18)
                 .Column(column =>
                 {
                     column.Item().Text(isCity ? "Total Overview" : "Pillar Score")
                         .FontSize(16)
                         .SemiBold()
-                        .FontColor("#1F2937");
+                        .FontColor(ReportThemeColors.Gray1F2937);
 
                     column.Item().PaddingTop(15);
 
-                    PillarProgressBar(column, "Score", data.AIProgress, "#22A06B");
+                    PillarProgressBar(column, "Score", data.AIProgress, ReportThemeColors.AccentTeal);
                 });
         }
         void PillarProgressBar(ColumnDescriptor column, string label, decimal? percentage, string color)
@@ -2122,19 +2066,19 @@ namespace PeaceEnablers.Common.Implementation
                     row.RelativeItem()
                         .Text(label)
                         .FontSize(11)
-                        .FontColor("#4B5563");
+                        .FontColor(ReportThemeColors.Gray4B5563);
 
                     row.AutoItem()
                         .Text($"{percentage ?? 0:F1}")
                         .FontSize(11)
                         .Bold()
-                        .FontColor("#111827");
+                        .FontColor(ReportThemeColors.Gray111827);
                 });
 
                 col.Item().PaddingTop(6);
 
                 // Progress Bar
-                col.Item().Height(8).Background("#E5E7EB").Row(barRow =>
+                col.Item().Height(8).Background(ReportThemeColors.GrayE5E7EB).Row(barRow =>
                 {
                     barRow.RelativeItem(per)
                         .Background(color);
@@ -2146,20 +2090,20 @@ namespace PeaceEnablers.Common.Implementation
 
         /// <summary>Generic titled content block with accent bar.</summary>
         static void PillarContentSection(
-            IContainer container, string title, string content, string accentColor, string textcolor = "#424242")
+            IContainer container, string title, string content, string accentColor, string textcolor = ReportThemeColors.TextDark)
         {
             container.Column(column =>
             {
                 column.Item().Row(row =>
                 {
                     row.ConstantItem(5).Background(accentColor);
-                    row.RelativeItem().Background("#F5F5F5").Padding(12)
-                        .Text(title).FontSize(15).Bold().FontColor("#212121");
+                    row.RelativeItem().Background(ReportThemeColors.ShadeLight).Padding(12)
+                        .Text(title).FontSize(15).Bold().FontColor(ReportThemeColors.TextNearBlack);
                 });
 
                 column.Item()
                     .Background(Colors.White)
-                    .Border(1).BorderColor("#E0E0E0")
+                    .Border(1).BorderColor(ReportThemeColors.GrayE0E0E0)
                     .Padding(18)
                     .Text(content)
                     .FontSize(10).LineHeight(1.6f).FontColor(textcolor);
@@ -2186,20 +2130,20 @@ namespace PeaceEnablers.Common.Implementation
                 // Header
                 column.Item().Row(row =>
                 {
-                    row.ConstantItem(5).Background("#396154");
+                    row.ConstantItem(5).Background(ReportThemeColors.C396154);
 
                     row.RelativeItem()
-                        .Background("#F5F5F5")
+                        .Background(ReportThemeColors.ShadeLight)
                         .Padding(12)
                         .Text(SanitizeText("Data Source Citations")) // 🔒 safe
-                        .FontSize(15).Bold().FontColor("#212121");
+                        .FontSize(15).Bold().FontColor(ReportThemeColors.TextNearBlack);
                 });
 
                 // Content Box
                 column.Item().PaddingTop(10)
                     .Background(Colors.White)
                     .Border(1)
-                    .BorderColor("#E0E0E0")
+                    .BorderColor(ReportThemeColors.GrayE0E0E0)
                     .Padding(15)
                     .Column(col =>
                     {
@@ -2212,7 +2156,7 @@ namespace PeaceEnablers.Common.Implementation
                                 {
                                     row.RelativeItem()
                                         .Text(source.SourceName ?? "-")
-                                        .FontSize(11).Bold().FontColor("#2c423b");
+                                        .FontSize(11).Bold().FontColor(ReportThemeColors.C2C423B);
 
                                     row.ConstantItem(100).AlignRight()
                                         .Background(GetSourceTypeBadgeColor(source.SourceType))
@@ -2227,12 +2171,12 @@ namespace PeaceEnablers.Common.Implementation
                                 {
                                     row.AutoItem()
                                         .Text(SanitizeText($"Trust Level: {source.TrustLevel}/7"))
-                                        .FontSize(9).FontColor("#757575");
+                                        .FontSize(9).FontColor(ReportThemeColors.Gray757575);
 
                                     row.AutoItem()
                                         .PaddingLeft(15)
                                         .Text(SanitizeText($"Year: {source.DataYear}"))
-                                        .FontSize(9).FontColor("#757575");
+                                        .FontSize(9).FontColor(ReportThemeColors.Gray757575);
                                 });
 
                                 // ── Data Extract ───────────────────────────
@@ -2241,7 +2185,7 @@ namespace PeaceEnablers.Common.Implementation
                                     sourceCol.Item().PaddingTop(6)
                                         .Text(TruncateText(source.DataExtract, 200))
                                         .FontSize(9)
-                                        .FontColor("#616161")
+                                        .FontColor(ReportThemeColors.Gray616161)
                                         .Italic();
                                 }
 
@@ -2251,7 +2195,7 @@ namespace PeaceEnablers.Common.Implementation
                                     sourceCol.Item().PaddingTop(4)
                                         .Text(source.SourceURL)
                                         .FontSize(8)
-                                        .FontColor("#305246")
+                                        .FontColor(ReportThemeColors.C305246)
                                         .Underline();
                                 }
                             });
@@ -2262,7 +2206,7 @@ namespace PeaceEnablers.Common.Implementation
                                 col.Item()
                                     .PaddingBottom(10)
                                     .LineHorizontal(1)
-                                    .LineColor("#EEEEEE");
+                                    .LineColor(ReportThemeColors.DividerLight);
                             }
                         }
                     });
@@ -2276,28 +2220,28 @@ namespace PeaceEnablers.Common.Implementation
 
         static SKColor GetColor(float value)
         {
-            if (value >= 80) return SKColor.Parse("#C62828");
-            else if (value >= 60) return SKColor.Parse("#c66528");
-            else if(value >= 40) return SKColor.Parse("#F9A825");
-            else if(value >= 20) return SKColor.Parse("#469449");
-            return SKColor.Parse("#2E7D32");
+            if (value >= 80) return SKColor.Parse(ReportThemeColors.DangerRed);
+            else if (value >= 60) return SKColor.Parse(ReportThemeColors.WarningOrange);
+            else if(value >= 40) return SKColor.Parse(ReportThemeColors.WarningAmber);
+            else if(value >= 20) return SKColor.Parse(ReportThemeColors.SuccessGreenMid);
+            return SKColor.Parse(ReportThemeColors.SuccessGreen);
         }
         static string GetBarColor(float value)
         {
-            if (value >= 80) return "#C62828";
-            else if (value >= 60) return "#c66528";
-            else if (value >= 40) return "#F9A825";
-            else if (value >= 20) return "#469449";
-            return "#2E7D32";
+            if (value >= 80) return ReportThemeColors.DangerRed;
+            else if (value >= 60) return ReportThemeColors.WarningOrange;
+            else if (value >= 40) return ReportThemeColors.WarningAmber;
+            else if (value >= 20) return ReportThemeColors.SuccessGreenMid;
+            return ReportThemeColors.SuccessGreen;
         }
 
         static string GetSourceTypeBadgeColor(string sourceType) => sourceType?.ToLower() switch
         {
-            "government" => "#133328",
-            "academic" => "#172923",
-            "international" => "#4d7d6d",
-            "news/ngo" => "#1ec990",
-            _ => "#0eeba1"
+            "government" => ReportThemeColors.SourceGovernment,
+            "academic" => ReportThemeColors.SourceAcademic,
+            "international" => ReportThemeColors.SourceInternational,
+            "news/ngo" => ReportThemeColors.SourceNewsNgo,
+            _ => ReportThemeColors.SourceDefault
         };
 
         static string Shorten(string text, int max)
@@ -2324,20 +2268,20 @@ namespace PeaceEnablers.Common.Implementation
         // Palette: index 0 = selected country (gold), 1-5 = peer countries
         private static readonly string[] CountryPalette =
         {
-            "#F0B429",   // gold  – selected country
-            "#4CAF8A",   // teal
-            "#1E88E5",   // blue
-            "#FB8C00",   // orange
-            "#7B61FF",   // purple
-            "#E05252",   // red
+            ReportThemeColors.ChartGold,   // gold  – selected country
+            ReportThemeColors.ChartTeal,   // teal
+            ReportThemeColors.ChartBlue,   // blue
+            ReportThemeColors.ChartOrange,   // orange
+            ReportThemeColors.ChartPurple,   // purple
+            ReportThemeColors.ChartRed,   // red
         };
 
         // Pillar palette (up to 14 distinct colours)
         private static readonly string[] PillarPalette =
         {
-            "#12352F","#336B58","#4CAF8A","#F0B429","#F5A623",
-            "#E05252","#7B61FF","#1E88E5","#43A047","#FB8C00",
-            "#0097A7","#8D6E63","#E91E63","#607D8B"
+            ReportThemeColors.PdfDarkGreen,ReportThemeColors.PdfMediumGreen,ReportThemeColors.ChartTeal,ReportThemeColors.ChartGold,ReportThemeColors.ChartAmber,
+            ReportThemeColors.ChartRed,ReportThemeColors.ChartPurple,ReportThemeColors.ChartBlue,ReportThemeColors.ChartLeaf,ReportThemeColors.ChartOrange,
+            ReportThemeColors.ChartCyan,ReportThemeColors.ChartBrown,ReportThemeColors.ChartPink,ReportThemeColors.ChartSlate
         };
 
         // ══════════════════════════════════════════════════════════════════════════
@@ -2471,7 +2415,7 @@ namespace PeaceEnablers.Common.Implementation
 
                 // ── Population bar chart ──────────────────────────────────────
                 col.Item().Text("Population Size by Country")
-                    .FontSize(11).Bold().FontColor("#12352f");
+                    .FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
 
                 col.Item().Height(all.Count * 40).Canvas((canvas, size) =>
                     DrawPopulationBars(canvas, size, all, countryDetails, maxPop));
@@ -2481,7 +2425,7 @@ namespace PeaceEnablers.Common.Implementation
                 // ── Score vs Population scatter ───────────────────────────────
                 col.Item().PaddingTop(8)
                     .Text("Score vs Population  (each dot = one country)")
-                    .FontSize(11).Bold().FontColor("#12352f");
+                    .FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
 
                 col.Item().Height(all.Count * 40).Canvas((canvas, size) =>
                     DrawScatterPlot(canvas, size, all, countryDetails,
@@ -2511,15 +2455,15 @@ namespace PeaceEnablers.Common.Implementation
                 // Row background
                 if (i % 2 == 0)
                     canvas.DrawRect(new SKRect(0, y - 2, size.Width, y + rowH - 4),
-                        new SKPaint { Color = SKColor.Parse("#f4f7f5") });
+                        new SKPaint { Color = SKColor.Parse(ReportThemeColors.PageBg) });
 
                 // Highlight selected country row
                 if (isMain)
                     canvas.DrawRect(new SKRect(0, y - 2, size.Width, y + rowH - 4),
-                        new SKPaint { Color = SKColor.Parse("#FFF8E1") });
+                        new SKPaint { Color = SKColor.Parse(ReportThemeColors.WarningAmberBg) });
 
                 DrawCanvasText(canvas, country.CountryName, 4, y + 5, 9,
-                    isMain ? "#12352f" : "#444444", bold: isMain);
+                    isMain ? ReportThemeColors.PdfDarkGreen : ReportThemeColors.TextMuted, bold: isMain);
 
                 string barColor = isMain ? CountryPalette[0] : CountryPalette[1 + (i % (CountryPalette.Length - 1))];
                 canvas.DrawRoundRect(
@@ -2527,7 +2471,7 @@ namespace PeaceEnablers.Common.Implementation
                     new SKPaint { Color = SKColor.Parse(barColor), IsAntialias = true });
 
                 DrawCanvasText(canvas, FormatPop(country.Population),
-                    labelW + barW + 5, y + 5, 9, "#555555");
+                    labelW + barW + 5, y + 5, 9, ReportThemeColors.TextMid);
             }
         }
 
@@ -2556,7 +2500,7 @@ namespace PeaceEnablers.Common.Implementation
                     $"{byRegion.Count} region(s)  |  {all.Count} total countries analysed"));
 
                 col.Item().Text("Country Distribution by Region")
-                    .FontSize(11).Bold().FontColor("#12352f");
+                    .FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
 
                 col.Item().Height(180).Canvas((canvas, size) =>
                     DrawDonutChart(canvas, size,
@@ -2564,7 +2508,7 @@ namespace PeaceEnablers.Common.Implementation
 
                 col.Item().PaddingTop(4)
                     .Text("Average Score per Region")
-                    .FontSize(11).Bold().FontColor("#12352f");
+                    .FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
 
                 col.Item().Canvas((canvas, size) =>
                 {
@@ -2589,14 +2533,14 @@ namespace PeaceEnablers.Common.Implementation
 
                         if (i % 2 == 0)
                             canvas.DrawRect(new SKRect(0, y - 2, size.Width, y + barH - 4),
-                                new SKPaint { Color = SKColor.Parse("#f4f7f5") });
+                                new SKPaint { Color = SKColor.Parse(ReportThemeColors.PageBg) });
 
-                        DrawCanvasText(canvas, r.Region, 4, y + 5, 9, "#333333");
+                        DrawCanvasText(canvas, r.Region, 4, y + 5, 9, ReportThemeColors.TextBody);
                         canvas.DrawRoundRect(
                             new SKRoundRect(new SKRect(labelW, y + 3, labelW + barW, y + barH - 6), 3),
                             new SKPaint { Color = SKColor.Parse(ScoreColor(r.Avg)), IsAntialias = true });
                         DrawCanvasText(canvas, $"{r.Avg:F1}  (n={r.Count})",
-                            labelW + barW + 5, y + 5, 9, "#555555");
+                            labelW + barW + 5, y + 5, 9, ReportThemeColors.TextMid);
                     }
                 });
             });
@@ -2616,11 +2560,11 @@ namespace PeaceEnablers.Common.Implementation
         {
             return category switch
             {
-                "Low Income" => "#D9534F",          // softer red
-                "Lower-Middle Income" => "#F0AD4E", // amber
-                "Upper-Middle Income" => "#5BC0DE", // blue-green
-                "High Income" => "#2E7D32",         // strong green
-                _ => "#999999"
+                "Low Income" => ReportThemeColors.PenaltyRed,          // softer red
+                "Lower-Middle Income" => ReportThemeColors.WarningGold, // amber
+                "Upper-Middle Income" => ReportThemeColors.InfoBlue, // blue-green
+                "High Income" => ReportThemeColors.SuccessGreen,         // strong green
+                _ => ReportThemeColors.TextPale
             };
         }
 
@@ -2655,7 +2599,7 @@ namespace PeaceEnablers.Common.Implementation
 
                 // ── Avg score per quartile bars (UNCHANGED) ──────────────────
                 col.Item().Text("Average Score by Income Quartile")
-                    .FontSize(11).Bold().FontColor("#12352f");
+                    .FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
 
                 col.Item().Height(130).Canvas((canvas, size) =>
                 {
@@ -2673,16 +2617,16 @@ namespace PeaceEnablers.Common.Implementation
                             new SKRoundRect(new SKRect(x, 100 - barH, x + barAreaW, 100), 6),
                             new SKPaint { Color = SKColor.Parse(GetSegmentColor(label)), IsAntialias = true });
 
-                        DrawCanvasText(canvas, $"{avg:F1}", x + barAreaW / 2 - 10, 100 - barH - 14, 9, "#12352f", true);
-                        DrawCanvasText(canvas, label, x, 108, 8, "#555555");
-                        DrawCanvasText(canvas, $"n={countries.Count}", x, 118, 8, "#888888");
+                        DrawCanvasText(canvas, $"{avg:F1}", x + barAreaW / 2 - 10, 100 - barH - 14, 9, ReportThemeColors.PdfDarkGreen, true);
+                        DrawCanvasText(canvas, label, x, 108, 8, ReportThemeColors.TextMid);
+                        DrawCanvasText(canvas, $"n={countries.Count}", x, 118, 8, ReportThemeColors.TextFaint);
                     }
                 });
 
                 // ── Scatter: Income vs Score (UNCHANGED) ─────────────────────
                 col.Item().PaddingTop(4)
                     .Text("Income vs Composite Score  (each dot = one country)")
-                    .FontSize(11).Bold().FontColor("#12352f");
+                    .FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
 
                 col.Item().Height(160).Canvas((canvas, size) =>
                     DrawScatterPlot(canvas, size, withIncome, countryDetails,
@@ -2694,7 +2638,7 @@ namespace PeaceEnablers.Common.Implementation
                 // ── Top performers table (UPDATED — PPP column added) ────────
                 col.Item().PaddingTop(8)
                     .Text("Top Performers by Income Group")
-                    .FontSize(11).Bold().FontColor("#12352f");
+                    .FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
 
                 col.Item().Table(table =>
                 {
@@ -2718,20 +2662,20 @@ namespace PeaceEnablers.Common.Implementation
                         foreach (var country in countries.OrderByDescending(c => GetLatestScoreOrZero(c)))
                         {
                             bool isMain = IsSameCountry(country.CountryName, countryDetails.Continent);
-                            string rowBg = isMain ? "#fff9e6" : Colors.White;
+                            string rowBg = isMain ? ReportThemeColors.HighlightBg : Colors.White;
                             float score = GetLatestScoreOrZero(country);
 
-                            table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor("#e0e0e0")
+                            table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor(ReportThemeColors.GrayE0E0E0)
                                 .Padding(5).Text(country.CountryName).FontSize(8)
-                                .FontColor(isMain ? "#12352f" : "#333333");
-                            table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor("#e0e0e0")
-                                .Padding(5).Text(country.Country ?? "—").FontSize(8).FontColor("#555555");
-                            table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor("#e0e0e0")
+                                .FontColor(isMain ? ReportThemeColors.PdfDarkGreen : ReportThemeColors.TextBody);
+                            table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor(ReportThemeColors.GrayE0E0E0)
+                                .Padding(5).Text(country.Country ?? "—").FontSize(8).FontColor(ReportThemeColors.TextMid);
+                            table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor(ReportThemeColors.GrayE0E0E0)
                                 .Padding(5).Text($"{score:F1}").FontSize(8).Bold().FontColor(ScoreColor(score));
-                            table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor("#e0e0e0")
-                                .Padding(5).Text(label).FontSize(8).FontColor("#555555");
-                            table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor("#e0e0e0")
-                                .Padding(5).Text(FormatPop(country.Income).ToString()).FontSize(8).FontColor("#555555");
+                            table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor(ReportThemeColors.GrayE0E0E0)
+                                .Padding(5).Text(label).FontSize(8).FontColor(ReportThemeColors.TextMid);
+                            table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor(ReportThemeColors.GrayE0E0E0)
+                                .Padding(5).Text(FormatPop(country.Income).ToString()).FontSize(8).FontColor(ReportThemeColors.TextMid);
 
 
                         }
@@ -2767,35 +2711,35 @@ namespace PeaceEnablers.Common.Implementation
                 col.Spacing(12);
 
                 // ── Hero rank banner ──────────────────────────────────────────
-                col.Item().Background("#12352f").Padding(14).Row(row =>
+                col.Item().Background(ReportThemeColors.PdfDarkGreen).Padding(14).Row(row =>
                 {
                     row.RelativeItem().Column(c =>
                     {
                         c.Item().Text($"#{mainRank} of {total}")
-                            .FontSize(32).Bold().FontColor("#f0b429");
+                            .FontSize(32).Bold().FontColor(ReportThemeColors.ChartGold);
                         c.Item().Text($"{countryDetails.CountryName}  \u00b7  {countryDetails.Continent}")
-                            .FontSize(12).FontColor("#a5d6c2");
+                            .FontSize(12).FontColor(ReportThemeColors.TrackGreen);
                     });
                     row.ConstantItem(130).Column(c =>
                     {
-                        c.Item().AlignRight().Text("Score").FontSize(9).FontColor("#a5a8ad");
+                        c.Item().AlignRight().Text("Score").FontSize(9).FontColor(ReportThemeColors.GrayA5A8AD);
                         c.Item().AlignRight().Text($"{mainScore:F1}")
                             .FontSize(28).Bold().FontColor(Colors.White);
                         c.Item().AlignRight().Text($"Top {100 - pctile:F0}% of peers")
-                            .FontSize(10).FontColor("#4caf8a");
+                            .FontSize(10).FontColor(ReportThemeColors.ChartTeal);
                     });
                 });
 
                 // ── Score distribution histogram ──────────────────────────────
                 col.Item().Text("Score Distribution Among All countries")
-                    .FontSize(11).Bold().FontColor("#12352f");
+                    .FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
 
                 col.Item().Height(150).Canvas((canvas, size) =>
                     DrawHistogram(canvas, size,
                         all.Select(r => r.Score).ToList(), mainScore, 10));
 
                 // ── Full ranking table ────────────────────────────────────────
-                col.Item().Text("Full Country Ranking").FontSize(11).Bold().FontColor("#12352f");
+                col.Item().Text("Full Country Ranking").FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
 
                 col.Item().Table(table =>
                 {
@@ -2815,36 +2759,36 @@ namespace PeaceEnablers.Common.Implementation
                     foreach (var (entry, idx) in all.Select((e, i) => (e, i)))
                     {
                         bool isMain = IsSameCountry(entry.Country.CountryName, countryDetails.CountryName);
-                        string bg = isMain ? "#fff9e6" : (idx % 2 == 0 ? Colors.White : "#fafafa");
-                        string rankColor = idx == 0 ? "#f0b429"
-                                         : idx == 1 ? "#a5a8ad"
-                                         : idx == 2 ? "#cd7f32" : "#555555";
+                        string bg = isMain ? ReportThemeColors.HighlightBg : (idx % 2 == 0 ? Colors.White : ReportThemeColors.RowPale);
+                        string rankColor = idx == 0 ? ReportThemeColors.ChartGold
+                                         : idx == 1 ? ReportThemeColors.GrayA5A8AD
+                                         : idx == 2 ? ReportThemeColors.Bronze : ReportThemeColors.TextMid;
 
-                        table.Cell().Background(bg).BorderBottom(0.5f).BorderColor("#e8e8e8")
+                        table.Cell().Background(bg).BorderBottom(0.5f).BorderColor(ReportThemeColors.ShadeE8E8E8)
                             .Padding(4).Text($"{idx + 1}").FontSize(8).FontColor(rankColor);
-                        table.Cell().Background(bg).BorderBottom(0.5f).BorderColor("#e8e8e8")
+                        table.Cell().Background(bg).BorderBottom(0.5f).BorderColor(ReportThemeColors.ShadeE8E8E8)
                             .Padding(4).Text(entry.Country.CountryName).FontSize(8)
-                            .FontColor(isMain ? "#12352f" : "#333333");
-                        table.Cell().Background(bg).BorderBottom(0.5f).BorderColor("#e8e8e8")
-                            .Padding(4).Text(entry.Country.Continent ?? "—").FontSize(8).FontColor("#555555");
-                        table.Cell().Background(bg).BorderBottom(0.5f).BorderColor("#e8e8e8")
-                            .Padding(4).Text(entry.Country.Region ?? "—").FontSize(8).FontColor("#555555");
-                        table.Cell().Background(bg).BorderBottom(0.5f).BorderColor("#e8e8e8")
+                            .FontColor(isMain ? ReportThemeColors.PdfDarkGreen : ReportThemeColors.TextBody);
+                        table.Cell().Background(bg).BorderBottom(0.5f).BorderColor(ReportThemeColors.ShadeE8E8E8)
+                            .Padding(4).Text(entry.Country.Continent ?? "—").FontSize(8).FontColor(ReportThemeColors.TextMid);
+                        table.Cell().Background(bg).BorderBottom(0.5f).BorderColor(ReportThemeColors.ShadeE8E8E8)
+                            .Padding(4).Text(entry.Country.Region ?? "—").FontSize(8).FontColor(ReportThemeColors.TextMid);
+                        table.Cell().Background(bg).BorderBottom(0.5f).BorderColor(ReportThemeColors.ShadeE8E8E8)
                             .Padding(4).AlignRight()
-                            .Text(FormatPop(entry.Country.Population)).FontSize(8).FontColor("#555555");
+                            .Text(FormatPop(entry.Country.Population)).FontSize(8).FontColor(ReportThemeColors.TextMid);
 
                         table.Cell()
                         .Background(bg)
                         .BorderBottom(0.5f)
-                        .BorderColor("#e8e8e8")
+                        .BorderColor(ReportThemeColors.ShadeE8E8E8)
                         .Padding(4)
                         .Row(r =>
                         {
                             var percent = entry.Score / 100f;
 
-                            r.RelativeItem().Height(10).Background("#eeeeee").Layers(layer =>
+                            r.RelativeItem().Height(10).Background(ReportThemeColors.DividerLight).Layers(layer =>
                             {
-                                layer.PrimaryLayer().Background("#eeeeee");
+                                layer.PrimaryLayer().Background(ReportThemeColors.DividerLight);
 
                                 layer.Layer().Width((float)percent * 100)
                                     .Background(ScoreColor(entry.Score));
@@ -2852,7 +2796,7 @@ namespace PeaceEnablers.Common.Implementation
 
                             r.ConstantItem(24).AlignRight().Text($"{entry.Score:F1}")
                                 .FontSize(8)
-                                .FontColor("#333333");
+                                .FontColor(ReportThemeColors.TextBody);
                         });
                     }
                 });
@@ -2918,7 +2862,7 @@ namespace PeaceEnablers.Common.Implementation
 
                 // ── 6.1  Multi-line trend ────────────────────────────────────
                 col.Item().Text("6.1  Historical Score Trend")
-                    .FontSize(12).Bold().FontColor("#12352f");
+                    .FontSize(12).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
 
                 col.Item().Height(190).Canvas((canvas, size) =>
                     DrawMultiLineTrendChart(canvas, size, allYears, peers, mainCountry, countryDetails, peerAvg));
@@ -2926,11 +2870,11 @@ namespace PeaceEnablers.Common.Implementation
                 // Legend: one entry per country
                 col.Item().Element(x => DrawCountryLineLegend(x, mainCountry, peers, countryDetails));
 
-                col.Item().PaddingVertical(4).LineHorizontal(0.5f).LineColor("#e0e0e0");
+                col.Item().PaddingVertical(4).LineHorizontal(0.5f).LineColor(ReportThemeColors.GrayE0E0E0);
 
                 // ── 6.2  Five-year area chart ────────────────────────────────
                 col.Item().Text("6.2  Five-Year Composite Score Evolution")
-                    .FontSize(12).Bold().FontColor("#12352f");
+                    .FontSize(12).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
 
                 var last5 = allYears.TakeLast(5).ToList();
                 var mainLast5 = mainHistory.Where(h => last5.Contains(h.Year))
@@ -2965,31 +2909,31 @@ namespace PeaceEnablers.Common.Implementation
                 });
 
                 // Header
-                table.Cell().Background("#12352f").Padding(5)
+                table.Cell().Background(ReportThemeColors.PdfDarkGreen).Padding(5)
                     .Text("Metric").FontSize(8).Bold().FontColor(Colors.White);
                 foreach (var yr in years)
-                    table.Cell().Background("#12352f").Padding(5).AlignRight()
+                    table.Cell().Background(ReportThemeColors.PdfDarkGreen).Padding(5).AlignRight()
                         .Text(yr.ToString()).FontSize(8).Bold().FontColor(Colors.White);
 
                 // Score row
-                table.Cell().Background("#f4f7f5").Padding(5)
-                    .Text("Score").FontSize(8).FontColor("#333333");
+                table.Cell().Background(ReportThemeColors.PageBg).Padding(5)
+                    .Text("Score").FontSize(8).FontColor(ReportThemeColors.TextBody);
                 foreach (var yr in years)
                 {
                     float s = (float)(mainHistory.FirstOrDefault(h => h.Year == yr)?.ScoreProgress ?? 0);
-                    table.Cell().Background("#f4f7f5").Padding(5).AlignRight()
+                    table.Cell().Background(ReportThemeColors.PageBg).Padding(5).AlignRight()
                         .Text($"{s:F1}").FontSize(8).Bold().FontColor(ScoreColor(s));
                 }
 
                 // YoY delta
                 table.Cell().Background(Colors.White).Padding(5)
-                    .Text("YoY \u0394").FontSize(8).FontColor("#333333");
+                    .Text("YoY \u0394").FontSize(8).FontColor(ReportThemeColors.TextBody);
                 for (int i = 0; i < years.Count; i++)
                 {
                     if (i == 0)
                     {
                         table.Cell().Background(Colors.White).Padding(5)
-                            .Text("—").FontSize(8).FontColor("#aaaaaa");
+                            .Text("—").FontSize(8).FontColor(ReportThemeColors.GrayAAAAAA);
                         continue;
                     }
                     float prev = (float)(mainHistory.FirstOrDefault(h => h.Year == years[i - 1])?.ScoreProgress ?? 0);
@@ -2997,20 +2941,20 @@ namespace PeaceEnablers.Common.Implementation
                     float d = curr - prev;
                     table.Cell().Background(Colors.White).Padding(5).AlignRight()
                         .Text($"{(d >= 0 ? "+" : "")}{d:F1}").FontSize(8)
-                        .FontColor(d >= 0 ? "#336b58" : "#e05252");
+                        .FontColor(d >= 0 ? ReportThemeColors.PdfMediumGreen : ReportThemeColors.ChartRed);
                 }
 
                 // vs Peers
-                table.Cell().Background("#f4f7f5").Padding(5)
-                    .Text("vs Peers").FontSize(8).FontColor("#333333");
+                table.Cell().Background(ReportThemeColors.PageBg).Padding(5)
+                    .Text("vs Peers").FontSize(8).FontColor(ReportThemeColors.TextBody);
                 foreach (var yr in years)
                 {
                     float myS = (float)(mainHistory.FirstOrDefault(h => h.Year == yr)?.ScoreProgress ?? 0);
                     float pAvg = peerAvg.FirstOrDefault(p => p.Year == yr).Avg;
                     float d = myS - pAvg;
-                    table.Cell().Background("#f4f7f5").Padding(5).AlignRight()
+                    table.Cell().Background(ReportThemeColors.PageBg).Padding(5).AlignRight()
                         .Text($"{(d >= 0 ? "+" : "")}{d:F1}").FontSize(8)
-                        .FontColor(d >= 0 ? "#336b58" : "#e05252");
+                        .FontColor(d >= 0 ? ReportThemeColors.PdfMediumGreen : ReportThemeColors.ChartRed);
                 }
             });
         }
@@ -3048,7 +2992,7 @@ namespace PeaceEnablers.Common.Implementation
                     $"{pillars.Count} pillar(s)  |  {allYears.Count} year(s)  |  Country: {mainCountry.CountryName}"));
 
                 col.Item().Text("Pillar Score Trajectory Over Time")
-                    .FontSize(11).Bold().FontColor("#12352f");
+                    .FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
 
                 col.Item().Height(200).Canvas((canvas, size) =>
                     DrawPillarLineChart(canvas, size, allYears, history, pillars));
@@ -3061,7 +3005,7 @@ namespace PeaceEnablers.Common.Implementation
                 // ── Pillar heatmap table ──────────────────────────────────────
                 col.Item().PaddingTop(4)
                     .Text("Pillar Score Heatmap  (darker = higher score)")
-                    .FontSize(11).Bold().FontColor("#12352f");
+                    .FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
 
                 col.Item().Table(table =>
                 {
@@ -3071,19 +3015,19 @@ namespace PeaceEnablers.Common.Implementation
                         foreach (var _ in allYears) cols.RelativeColumn();
                     });
 
-                    table.Cell().Background("#12352f").Padding(5)
+                    table.Cell().Background(ReportThemeColors.PdfDarkGreen).Padding(5)
                         .Text("Pillar").FontSize(8).Bold().FontColor(Colors.White);
                     foreach (var yr in allYears)
-                        table.Cell().Background("#12352f").Padding(5).AlignCenter()
+                        table.Cell().Background(ReportThemeColors.PdfDarkGreen).Padding(5).AlignCenter()
                             .Text(yr.ToString()).FontSize(8).Bold().FontColor(Colors.White);
 
                     foreach (var (pillar, pi) in pillars.Select((p, i) => (p, i)))
                     {
-                        string rowBg = pi % 2 == 0 ? "#f4f7f5" : Colors.White;
+                        string rowBg = pi % 2 == 0 ? ReportThemeColors.PageBg : Colors.White;
 
-                        table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor("#e0e0e0")
+                        table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor(ReportThemeColors.GrayE0E0E0)
                             .Padding(5).Text(pillar.PillarName).FontSize(8)
-                            .Bold().FontColor("#12352f");
+                            .Bold().FontColor(ReportThemeColors.PdfDarkGreen);
 
                         foreach (var yr in allYears)
                         {
@@ -3093,13 +3037,13 @@ namespace PeaceEnablers.Common.Implementation
                             bool hasData = ps != null;
                             float score = hasData ? (float)ps!.ScoreProgress : -1f;
 
-                            string cellBg = !hasData ? "#f0f0f0"
-                                : InterpolateColor("#ffffff", "#12352f", score / 100f);
+                            string cellBg = !hasData ? ReportThemeColors.SubHeaderBg
+                                : InterpolateColor(ReportThemeColors.White, ReportThemeColors.PdfDarkGreen, score / 100f);
 
-                            table.Cell().Background(cellBg).BorderBottom(0.5f).BorderColor("#e0e0e0")
+                            table.Cell().Background(cellBg).BorderBottom(0.5f).BorderColor(ReportThemeColors.GrayE0E0E0)
                                 .Padding(4).AlignCenter()
                                 .Text(!hasData ? "—" : $"{score:F1}").FontSize(8)
-                                .FontColor(score >= 50 ? Colors.White : "#333333");
+                                .FontColor(score >= 50 ? Colors.White : ReportThemeColors.TextBody);
                         }
                     }
                 });
@@ -3108,7 +3052,7 @@ namespace PeaceEnablers.Common.Implementation
                 if (allYears.Count >= 2 && pillars.Any())
                 {
                     col.Item().PaddingTop(6)
-                        .Text("Pillar Trend Highlights").FontSize(11).Bold().FontColor("#12352f");
+                        .Text("Pillar Trend Highlights").FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
 
                     var pillarDeltas = pillars.Select(p =>
                     {
@@ -3123,30 +3067,30 @@ namespace PeaceEnablers.Common.Implementation
                     col.Item().Row(row =>
                     {
                         // Most improved  (replaced emoji with ASCII arrow)
-                        row.RelativeItem().Background("#e8f5e9").Padding(10).Column(c =>
+                        row.RelativeItem().Background(ReportThemeColors.SuccessGreenBg).Padding(10).Column(c =>
                         {
-                            c.Item().Text("(+) Most Improved").FontSize(9).Bold().FontColor("#336b58");
+                            c.Item().Text("(+) Most Improved").FontSize(9).Bold().FontColor(ReportThemeColors.PdfMediumGreen);
                             foreach (var pd in pillarDeltas.Take(3))
                                 c.Item().Row(r =>
                                 {
-                                    r.RelativeItem().Text(Shorten(pd.Name, 28)).FontSize(8).FontColor("#333333");
+                                    r.RelativeItem().Text(Shorten(pd.Name, 28)).FontSize(8).FontColor(ReportThemeColors.TextBody);
                                     r.ConstantItem(44).AlignRight()
-                                        .Text($"+{pd.Delta:F1}").FontSize(8).Bold().FontColor("#336b58");
+                                        .Text($"+{pd.Delta:F1}").FontSize(8).Bold().FontColor(ReportThemeColors.PdfMediumGreen);
                                 });
                         });
 
                         row.ConstantItem(10);
 
                         // Needs attention  (replaced emoji with ASCII)
-                        row.RelativeItem().Background("#fdecea").Padding(10).Column(c =>
+                        row.RelativeItem().Background(ReportThemeColors.DangerRedBg).Padding(10).Column(c =>
                         {
-                            c.Item().Text("(!) Needs Attention").FontSize(9).Bold().FontColor("#e05252");
+                            c.Item().Text("(!) Needs Attention").FontSize(9).Bold().FontColor(ReportThemeColors.ChartRed);
                             foreach (var pd in pillarDeltas.TakeLast(3).Reverse())
                                 c.Item().Row(r =>
                                 {
-                                    r.RelativeItem().Text(Shorten(pd.Name, 28)).FontSize(8).FontColor("#333333");
+                                    r.RelativeItem().Text(Shorten(pd.Name, 28)).FontSize(8).FontColor(ReportThemeColors.TextBody);
                                     r.ConstantItem(44).AlignRight()
-                                        .Text($"{pd.Delta:F1}").FontSize(8).Bold().FontColor("#e05252");
+                                        .Text($"{pd.Delta:F1}").FontSize(8).Bold().FontColor(ReportThemeColors.ChartRed);
                                 });
                         });
                     });
@@ -3184,15 +3128,15 @@ namespace PeaceEnablers.Common.Implementation
             {
                 float y = Yp(s);
                 canvas.DrawLine(padL, y, padL + w, y,
-                    new SKPaint { Color = SKColor.Parse("#e8e8e8"), StrokeWidth = 0.5f });
-                DrawCanvasText(canvas, s.ToString(), 2, y - 5, 7, "#aaaaaa");
+                    new SKPaint { Color = SKColor.Parse(ReportThemeColors.ShadeE8E8E8), StrokeWidth = 0.5f });
+                DrawCanvasText(canvas, s.ToString(), 2, y - 5, 7, ReportThemeColors.GrayAAAAAA);
             }
             foreach (int yr in years)
             {
                 float x = Xp(yr);
                 canvas.DrawLine(x, padT, x, padT + h,
-                    new SKPaint { Color = SKColor.Parse("#f0f0f0"), StrokeWidth = 0.5f });
-                DrawCanvasText(canvas, yr.ToString(), x - 14, padT + h + 7, 7, "#888888");
+                    new SKPaint { Color = SKColor.Parse(ReportThemeColors.SubHeaderBg), StrokeWidth = 0.5f });
+                DrawCanvasText(canvas, yr.ToString(), x - 14, padT + h + 7, 7, ReportThemeColors.TextFaint);
             }
 
             // Peer average (dashed green)
@@ -3201,7 +3145,7 @@ namespace PeaceEnablers.Common.Implementation
             DrawDashedPolyline(canvas, avgPts,
                 new SKPaint
                 {
-                    Color = SKColor.Parse("#4CAF8A"),
+                    Color = SKColor.Parse(ReportThemeColors.ChartTeal),
                     StrokeWidth = 1.5f,
                     IsAntialias = true,
                     IsStroke = true
@@ -3269,11 +3213,11 @@ namespace PeaceEnablers.Common.Implementation
             {
                 float y = Yp(s);
                 canvas.DrawLine(padL, y, padL + w, y,
-                    new SKPaint { Color = SKColor.Parse("#e8e8e8"), StrokeWidth = 0.5f });
-                DrawCanvasText(canvas, s.ToString(), 2, y - 5, 7, "#aaaaaa");
+                    new SKPaint { Color = SKColor.Parse(ReportThemeColors.ShadeE8E8E8), StrokeWidth = 0.5f });
+                DrawCanvasText(canvas, s.ToString(), 2, y - 5, 7, ReportThemeColors.GrayAAAAAA);
             }
             foreach (int yr in years)
-                DrawCanvasText(canvas, yr.ToString(), Xp(yr) - 12, padT + h + 5, 7, "#888888");
+                DrawCanvasText(canvas, yr.ToString(), Xp(yr) - 12, padT + h + 5, 7, ReportThemeColors.TextFaint);
 
             // Peer area
             var peerPath = new SKPath();
@@ -3286,7 +3230,7 @@ namespace PeaceEnablers.Common.Implementation
             peerPath.LineTo(Xp(years.Last()), Yp(0));
             peerPath.Close();
             canvas.DrawPath(peerPath,
-                new SKPaint { Color = SKColor.Parse("#4CAF8A").WithAlpha(40), IsAntialias = true });
+                new SKPaint { Color = SKColor.Parse(ReportThemeColors.ChartTeal).WithAlpha(40), IsAntialias = true });
 
             // Main area
             var mainPath = new SKPath();
@@ -3307,7 +3251,7 @@ namespace PeaceEnablers.Common.Implementation
                     Yp(peerAvg.FirstOrDefault(p => p.Year == yr).Avg))).ToList(),
                 new SKPaint
                 {
-                    Color = SKColor.Parse("#4CAF8A"),
+                    Color = SKColor.Parse(ReportThemeColors.ChartTeal),
                     StrokeWidth = 1.5f,
                     IsAntialias = true,
                     IsStroke = true
@@ -3345,11 +3289,11 @@ namespace PeaceEnablers.Common.Implementation
             {
                 float y = Yp(s);
                 canvas.DrawLine(padL, y, padL + w, y,
-                    new SKPaint { Color = SKColor.Parse("#e8e8e8"), StrokeWidth = 0.5f });
-                DrawCanvasText(canvas, s.ToString(), 2, y - 5, 7, "#aaaaaa");
+                    new SKPaint { Color = SKColor.Parse(ReportThemeColors.ShadeE8E8E8), StrokeWidth = 0.5f });
+                DrawCanvasText(canvas, s.ToString(), 2, y - 5, 7, ReportThemeColors.GrayAAAAAA);
             }
             foreach (int yr in years)
-                DrawCanvasText(canvas, yr.ToString(), Xp(yr) - 12, padT + h + 5, 7, "#888888");
+                DrawCanvasText(canvas, yr.ToString(), Xp(yr) - 12, padT + h + 5, 7, ReportThemeColors.TextFaint);
 
             for (int pi = 0; pi < pillars.Count; pi++)
             {
@@ -3404,16 +3348,16 @@ namespace PeaceEnablers.Common.Implementation
 
             // Axes
             canvas.DrawLine(padL, padT, padL, padT + h,
-                new SKPaint { Color = SKColor.Parse("#aaaaaa"), StrokeWidth = 0.8f });
+                new SKPaint { Color = SKColor.Parse(ReportThemeColors.GrayAAAAAA), StrokeWidth = 0.8f });
             canvas.DrawLine(padL, padT + h, padL + w, padT + h,
-                new SKPaint { Color = SKColor.Parse("#aaaaaa"), StrokeWidth = 0.8f });
+                new SKPaint { Color = SKColor.Parse(ReportThemeColors.GrayAAAAAA), StrokeWidth = 0.8f });
 
             foreach (int s in new[] { 0, 25, 50, 75, 100 })
             {
                 float y = Yp(s);
                 canvas.DrawLine(padL, y, padL + w, y,
-                    new SKPaint { Color = SKColor.Parse("#eeeeee"), StrokeWidth = 0.5f });
-                DrawCanvasText(canvas, s.ToString(), 2, y - 5, 7, "#999999");
+                    new SKPaint { Color = SKColor.Parse(ReportThemeColors.DividerLight), StrokeWidth = 0.5f });
+                DrawCanvasText(canvas, s.ToString(), 2, y - 5, 7, ReportThemeColors.TextPale);
             }
 
             for (int i = 0; i < countries.Count; i++)
@@ -3431,15 +3375,15 @@ namespace PeaceEnablers.Common.Implementation
                     canvas.DrawCircle(x, y, 6f,
                         new SKPaint
                         {
-                            Color = SKColor.Parse("#12352f"),
+                            Color = SKColor.Parse(ReportThemeColors.PdfDarkGreen),
                             IsStroke = true,
                             StrokeWidth = 1.5f,
                             IsAntialias = true
                         });
             }
 
-            DrawCanvasText(canvas, xLabel, padL + w / 2 - 22, padT + h + 14, 8, "#666666");
-            DrawCanvasText(canvas, yLabel, 2, padT + h / 2, 8, "#666666");
+            DrawCanvasText(canvas, xLabel, padL + w / 2 - 22, padT + h + 14, 8, ReportThemeColors.TextLabel);
+            DrawCanvasText(canvas, yLabel, 2, padT + h / 2, 8, ReportThemeColors.TextLabel);
         }
 
         void DrawDonutChart(SKCanvas canvas, Size size, List<(string Label, float Value)> segments)
@@ -3470,8 +3414,8 @@ namespace PeaceEnablers.Common.Implementation
             }
 
             // Centre count
-            DrawCanvasText(canvas, $"{segments.Count}", cx - 8, cy - 8, 14, "#12352f", bold: true);
-            DrawCanvasText(canvas, "groups", cx - 16, cy + 6, 7, "#555555");
+            DrawCanvasText(canvas, $"{segments.Count}", cx - 8, cy - 8, 14, ReportThemeColors.PdfDarkGreen, bold: true);
+            DrawCanvasText(canvas, "groups", cx - 16, cy + 6, 7, ReportThemeColors.TextMid);
 
             // Legend right of donut
             float lx = cx + outerR + 14f;
@@ -3487,7 +3431,7 @@ namespace PeaceEnablers.Common.Implementation
                     });
                 DrawCanvasText(canvas,
                     $"{Shorten(segments[i].Label, 18)}  ({segments[i].Value:F0})",
-                    lx + 14, ly, 8, "#333333");
+                    lx + 14, ly, 8, ReportThemeColors.TextBody);
             }
         }
 
@@ -3522,12 +3466,12 @@ namespace PeaceEnablers.Common.Implementation
                     new SKPaint { Color = SKColor.Parse(ScoreColor(midScr)), IsAntialias = true });
 
                 if (counts[b] > 0)
-                    DrawCanvasText(canvas, counts[b].ToString(), x + 3, padT + h - bH - 12, 7, "#555555");
+                    DrawCanvasText(canvas, counts[b].ToString(), x + 3, padT + h - bH - 12, 7, ReportThemeColors.TextMid);
             }
 
             for (int b = 0; b <= bins; b += 2)
                 DrawCanvasText(canvas, (b * bucketSz).ToString("F0"),
-                    padL + b * binW - 6, padT + h + 5, 7, "#888888");
+                    padL + b * binW - 6, padT + h + 5, 7, ReportThemeColors.TextFaint);
 
             // Marker for selected country
             float mx = padL + Math.Clamp(markerValue, 0, 100) / 100f * w;
@@ -3547,15 +3491,15 @@ namespace PeaceEnablers.Common.Implementation
 
         void DrawInsightBand(IContainer container, string text)
         {
-            container.Background("#e8f5e9").Padding(8)
-                .Text(text).FontSize(8.5f).FontColor("#12352f");
+            container.Background(ReportThemeColors.SuccessGreenBg).Padding(8)
+                .Text(text).FontSize(8.5f).FontColor(ReportThemeColors.PdfDarkGreen);
         }
 
         void DrawNoDataPage(IContainer container)
         {
             container.AlignCenter().AlignMiddle()
                 .Text("No data available for this section.")
-                .FontSize(12).FontColor("#aaaaaa");
+                .FontSize(12).FontColor(ReportThemeColors.GrayAAAAAA);
         }
         void DrawLegend(IContainer container, (string Color, string Label)[] items, int textsize = 20)
         {
@@ -3571,7 +3515,7 @@ namespace PeaceEnablers.Common.Implementation
                     row.AutoItem().AlignMiddle()
                         .Text("Legend:  ")
                         .FontSize(8)
-                        .FontColor("#888888");
+                        .FontColor(ReportThemeColors.TextFaint);
                 });
 
                 foreach (var group in groups)
@@ -3590,7 +3534,7 @@ namespace PeaceEnablers.Common.Implementation
                                 .PaddingRight(10)
                                 .Text(Shorten(label, textsize))
                                 .FontSize(8)
-                                .FontColor("#555555");
+                                .FontColor(ReportThemeColors.TextMid);
                         }
                     });
                 }
@@ -3607,7 +3551,7 @@ namespace PeaceEnablers.Common.Implementation
             var items = new List<(string Color, string Label)>
             {
                 (CountryPalette[0],  $"{countryDetails.CountryName} (selected)"),
-                ("#4CAF8A",       "Peer Average")
+                (ReportThemeColors.ChartTeal,       "Peer Average")
             };
             for (int i = 0; i < peers.Count; i++)
                 items.Add((CountryPalette[1 + (i % (CountryPalette.Length - 1))], peers[i].CountryName));
@@ -3633,10 +3577,63 @@ namespace PeaceEnablers.Common.Implementation
             DrawLegend(container, items);
         }
 
+        void SelectedPillarMarkedContent(
+    IContainer container, AiCountryPillarResponse data, CountryPillarRankingResultDto? pillarRank, UserRole userRole)
+        {
+            container.PaddingTop(8).Column(column =>
+            {
+                column.Item().PaddingTop(10)
+                    .Element(c => PillarProgressSection(c, data, userRole));
+
+                column.Item().PaddingTop(10)
+                    .Element(c => SelectedPillarRankTable(c, pillarRank));
+
+                column.Item().PaddingTop(10).Element(c =>
+                    PillarContentSection(c, "Executive Summary", SanitizeText(data.EvidenceSummary ?? ""), ReportThemeColors.AccentExecutiveSummary));
+
+            });
+        }
+        void SelectedPillarRankTable(IContainer container, CountryPillarRankingResultDto? data)
+        {
+            static string FormatRank(int rank, int total) =>
+                rank > 0 && total > 0 ? $"{rank} / {total}" : "-";
+
+            container
+                .Border(1).BorderColor(ReportThemeColors.Gray300)
+                .Table(table =>
+                {
+                    table.ColumnsDefinition(columns =>
+                    {
+                        columns.RelativeColumn(3);
+                        columns.RelativeColumn(1);
+                    });
+
+                    table.Header(header =>
+                    {
+                        header.Cell().Background(ReportThemeColors.Gray100).Padding(8)
+                            .Text("Ranking").SemiBold().FontSize(11).FontColor(ReportThemeColors.GrayTailwind800);
+                        header.Cell().Background(ReportThemeColors.Gray100).Padding(8).AlignRight()
+                            .Text("Result").SemiBold().FontSize(11).FontColor(ReportThemeColors.GrayTailwind800);
+                    });
+
+                    void Row(string label, string value, bool shade)
+                    {
+                        var background = shade ? ReportThemeColors.Gray50 : ReportThemeColors.White;
+                        table.Cell().Background(background).BorderTop(1).BorderColor(ReportThemeColors.Gray300).Padding(8)
+                            .Text(label).FontSize(11).FontColor(ReportThemeColors.GrayTailwind700);
+                        table.Cell().Background(background).BorderTop(1).BorderColor(ReportThemeColors.Gray300).Padding(8).AlignRight()
+                            .Text(value).FontSize(11).Bold().FontColor(ReportThemeColors.GrayTailwind900);
+                    }
+
+                    Row("Continent Rank", FormatRank(data?.GlobalPillarRank ?? 0, data?.TotalPillarsInAllCountries ?? 0), false);
+                    Row($"{data?.Region} Region Rank", FormatRank(data?.RegionPillarRank ?? 0, data?.TotalPillarInRegion ?? 0), true);
+                    Row("Country Level Rank", FormatRank(data?.CountryPillarRank ?? 0, data?.TotalPillars ?? 0), false);
+                });
+        }
         static void DrawTableHeader(TableDescriptor table, string[] headers)
         {
             foreach (string h in headers)
-                table.Cell().Background("#12352f").Padding(5)
+                table.Cell().Background(ReportThemeColors.PdfDarkGreen).Padding(5)
                     .Text(h).FontSize(8).Bold().FontColor(Colors.White);
         }
 
@@ -3706,7 +3703,7 @@ namespace PeaceEnablers.Common.Implementation
         }
 
         static string ScoreColor(float score) =>
-            score >= 70 ? "#336b58" : score >= 40 ? "#f5a623" : "#e05252";
+            score >= 70 ? ReportThemeColors.PdfMediumGreen : score >= 40 ? ReportThemeColors.ChartAmber : ReportThemeColors.ChartRed;
 
         static string DeriveRole(PeerCountryHistoryReportDto country)
         {

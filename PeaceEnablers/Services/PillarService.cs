@@ -797,8 +797,13 @@ namespace PeaceEnablers.Services
                             .ToList(); // materialize once
 
                         var count = userData.Count;
+                        var filteredData = userData
+                        .Where(x => x.Value.Score != null)
+                        .Select(x => Convert.ToDecimal(x.Value.Score));
 
-                        decimal score = 0;
+                        decimal score = filteredData.Any()
+                      ? filteredData.Average()
+                      : 0m;
 
                         if (count > 0)
                         {
@@ -935,19 +940,19 @@ namespace PeaceEnablers.Services
                 // =========================
                 // 2. AI DATA
                 // =========================
-                var aiDataList = await _context.AIPillarScores
-                    .Where(x => x.CountryID == request.CountryID
-                        && (!request.PillarID.HasValue || x.PillarID == request.PillarID)
-                        && x.Year == year)
-                    .GroupBy(x => x.PillarID)
-                    .Select(g => new
-                    {
-                        PillarID = g.Key,
-                        Score = g.Sum(x => x.AIScore ?? 0),
-                        ScoreProgress = g.Average(x => x.AIProgress ?? 0),
-                        Count = g.Count()
-                    })
-                    .ToListAsync();
+                var aiDataList = await _context.AIEstimatedQuestionScores
+                     .Where(x => x.CountryID == request.CountryID
+                         && (!request.PillarID.HasValue || x.PillarID == request.PillarID)
+                         && x.Year == year)
+                     .GroupBy(x => x.PillarID)
+                     .Select(g => new
+                     {
+                         PillarID = g.Key,
+                         Score = g.Sum(x => x.AIScore ?? 0),
+                         ScoreProgress = g.Average(x => x.AIScore ?? 0),
+                         Count = _context.AIEstimatedQuestionScores.Where(x => x.PillarID == g.Key && x.CountryID == request.CountryID && x.Year == year).Count()
+                     })
+                     .ToListAsync();
 
 
                 // =========================
@@ -996,8 +1001,7 @@ namespace PeaceEnablers.Services
                             {
                                 var responses = userGroup
                                     .SelectMany(x => x.Responses)
-                                    .Where(r => r.Score.HasValue &&
-                                                (int)r.Score.Value <= (int)ScoreValue.Four)
+                                    .Where(r => r.Score.HasValue)
                                     .ToList();
 
                                 var score = responses.Sum(r => (int?)r.Score ?? 0);

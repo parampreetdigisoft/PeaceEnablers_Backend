@@ -249,7 +249,7 @@ namespace PeaceEnablers.Services
                     Region = country.Region,
                     RegionRank= country.RegionRank,
                     TotalCountry = country.TotalCountry,
-                    TotalCountryInRegion = country.TotalCountryInRegion,
+                    TotalPillarInRegion = country.TotalPillarInRegion,
                     Pillars = pillars.OrderBy(p => p.DisplayOrder).ToList()
                 };
 

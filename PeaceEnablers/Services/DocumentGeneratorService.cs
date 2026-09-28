@@ -3,6 +3,7 @@ using AssessmentPlatform.Dtos.AiDto;
 using AssessmentPlatform.Models;
 using PeaceEnablers.Common.Interface;
 using PeaceEnablers.Dtos.AiDto;
+using PeaceEnablers.Dtos.CountryDto;
 using PeaceEnablers.IServices;
 using PeaceEnablers.Models;
 using static PeaceEnablers.Services.AIComputationService;
@@ -61,5 +62,14 @@ namespace PeaceEnablers.Services
             => format == PeaceEnablers.IServices.DocumentFormat.Docx
                 ? _docx.GenerateAllCountriesDetailsDocx(countries, pillarsDict, kpis, userRole)
                 : _pdf.GenerateAllCountriesDetailsPdf(countries, pillarsDict, kpis, userRole);
+
+        public Task<byte[]> GenerateSelectedPillarDetails(
+            List<AiCountryPillarResponse> pillars,
+            List<CountryPillarRankingResultDto> pillarRankings,
+            UserRole userRole,
+            PeaceEnablers.IServices.DocumentFormat format = PeaceEnablers.IServices.DocumentFormat.Pdf)
+            => format == PeaceEnablers.IServices.DocumentFormat.Docx
+                ? _docx.GenerateSelectedPillarsDetailsDocx(pillars, pillarRankings, userRole)
+                : _pdf.GenerateSelectedPillarsDetailsPdf(pillars, pillarRankings, userRole);
     }
 }

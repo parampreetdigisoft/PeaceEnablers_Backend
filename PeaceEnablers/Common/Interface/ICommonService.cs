@@ -14,6 +14,7 @@ namespace PeaceEnablers.Common.Interface
         Task<List<GetPillarDto>> GetPillars();
         void ClearPillarCache();
         Task<ResultResponseDto<bool>> RevokeCountriesPermission(List<int> countryIds, int userID, int year);
+        Task<List<CountryPillarRankingResultDto>> GetCountriesPillarRankingAsync(int countryID = 0, int year = 0);
 
     }
 }
